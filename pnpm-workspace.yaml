@@ -1,0 +1,9 @@
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - svelte@5.56.7
+  - daisyui@5.7.0
+onlyBuiltDependencies:
+  - "@prisma/client"
+  - better-sqlite3
+  - esbuild

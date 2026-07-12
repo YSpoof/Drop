@@ -1,0 +1,49 @@
+{
+  "name": "Drop",
+  "short_name": "Drop",
+  "description": "Compartilhe arquivos de forma simplificada",
+  "lang": "pt-BR",
+  "start_url": "/?utm_medium=PWA&utm_source=launcher",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#356DFF",
+  "icons": [
+    {
+      "src": "/images/pwa/192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/pwa/512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/pwa/narrow.webp",
+      "type": "image/webp",
+      "sizes": "720x1280",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/images/pwa/wide.webp",
+      "type": "image/webp",
+      "sizes": "1280x720",
+      "form_factor": "wide"
+    }
+  ],
+  "share_target": {
+    "action": "/web-share-catcher/?utm_medium=PWA&utm_source=share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": {
+        "name": "files",
+        "accept": ["*/*"]
+      }
+    }
+  }
+}

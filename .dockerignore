@@ -1,0 +1,14 @@
+.git
+.cursor
+.husky
+.pnpm-store
+.svelte-kit
+.vscode
+build
+data
+node_modules
+.dockerignore
+.gitignore
+.oxfmtrc.json
+drizzle.config.ts
+README.md

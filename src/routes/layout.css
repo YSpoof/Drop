@@ -1,0 +1,140 @@
+@import "tailwindcss";
+@plugin "daisyui/index.js";
+
+@font-face {
+  font-family: "Open Sans";
+  src: url("/open-sans-italic.woff2") format("woff2");
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Open Sans";
+  src: url("/open-sans.woff2") format("woff2");
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@theme {
+  --animate-fade-in-scale: fade-in-scale 1.2s ease-in-out infinite alternate;
+  @keyframes fade-in-scale {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+@plugin "daisyui/theme/index.js" {
+  name: "light";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(98% 0 0);
+  --color-base-200: oklch(96% 0 0);
+  --color-base-300: oklch(93% 0 0);
+  --color-base-content: oklch(0.3715 0 0);
+  --color-primary: oklch(60% 0.243 264.376);
+  --color-primary-content: oklch(93% 0.032 255.585);
+  --color-secondary: oklch(48% 0.243 264.376);
+  --color-secondary-content: oklch(93% 0.034 272.788);
+  --color-accent: oklch(78% 0.154 211.53);
+  --color-accent-content: oklch(30% 0.056 229.695);
+  --color-neutral: oklch(14% 0.005 285.823);
+  --color-neutral-content: oklch(92% 0.004 286.32);
+  --color-info: oklch(74% 0.16 232.661);
+  --color-info-content: oklch(29% 0.066 243.157);
+  --color-success: oklch(77.61% 0.198 145.69);
+  --color-success-content: oklch(27% 0.072 132.109);
+  --color-warning: oklch(82% 0.189 84.429);
+  --color-warning-content: oklch(27% 0.077 45.635);
+  --color-error: oklch(71% 0.194 13.428);
+  --color-error-content: oklch(27% 0.105 12.094);
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme/index.js" {
+  name: "dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(14% 0.005 285.823);
+  --color-base-200: oklch(21% 0.006 285.885);
+  --color-base-300: oklch(27% 0.006 286.033);
+  --color-base-content: oklch(0.8699 0 0);
+  --color-primary: oklch(60% 0.243 264.376);
+  --color-primary-content: oklch(93% 0.032 255.585);
+  --color-secondary: oklch(48% 0.243 264.376);
+  --color-secondary-content: oklch(93% 0.034 272.788);
+  --color-accent: oklch(78% 0.154 211.53);
+  --color-accent-content: oklch(30% 0.056 229.695);
+  --color-neutral: oklch(87% 0.006 286.286);
+  --color-neutral-content: oklch(14% 0.005 285.823);
+  --color-info: oklch(74% 0.16 232.661);
+  --color-info-content: oklch(29% 0.066 243.157);
+  --color-success: oklch(0.7761 0.1979 145.69);
+  --color-success-content: oklch(27% 0.072 132.109);
+  --color-warning: oklch(82% 0.189 84.429);
+  --color-warning-content: oklch(27% 0.077 45.635);
+  --color-error: oklch(71% 0.194 13.428);
+  --color-error-content: oklch(27% 0.105 12.094);
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1.5px;
+  --depth: 0;
+  --noise: 0;
+}
+
+:root {
+  interpolate-size: allow-keywords;
+}
+
+html {
+  @apply scrollbar-thumb-base-content scrollbar-track-base-100 dark:scrollbar-track-base-300 scrollbar-thin scroll-smooth overflow-x-clip;
+  font-family: "Open Sans", sans-serif;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+@layer utilities {
+  .rounded {
+    border-radius: var(--radius-box);
+  }
+}
+
+.card {
+  view-transition-name: var(--cardId);
+
+  transition:
+    opacity 0.3s ease,
+    translate 0.3s ease;
+  transition-delay: calc((sibling-index() - 1) * 0.05s);
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 20px;
+  }
+}
