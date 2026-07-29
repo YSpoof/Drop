@@ -8,6 +8,10 @@
   import { appState } from "$lib/stores/appState.svelte";
   import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
   import { toastStore } from "$lib/stores/toast.svelte";
+  import {
+    closeAutoConnectBackgroundNotify,
+    notifyAutoConnectBackground,
+  } from "$lib/utils/device/backgroundNotify";
   import { releaseWakeLock, requestWakeLock } from "$lib/utils/device/wakelock";
   import { createQueuedFile } from "$lib/utils/files/queue";
   import { ensureServiceWorkerReady } from "$lib/utils/files/swDownload";
@@ -75,6 +79,9 @@
   $effect(() => {
     if (visibilityState === "visible") {
       void requestWakeLock();
+      closeAutoConnectBackgroundNotify();
+    } else if (visibilityState === "hidden" && appState.autoKey) {
+      notifyAutoConnectBackground();
     }
   });
 
@@ -86,6 +93,7 @@
     if (appState.connectionModalOpen) lazyLoad.mark("connectionRequest");
     if (appState.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
     if (appState.autoKey) lazyLoad.mark("autoKeyShare");
+    if (appState.autoKeyNotifyModalOpen) lazyLoad.mark("autoKeyNotify");
     if (appState.enterKeyModalOpen) lazyLoad.mark("autoKeyEnter");
     if (appState.inRoomModalOpen) lazyLoad.mark("inRoom");
   });
@@ -201,6 +209,17 @@
     await import("$lib/components/modals/UnsupportedBrowserModal.svelte")
   ).default}
   <UnsupportedBrowserModal />
+{/if}
+
+{#if lazyLoad.has("autoKeyNotify")}
+  {const AutoKeyNotifyPermissionModal = (
+    await import("$lib/components/modals/AutoKeyNotifyPermissionModal.svelte")
+  ).default}
+  <AutoKeyNotifyPermissionModal
+    open={appState.autoKeyNotifyModalOpen}
+    denied={appState.autoKeyNotifyDenied}
+    onClose={() => session.handleAutoKeyNotifyClose()}
+    onContinue={() => session.handleAutoKeyNotifyContinue()} />
 {/if}
 
 {#if lazyLoad.has("autoKeyShare") && appState.autoKey}

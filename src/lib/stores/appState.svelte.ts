@@ -36,6 +36,8 @@ class AppState {
   unsupportedBrowserModalOpen = $state(false);
   autoKey = $state<string | null>(null);
   autoKeyModalOpen = $state(false);
+  autoKeyNotifyModalOpen = $state(false);
+  autoKeyNotifyDenied = $state(false);
   enterKeyModalOpen = $state(false);
   enterKeyPeer = $state<PeerInfo | null>(null);
   inRoomModalOpen = $state(false);

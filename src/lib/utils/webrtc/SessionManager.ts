@@ -1,5 +1,6 @@
 import { appState } from "$lib/stores/appState.svelte";
 import { toastStore } from "$lib/stores/toast.svelte";
+import { ensureNotificationPermission } from "$lib/utils/device/backgroundNotify";
 import type { QueuedFile } from "$lib/utils/files/queue";
 import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
 import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
@@ -471,6 +472,28 @@ export class SessionManager {
       return;
     }
 
+    appState.autoKeyNotifyDenied = false;
+    appState.autoKeyNotifyModalOpen = true;
+  }
+
+  async handleAutoKeyNotifyContinue() {
+    const granted = await ensureNotificationPermission();
+    if (!granted) {
+      appState.autoKeyNotifyDenied = true;
+      return;
+    }
+
+    appState.autoKeyNotifyModalOpen = false;
+    appState.autoKeyNotifyDenied = false;
+    await this.enableAutoKey();
+  }
+
+  handleAutoKeyNotifyClose() {
+    appState.autoKeyNotifyModalOpen = false;
+    appState.autoKeyNotifyDenied = false;
+  }
+
+  private async enableAutoKey() {
     const stored = await localForage.getItem<string>(AUTO_KEY_STORAGE_KEY);
     const key = stored ?? this.generateAutoKey();
     if (!stored) {
