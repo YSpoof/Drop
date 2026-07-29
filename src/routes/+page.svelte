@@ -8,7 +8,7 @@
   import { appState } from "$lib/stores/appState.svelte";
   import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
   import { toastStore } from "$lib/stores/toast.svelte";
-  import { requestWakeLock } from "$lib/utils/device/wakelock";
+  import { releaseWakeLock, requestWakeLock } from "$lib/utils/device/wakelock";
   import { createQueuedFile } from "$lib/utils/files/queue";
   import { ensureServiceWorkerReady } from "$lib/utils/files/swDownload";
   import { consumeSharedRecords } from "$lib/utils/files/webShare";
@@ -73,7 +73,7 @@
   }
 
   $effect(() => {
-    if (visibilityState === "visible" && appState.connectedPeerId) {
+    if (visibilityState === "visible") {
       void requestWakeLock();
     }
   });
@@ -91,6 +91,8 @@
   });
 
   onMount(async () => {
+    void requestWakeLock();
+
     const inRoom = !!room;
     const swAvailable = await ensureServiceWorkerReady();
     if (!swAvailable) {
@@ -134,6 +136,7 @@
   });
 
   onDestroy(() => {
+    void releaseWakeLock();
     session.destroy();
     unregisterSession(session);
   });

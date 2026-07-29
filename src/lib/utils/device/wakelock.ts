@@ -1,15 +1,7 @@
 let sentinel: WakeLockSentinel | null = null;
-let shouldHoldLock = false;
-
-export function setWakeLockConnected(connected: boolean) {
-  shouldHoldLock = connected;
-  if (!connected) {
-    void releaseWakeLock();
-  }
-}
 
 export async function requestWakeLock(): Promise<WakeLockSentinel | null> {
-  if (!("wakeLock" in navigator) || document.visibilityState !== "visible" || !shouldHoldLock) {
+  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") {
     return null;
   }
 
@@ -19,7 +11,7 @@ export async function requestWakeLock(): Promise<WakeLockSentinel | null> {
     sentinel = await navigator.wakeLock.request("screen");
     sentinel.addEventListener("release", () => {
       sentinel = null;
-      if (shouldHoldLock && document.visibilityState === "visible") {
+      if (document.visibilityState === "visible") {
         void requestWakeLock();
       }
     });

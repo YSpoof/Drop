@@ -1,6 +1,5 @@
 import { appState } from "$lib/stores/appState.svelte";
 import { toastStore } from "$lib/stores/toast.svelte";
-import { releaseWakeLock, requestWakeLock, setWakeLockConnected } from "$lib/utils/device/wakelock";
 import type { QueuedFile } from "$lib/utils/files/queue";
 import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
 import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
@@ -223,9 +222,6 @@ export class SessionManager {
     if (this.peerDisconnectHandled) return;
     this.peerDisconnectHandled = true;
 
-    setWakeLockConnected(false);
-    void releaseWakeLock();
-
     appState.resetTransferState();
     this.clearPendingBatchCompletions();
     this.transferManager?.abort();
@@ -267,9 +263,6 @@ export class SessionManager {
       this.peerDisconnectHandled = false;
       toastStore.showToast("Conectado", "success");
       this.suspendSignaling();
-
-      setWakeLockConnected(true);
-      void requestWakeLock();
 
       let chunkSize: number;
       try {
@@ -656,16 +649,11 @@ export class SessionManager {
       pc.onConnectionStateChange = null;
       pc.close();
     }
-
-    setWakeLockConnected(false);
-    void releaseWakeLock();
   }
 
   destroy() {
     this.transferManager?.abort();
     this.transferManager = null;
-    setWakeLockConnected(false);
-    void releaseWakeLock();
     this.signaling.disconnect();
     this.peerConnection?.close();
     if (this.queueNotifyDelayTimeout) {
