@@ -38,7 +38,8 @@ export type ClientMessage =
       type: "ice-candidate";
       targetPeerId: string;
       candidate: RTCIceCandidateInit;
-    };
+    }
+  | { type: "ping" };
 
 export type ServerMessage =
   | PeerListMessage
@@ -62,4 +63,5 @@ export type ServerMessage =
       type: "ice-candidate";
       fromPeerId: string;
       candidate: RTCIceCandidateInit;
-    };
+    }
+  | { type: "pong" };

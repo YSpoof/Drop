@@ -76,6 +76,16 @@
     session.handleAutoKeyClick();
   }
 
+  function handleOnline() {
+    session.wakeSignaling("online");
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === "visible") {
+      session.wakeSignaling("visibility");
+    }
+  }
+
   $effect(() => {
     if (visibilityState === "visible") {
       void requestWakeLock();
@@ -251,4 +261,7 @@
     onClose={() => (appState.inRoomModalOpen = false)} />
 {/if}
 
-<svelte:document bind:visibilityState />
+<svelte:window ononline={handleOnline} />
+<svelte:document
+  bind:visibilityState
+  onvisibilitychange={handleVisibilityChange} />

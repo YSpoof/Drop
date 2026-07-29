@@ -183,6 +183,10 @@ function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
       });
       break;
     }
+    case "ping": {
+      send(ws, { type: "pong" });
+      break;
+    }
   }
 }
 

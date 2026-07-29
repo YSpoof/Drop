@@ -5,6 +5,7 @@ import type { QueuedFile } from "$lib/utils/files/queue";
 import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
 import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
 import { localForage } from "$lib/utils/localForage";
+import { logger } from "$lib/utils/logger";
 import { SignalingClient } from "$lib/utils/signaling/client";
 import type { PeerInfo } from "$lib/utils/signaling/types";
 import { resolveChunkSize } from "$lib/utils/webrtc/chunkSize";
@@ -108,14 +109,17 @@ export class SessionManager {
 
   announce() {
     if (!this.signaling.isConnected()) return;
+    const room = this.getRoom();
+    const hasAutoKey = !!appState.autoKey;
+    logger.log(`(Room) announce room=${room ?? ""} hasAutoKey=${hasAutoKey}`);
     this.signaling.announce({
       type: "announce",
       peerId: appState.identity.peerId,
       displayName: appState.displayName,
       deviceHint: appState.identity.deviceHint,
-      room: this.getRoom(),
+      room,
       localIps: appState.localIps,
-      hasAutoKey: !!appState.autoKey,
+      hasAutoKey,
     });
   }
 
@@ -214,17 +218,21 @@ export class SessionManager {
   }
 
   private suspendSignaling() {
+    logger.log("(Room) suspend");
     this.signaling.suspend();
     appState.peers = [];
   }
 
   private async resumeSignaling() {
+    logger.log("(Room) resume");
     this.signaling.resume();
   }
 
   private cleanupPeerConnection() {
     if (this.peerDisconnectHandled) return;
     this.peerDisconnectHandled = true;
+
+    logger.log("(Room) peer disconnect");
 
     appState.resetTransferState();
     this.clearPendingBatchCompletions();
@@ -265,6 +273,7 @@ export class SessionManager {
       appState.connectedPeerId = targetPeerId;
       appState.connectingPeerId = null;
       this.peerDisconnectHandled = false;
+      logger.log("(Room) peer connect");
       toastStore.showToast("Conectado", "success");
       this.suspendSignaling();
 
@@ -553,8 +562,13 @@ export class SessionManager {
   }
 
   async joinSignaling() {
+    logger.log("(Room) joinSignaling");
     appState.localIps = appState.localIps.length > 0 ? appState.localIps : await discoverLocalIps();
     this.announce();
+  }
+
+  wakeSignaling(reason: "online" | "visibility") {
+    this.signaling.wakeReconnect(reason);
   }
 
   connect() {
