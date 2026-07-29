@@ -8,9 +8,10 @@
     autoKey: string;
     onClose: () => void;
     onCopy: () => void | Promise<void>;
+    onRegenerate: () => void | Promise<void>;
   }
 
-  let { open, autoKey, onClose, onCopy }: Props = $props();
+  let { open, autoKey, onClose, onCopy, onRegenerate }: Props = $props();
 
   let cantClose = $state(true);
 
@@ -19,6 +20,11 @@
     cantClose = false;
     await onCopy();
     onClose();
+  }
+
+  async function handleRegenerate() {
+    vibrate.light();
+    await onRegenerate();
   }
 </script>
 
@@ -44,6 +50,13 @@
 
   {#snippet modalActions()}
     <button
+      type="button"
+      class="btn btn-ghost"
+      onclick={handleRegenerate}>
+      Gerar nova chave
+    </button>
+    <button
+      type="button"
       class="btn btn-primary"
       onclick={handleCopyAndClose}>
       Copiar e fechar

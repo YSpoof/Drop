@@ -3,6 +3,7 @@ import { toastStore } from "$lib/stores/toast.svelte";
 import type { QueuedFile } from "$lib/utils/files/queue";
 import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
 import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
+import { localForage } from "$lib/utils/localForage";
 import { SignalingClient } from "$lib/utils/signaling/client";
 import type { PeerInfo } from "$lib/utils/signaling/types";
 import { resolveChunkSize } from "$lib/utils/webrtc/chunkSize";
@@ -12,6 +13,8 @@ import {
   TransferManager,
   type TransferProgress as TransferProgressState,
 } from "$lib/utils/webrtc/transfer";
+
+const AUTO_KEY_STORAGE_KEY = "autoKey";
 
 type PendingBatchCompletion = {
   direction: HistoryEntry["direction"];
@@ -459,7 +462,7 @@ export class SessionManager {
     }
   }
 
-  handleAutoKeyClick() {
+  async handleAutoKeyClick() {
     if (appState.autoKey) {
       appState.autoKey = null;
       appState.autoKeyModalOpen = false;
@@ -467,9 +470,23 @@ export class SessionManager {
       toastStore.showToast("Auto-conexão desativada", "info");
       return;
     }
-    appState.autoKey = this.generateAutoKey();
+
+    const stored = await localForage.getItem<string>(AUTO_KEY_STORAGE_KEY);
+    const key = stored ?? this.generateAutoKey();
+    if (!stored) {
+      await localForage.setItem(AUTO_KEY_STORAGE_KEY, key);
+    }
+    appState.autoKey = key;
     this.announce();
     appState.autoKeyModalOpen = true;
+  }
+
+  async regenerateAutoKey() {
+    const key = this.generateAutoKey();
+    await localForage.setItem(AUTO_KEY_STORAGE_KEY, key);
+    appState.autoKey = key;
+    this.announce();
+    toastStore.showToast("Nova chave gerada", "success");
   }
 
   handleAutoKeyModalClose() {

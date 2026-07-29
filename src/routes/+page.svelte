@@ -210,7 +210,8 @@
     open={appState.autoKeyModalOpen}
     autoKey={appState.autoKey}
     onClose={() => session.handleAutoKeyModalClose()}
-    onCopy={() => session.copyAutoKey()} />
+    onCopy={() => session.copyAutoKey()}
+    onRegenerate={() => session.regenerateAutoKey()} />
 {/if}
 
 {#if lazyLoad.has("autoKeyEnter")}
