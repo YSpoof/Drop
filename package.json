@@ -9,13 +9,11 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo '' && husky",
     "precommit": "lint-staged",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "start": "node build/server.js"
   },
   "dependencies": {
-    "client-zip": "^2.5.0",
-    "localforage": "^1.10.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
@@ -26,9 +24,12 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.1.2",
     "@types/ws": "^8.18.1",
-    "daisyui": "^5.7.4",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "client-zip": "^2.5.0",
+    "daisyui": "^5.7.7",
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",
+    "localforage": "^1.10.0",
     "oxfmt": "^0.61.0",
     "svelte": "^5.56.8",
     "svelte-check": "^4.7.4",
