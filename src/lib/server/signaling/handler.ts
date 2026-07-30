@@ -14,7 +14,6 @@ interface StoredPeer {
   localIps: string[];
   subnets: string[];
   publicIp: string;
-  hasAutoKey?: boolean;
 }
 
 const peers = new Map<string, StoredPeer>();
@@ -54,7 +53,6 @@ function toPeerInfo(peer: StoredPeer, nearby: boolean): PeerInfo {
     deviceHint: peer.deviceHint,
     room: peer.room,
     nearby,
-    hasAutoKey: peer.hasAutoKey,
   };
 }
 
@@ -128,7 +126,6 @@ function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
         localIps: message.localIps,
         subnets,
         publicIp,
-        hasAutoKey: message.hasAutoKey,
       });
       broadcastPeerLists();
       break;
@@ -139,7 +136,7 @@ function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
       send(target.ws, {
         type: "connect-request",
         requester: toPeerInfo(sender, areNearby(sender, target)),
-        autoKey: message.autoKey,
+        roomCode: message.roomCode,
       });
       break;
     }

@@ -1,4 +1,4 @@
-const AUTO_CONNECT_NOTIFY_TAG = "drop-auto-connect-background";
+const HOST_NOTIFY_TAG = "drop-host-background";
 
 let lastNotification: Notification | null = null;
 
@@ -11,19 +11,24 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   return result === "granted";
 }
 
-export function notifyAutoConnectBackground(): void {
+export function notifyHostBackground(): void {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
 
   lastNotification?.close();
-  lastNotification = new Notification("Auto-conexão INATIVA", {
-    body: "O Drop só funciona com o app aberto em primeiro plano.",
-    icon: "/static/images/pwa/192.png",
+  lastNotification = new Notification("Mantenha o Drop aberto", {
+    body: "O compartilhamento via link só funciona em primeiro plano.",
+    icon: "/favicon.svg",
     requireInteraction: true,
-    tag: AUTO_CONNECT_NOTIFY_TAG,
+    tag: HOST_NOTIFY_TAG,
   });
+  lastNotification.onclick = () => {
+    globalThis.focus();
+    lastNotification?.close();
+    lastNotification = null;
+  };
 }
 
-export function closeAutoConnectBackgroundNotify(): void {
+export function closeHostBackgroundNotify(): void {
   lastNotification?.close();
   lastNotification = null;
 }

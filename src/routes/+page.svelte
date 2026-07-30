@@ -9,8 +9,9 @@
   import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
   import { toastStore } from "$lib/stores/toast.svelte";
   import {
-    closeAutoConnectBackgroundNotify,
-    notifyAutoConnectBackground,
+    closeHostBackgroundNotify,
+    ensureNotificationPermission,
+    notifyHostBackground,
   } from "$lib/utils/device/backgroundNotify";
   import { releaseWakeLock, requestWakeLock } from "$lib/utils/device/wakelock";
   import { createQueuedFile } from "$lib/utils/files/queue";
@@ -22,58 +23,96 @@
   import { onDestroy, onMount, tick } from "svelte";
 
   const room = $derived(page.url.searchParams.get("room") ?? undefined);
+  const autoParam = $derived(page.url.searchParams.get("auto") ?? undefined);
+  const isHost = $derived(page.url.searchParams.get("host") === appState.identity.peerId);
+  const inRoom = $derived(!!room);
+  const shareMode = $derived<"manual" | "auto" | null>(autoParam ? "auto" : room ? "manual" : null);
+  const shareLink = $derived(inRoom ? page.url.href : null);
 
   const session = new SessionManager({
-    getRoom: () => room,
+    getRoom: () => page.url.searchParams.get("room") ?? undefined,
+    getRoomCode: () => page.url.searchParams.get("auto") ?? undefined,
   });
   registerSession(session);
 
   let visibilityState = $state(document.visibilityState);
+  let shareModalOpen = $state(false);
+  let shareNotifyModalOpen = $state(false);
+  let shareNotifyDenied = $state(false);
 
   function generateRoomId() {
     return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   }
 
-  async function shareRoom() {
+  function handleRoomClick() {
+    vibrate.light();
+    if (inRoom) {
+      shareModalOpen = true;
+      return;
+    }
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      shareModalOpen = true;
+      return;
+    }
+    shareNotifyDenied = false;
+    shareNotifyModalOpen = true;
+  }
+
+  async function handleShareNotifyContinue() {
+    const granted = await ensureNotificationPermission();
+    if (granted) {
+      shareNotifyModalOpen = false;
+      shareModalOpen = true;
+      return;
+    }
+    shareNotifyDenied = true;
+  }
+
+  async function applyShareParams(mode: "manual" | "auto") {
     vibrate.light();
 
-    let roomId = room;
-    if (!roomId) {
-      roomId = generateRoomId();
-      await goto(`?room=${roomId}`, { keepFocus: true, noScroll: true });
-      await tick();
-    }
-
+    const roomId = room ?? generateRoomId();
     const url = new URL(page.url);
     url.searchParams.set("room", roomId);
+    url.searchParams.set("host", appState.identity.peerId);
 
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      toastStore.showToast("Link copiado", "success");
-      session.announce();
-    } catch {
-      toastStore.showToast("Não foi possível copiar o link", "error");
+    if (mode === "auto") {
+      url.searchParams.set("auto", session.generateRoomCode());
+    } else {
+      url.searchParams.delete("auto");
     }
+
+    await goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
+    await tick();
+    session.announce();
+  }
+
+  function chooseManualShare() {
+    return applyShareParams("manual");
+  }
+
+  function chooseAutoShare() {
+    return applyShareParams("auto");
   }
 
   async function leaveRoom() {
     vibrate.light();
     if (!room) return;
 
+    shareModalOpen = false;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     if (appState.connectedPeerId) session.disconnectPeer();
 
     const url = new URL(page.url);
     url.searchParams.delete("room");
+    url.searchParams.delete("host");
+    url.searchParams.delete("auto");
     const target = url.search ? `${url.pathname}${url.search}` : url.pathname;
     await goto(target, { keepFocus: true, noScroll: true });
     await tick();
     session.announce();
     toastStore.showToast("Saiu da sala", "info");
-  }
-
-  function handleAutoKeyClick() {
-    vibrate.light();
-    session.handleAutoKeyClick();
   }
 
   function handleOnline() {
@@ -89,29 +128,38 @@
   $effect(() => {
     if (visibilityState === "visible") {
       void requestWakeLock();
-      closeAutoConnectBackgroundNotify();
-    } else if (visibilityState === "hidden" && appState.autoKey) {
-      notifyAutoConnectBackground();
+      closeHostBackgroundNotify();
+    } else if (visibilityState === "hidden" && isHost && room) {
+      notifyHostBackground();
     }
+  });
+
+  $effect(() => {
+    room;
+    session.announce();
   });
 
   $effect(() => {
     session.setManualDownload(!appState.autoDownload);
   });
 
+  $effect(() => {
+    if (appState.roomJoinOpen && appState.connectedPeerId) {
+      session.finishRoomJoinSuccess();
+    }
+  });
+
   $effect.pre(() => {
     if (appState.connectionModalOpen) lazyLoad.mark("connectionRequest");
     if (appState.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
-    if (appState.autoKey) lazyLoad.mark("autoKeyShare");
-    if (appState.autoKeyNotifyModalOpen) lazyLoad.mark("autoKeyNotify");
-    if (appState.enterKeyModalOpen) lazyLoad.mark("autoKeyEnter");
-    if (appState.inRoomModalOpen) lazyLoad.mark("inRoom");
+    if (shareModalOpen) lazyLoad.mark("shareLink");
+    if (shareNotifyModalOpen) lazyLoad.mark("shareNotify");
+    if (appState.roomJoinOpen) lazyLoad.mark("roomJoin");
   });
 
   onMount(async () => {
     void requestWakeLock();
 
-    const inRoom = !!room;
     const swAvailable = await ensureServiceWorkerReady();
     if (!swAvailable) {
       appState.unsupportedBrowserModalOpen = true;
@@ -148,8 +196,11 @@
       console.error("Failed to recover shared files", e);
     }
 
-    if (inRoom) {
-      appState.inRoomModalOpen = true;
+    const roomId = page.url.searchParams.get("room");
+    const hostId = page.url.searchParams.get("host");
+    const auto = page.url.searchParams.get("auto") ?? undefined;
+    if (roomId && hostId !== appState.identity.peerId) {
+      session.startRoomJoin(auto ? "auto" : "ask", auto);
     }
   });
 
@@ -163,16 +214,14 @@
 <div class="flex flex-col gap-6 py-6">
   <DeviceList
     peers={appState.displayPeers}
-    inRoom={!!room}
-    hasAutoKey={!!appState.autoKey}
+    {inRoom}
+    pollingStopped={appState.roomJoinPhase === "failed"}
     connectingPeerId={appState.connectingPeerId}
     connectedPeerId={appState.connectedPeerId}
     connected={appState.connected}
     onConnect={(id) => session.handleConnect(id)}
     onDisconnect={() => session.disconnectPeer()}
-    onRoomClick={() => (room ? leaveRoom() : shareRoom())}
-    onAutoKeyClick={handleAutoKeyClick}
-    onAutoConnect={(id) => session.handleAutoConnectClick(id)} />
+    onRoomClick={handleRoomClick} />
 
   <div class="grid min-w-0 gap-6 lg:grid-cols-2">
     <div class="flex flex-col gap-4 lg:col-span-1">
@@ -221,44 +270,37 @@
   <UnsupportedBrowserModal />
 {/if}
 
-{#if lazyLoad.has("autoKeyNotify")}
-  {const AutoKeyNotifyPermissionModal = (
-    await import("$lib/components/modals/AutoKeyNotifyPermissionModal.svelte")
+{#if lazyLoad.has("shareNotify")}
+  {const ShareNotifyPermissionModal = (
+    await import("$lib/components/modals/ShareNotifyPermissionModal.svelte")
   ).default}
-  <AutoKeyNotifyPermissionModal
-    open={appState.autoKeyNotifyModalOpen}
-    denied={appState.autoKeyNotifyDenied}
-    onClose={() => session.handleAutoKeyNotifyClose()}
-    onContinue={() => session.handleAutoKeyNotifyContinue()} />
+  <ShareNotifyPermissionModal
+    open={shareNotifyModalOpen}
+    denied={shareNotifyDenied}
+    onClose={() => (shareNotifyModalOpen = false)}
+    onContinue={handleShareNotifyContinue} />
 {/if}
 
-{#if lazyLoad.has("autoKeyShare") && appState.autoKey}
-  {const AutoKeyShareModal = (await import("$lib/components/modals/AutoKeyShareModal.svelte"))
-    .default}
-  <AutoKeyShareModal
-    open={appState.autoKeyModalOpen}
-    autoKey={appState.autoKey}
-    onClose={() => session.handleAutoKeyModalClose()}
-    onCopy={() => session.copyAutoKey()}
-    onRegenerate={() => session.regenerateAutoKey()} />
+{#if lazyLoad.has("shareLink")}
+  {const ShareLinkModal = (await import("$lib/components/modals/ShareLinkModal.svelte")).default}
+  <ShareLinkModal
+    open={shareModalOpen}
+    {inRoom}
+    mode={shareMode}
+    link={shareLink}
+    onSelectManual={chooseManualShare}
+    onSelectAuto={chooseAutoShare}
+    onLeaveRoom={leaveRoom}
+    onClose={() => (shareModalOpen = false)} />
 {/if}
 
-{#if lazyLoad.has("autoKeyEnter")}
-  {const AutoKeyEnterModal = (await import("$lib/components/modals/AutoKeyEnterModal.svelte"))
-    .default}
-  <AutoKeyEnterModal
-    open={appState.enterKeyModalOpen}
-    peer={appState.enterKeyPeer}
-    onClose={() => session.handleEnterKeyModalClose()}
-    onSubmit={(key) => session.handleEnterKeySubmit(key)}
-    onNoKey={() => session.handleEnterKeyNoKey()} />
-{/if}
-
-{#if lazyLoad.has("inRoom")}
-  {const InRoomModal = (await import("$lib/components/modals/InRoomModal.svelte")).default}
-  <InRoomModal
-    open={appState.inRoomModalOpen}
-    onClose={() => (appState.inRoomModalOpen = false)} />
+{#if lazyLoad.has("roomJoin")}
+  {const RoomJoinModal = (await import("$lib/components/modals/RoomJoinModal.svelte")).default}
+  <RoomJoinModal
+    open={appState.roomJoinOpen}
+    phase={appState.roomJoinPhase}
+    peerName={appState.connectedPeerInfo?.displayName}
+    onClose={() => session.cancelRoomJoin()} />
 {/if}
 
 <svelte:window ononline={handleOnline} />

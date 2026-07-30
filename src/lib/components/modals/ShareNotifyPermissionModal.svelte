@@ -28,7 +28,7 @@
   onClose={handleClose}>
   {#if denied}
     <p class="text-base-content/80 text-sm">
-      Sem permissão de notificações a auto-conexão não pode ser ativada.
+      Sem permissão de notificações o compartilhamento de link não pode ser ativado.
     </p>
     <p class="text-base-content/70 mt-3 text-sm">
       Se o navegador bloqueou o pedido, ative as notificações nas configurações do site e tente
@@ -36,8 +36,8 @@
     </p>
   {:else}
     <p class="text-base-content/80 text-sm">
-      A auto-conexão avisa quando o app fica em segundo plano. É preciso permitir notificações para
-      ativá-la.
+      O compartilhamento de link avisa você quando o app fica em segundo plano. É preciso permitir
+      notificações para continuar.
     </p>
   {/if}
 

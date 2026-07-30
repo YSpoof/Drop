@@ -11,7 +11,6 @@
     connected?: boolean;
     onConnect: (peerId: string) => void;
     onDisconnect?: () => void;
-    onAutoConnect?: (peerId: string) => void;
     disabled?: boolean;
   }
 
@@ -21,17 +20,12 @@
     connected = false,
     onConnect,
     onDisconnect,
-    onAutoConnect,
     disabled = false,
   }: Props = $props();
 
   function handleConnect() {
     vibrate.light();
-    if (peer.hasAutoKey && onAutoConnect) {
-      onAutoConnect(peer.peerId);
-    } else {
-      onConnect(peer.peerId);
-    }
+    onConnect(peer.peerId);
   }
 
   function handleDisconnect() {

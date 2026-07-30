@@ -47,9 +47,9 @@
     event?.stopPropagation();
 
     if (cantClose) {
-      if (fromDialog || !open) {
+      if (open && fromDialog) {
         void tick().then(() => {
-          if (modalRef?.isConnected && !modalRef.open) modalRef.showModal();
+          if (modalRef?.isConnected && open && !modalRef.open) modalRef.showModal();
         });
       }
       return;

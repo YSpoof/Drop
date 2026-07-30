@@ -37,25 +37,16 @@ Ideal para compartilhar projetos, coleções de fotos, documentos e backups.
 
 ---
 
-### 🔢 Auto-conexão por PIN
+### 👥 Salas e links de conexão
 
-Caso um dispositivo habilite o modo de **Auto-Conexão**, ele pode compartilhar um PIN com outra pessoa.
+Na rede local, os dispositivos são descobertos automaticamente. Para conectar com alguém remoto, crie uma **sala** e compartilhe o link.
 
-Ao informar esse PIN:
+Ao criar a sala, escolha o modo de conexão:
 
-- é possivel se conectar sem a necessidade de confirmação;
-- com isso não tem espera caso o usuário tenha compartilhado o PIN com você.
+- **Manual** — quem abrir o link solicita conexão e você aprova;
+- **Automática** — um código fica embutido no link; quem abrir conecta na hora, sem aprovação.
 
----
-
-### 👥 Salas
-
-Também é possível criar ou entrar em salas.
-
-Isso permite:
-
-- localizar dispositivos que estão fora da sua rede;
-- compartilhar arquivos com mais facilidade para um amigo que está remoto;
+Enquanto estiver na sala, é possível copiar o link, trocar entre os modos ou sair da sala. Quem recebe o link vê o progresso da conexão (aguardando, conectando, conectado) até a transferência começar. Se a conexão automática falhar, um aviso é exibido com opção de reconectar; a busca por dispositivos é pausada até então.
 
 ---
 
@@ -132,7 +123,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 ## 🚀 Como usar
 
 1. Abra o Drop em ambos os dispositivos.
-2. Aguarde a descoberta automática se for na rede local ou cria uma sala e compartilhe o link para se conectar.
+2. Na rede local, aguarde a descoberta automática. Se estiverem remotos, crie uma sala, escolha conexão manual ou automática e envie o link.
 3. Arraste arquivos ou pastas para a janela.
 4. Caso prefira, adicione os arquivos à fila antes mesmo da conexão.
 5. O destinatário poderá aceitar tudo ou selecionar apenas os arquivos desejados.

@@ -4,7 +4,6 @@ export interface PeerInfo {
   deviceHint: string;
   room?: string;
   nearby: boolean;
-  hasAutoKey?: boolean;
 }
 
 export interface PeerListMessage {
@@ -20,9 +19,8 @@ export type ClientMessage =
       deviceHint: string;
       room?: string;
       localIps: string[];
-      hasAutoKey?: boolean;
     }
-  | { type: "connect-request"; targetPeerId: string; autoKey?: string }
+  | { type: "connect-request"; targetPeerId: string; roomCode?: string }
   | { type: "connect-response"; targetPeerId: string; accepted: boolean }
   | {
       type: "sdp-offer";
@@ -43,7 +41,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | PeerListMessage
-  | { type: "connect-request"; requester: PeerInfo; autoKey?: string }
+  | { type: "connect-request"; requester: PeerInfo; roomCode?: string }
   | {
       type: "connect-response";
       accepted: boolean;

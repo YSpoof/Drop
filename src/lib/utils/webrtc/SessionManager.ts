@@ -1,10 +1,8 @@
 import { appState } from "$lib/stores/appState.svelte";
 import { toastStore } from "$lib/stores/toast.svelte";
-import { ensureNotificationPermission } from "$lib/utils/device/backgroundNotify";
 import type { QueuedFile } from "$lib/utils/files/queue";
 import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
 import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
-import { localForage } from "$lib/utils/localForage";
 import { logger } from "$lib/utils/logger";
 import { SignalingClient } from "$lib/utils/signaling/client";
 import type { PeerInfo } from "$lib/utils/signaling/types";
@@ -16,7 +14,9 @@ import {
   type TransferProgress as TransferProgressState,
 } from "$lib/utils/webrtc/transfer";
 
-const AUTO_KEY_STORAGE_KEY = "autoKey";
+const ROOM_JOIN_TIMEOUT_MS = 15_000;
+const ROOM_JOIN_CONNECTED_CLOSE_MS = 3_000;
+const ROOM_JOIN_CLOSE_MS = 300;
 
 type PendingBatchCompletion = {
   direction: HistoryEntry["direction"];
@@ -26,6 +26,7 @@ type PendingBatchCompletion = {
 
 export type SessionRoomAccessors = {
   getRoom: () => string | undefined;
+  getRoomCode: () => string | undefined;
 };
 
 export class SessionManager {
@@ -36,11 +37,15 @@ export class SessionManager {
   private peerDisconnectHandled = false;
   private signalingDisconnectNotified = false;
   private queueNotifyDelayTimeout: ReturnType<typeof setTimeout> | null = null;
+  private roomJoinTimeout: ReturnType<typeof setTimeout> | null = null;
+  private roomJoinConnectedTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingBatchCompletions = new Map<string, PendingBatchCompletion>();
   private readonly getRoom: () => string | undefined;
+  private readonly getRoomCode: () => string | undefined;
 
   constructor(accessors: SessionRoomAccessors) {
     this.getRoom = accessors.getRoom;
+    this.getRoomCode = accessors.getRoomCode;
   }
 
   private findPeer(peerId: string) {
@@ -110,8 +115,7 @@ export class SessionManager {
   announce() {
     if (!this.signaling.isConnected()) return;
     const room = this.getRoom();
-    const hasAutoKey = !!appState.autoKey;
-    logger.log(`(Room) announce room=${room ?? ""} hasAutoKey=${hasAutoKey}`);
+    logger.log(`(Room) announce room=${room ?? ""}`);
     this.signaling.announce({
       type: "announce",
       peerId: appState.identity.peerId,
@@ -119,7 +123,6 @@ export class SessionManager {
       deviceHint: appState.identity.deviceHint,
       room,
       localIps: appState.localIps,
-      hasAutoKey,
     });
   }
 
@@ -234,6 +237,8 @@ export class SessionManager {
 
     logger.log("(Room) peer disconnect");
 
+    const roomJoinConnecting = appState.roomJoinOpen && appState.roomJoinPhase === "connecting";
+
     appState.resetTransferState();
     this.clearPendingBatchCompletions();
     this.transferManager?.abort();
@@ -249,6 +254,16 @@ export class SessionManager {
     if (pc) {
       pc.onConnectionStateChange = null;
       pc.close();
+    }
+
+    if (roomJoinConnecting) {
+      this.unlockRoomJoin("Falha na conexão", "error");
+      void this.resumeSignaling();
+      return;
+    }
+
+    if (appState.roomJoinOpen) {
+      this.clearRoomJoinState();
     }
 
     toastStore.showToast("Desconectado", "info");
@@ -274,7 +289,12 @@ export class SessionManager {
       appState.connectingPeerId = null;
       this.peerDisconnectHandled = false;
       logger.log("(Room) peer connect");
-      toastStore.showToast("Conectado", "success");
+      this.clearRoomJoinTimeout();
+      if (appState.roomJoinOpen) {
+        this.finishRoomJoinSuccess();
+      } else {
+        toastStore.showToast("Conectado", "success");
+      }
       this.suspendSignaling();
 
       let chunkSize: number;
@@ -453,112 +473,163 @@ export class SessionManager {
     const peerInfo = this.findPeer(targetPeerId);
     if (peerInfo) appState.connectedPeerInfo = peerInfo;
     toastStore.showToast("Solicitando conexão…", "info");
-    this.signaling.send({ type: "connect-request", targetPeerId });
+    const roomCode = this.getRoomCode();
+    if (roomCode) {
+      this.signaling.send({ type: "connect-request", targetPeerId, roomCode });
+    } else {
+      this.signaling.send({ type: "connect-request", targetPeerId });
+    }
   }
 
-  private generateAutoKey(): string {
+  generateRoomCode(): string {
     const bytes = new Uint32Array(1);
     crypto.getRandomValues(bytes);
     return String(bytes[0]! % 1_000_000).padStart(6, "0");
   }
 
-  async copyAutoKey() {
-    if (!appState.autoKey) return;
-    try {
-      await navigator.clipboard.writeText(appState.autoKey);
-      toastStore.showToast("Chave copiada", "success");
-    } catch {
-      toastStore.showToast("Não foi possível copiar a chave", "error");
+  private clearRoomJoinTimeout() {
+    if (this.roomJoinTimeout) {
+      clearTimeout(this.roomJoinTimeout);
+      this.roomJoinTimeout = null;
     }
   }
 
-  async handleAutoKeyClick() {
-    if (appState.autoKey) {
-      appState.autoKey = null;
-      appState.autoKeyModalOpen = false;
-      this.announce();
-      toastStore.showToast("Auto-conexão desativada", "info");
+  private clearRoomJoinConnectedTimeout() {
+    if (this.roomJoinConnectedTimeout) {
+      clearTimeout(this.roomJoinConnectedTimeout);
+      this.roomJoinConnectedTimeout = null;
+    }
+  }
+
+  private clearRoomJoinTimers() {
+    this.clearRoomJoinTimeout();
+    this.clearRoomJoinConnectedTimeout();
+  }
+
+  private clearRoomJoinState() {
+    this.clearRoomJoinTimers();
+
+    if (!appState.roomJoinOpen) {
+      appState.roomJoinPhase = "waiting";
+      appState.roomJoinMode = null;
+      appState.roomJoinCode = null;
+      appState.roomJoinTargetPeerId = null;
       return;
     }
 
-    appState.autoKeyNotifyDenied = false;
-    appState.autoKeyNotifyModalOpen = true;
+    appState.roomJoinOpen = false;
+    setTimeout(() => {
+      appState.roomJoinPhase = "waiting";
+      appState.roomJoinMode = null;
+      appState.roomJoinCode = null;
+      appState.roomJoinTargetPeerId = null;
+    }, ROOM_JOIN_CLOSE_MS);
   }
 
-  async handleAutoKeyNotifyContinue() {
-    const granted = await ensureNotificationPermission();
-    if (!granted) {
-      appState.autoKeyNotifyDenied = true;
-      return;
+  finishRoomJoinSuccess() {
+    if (!appState.roomJoinOpen || this.roomJoinConnectedTimeout) return;
+
+    this.clearRoomJoinTimeout();
+    appState.roomJoinPhase = "connected";
+    this.roomJoinConnectedTimeout = setTimeout(() => {
+      this.roomJoinConnectedTimeout = null;
+      this.clearRoomJoinState();
+    }, ROOM_JOIN_CONNECTED_CLOSE_MS);
+  }
+
+  private failRoomJoinTimeout() {
+    if (this.peerConnection) {
+      this.peerDisconnectHandled = true;
+      const pc = this.peerConnection;
+      this.peerConnection = null;
+      this.activeTargetPeerId = null;
+      pc.onConnectionStateChange = null;
+      pc.close();
     }
 
-    appState.autoKeyNotifyModalOpen = false;
-    appState.autoKeyNotifyDenied = false;
-    await this.enableAutoKey();
+    appState.connectingPeerId = null;
+    appState.connectedPeerInfo = null;
+    this.clearRoomJoinTimers();
+    this.suspendSignaling();
+    appState.roomJoinPhase = "failed";
   }
 
-  handleAutoKeyNotifyClose() {
-    appState.autoKeyNotifyModalOpen = false;
-    appState.autoKeyNotifyDenied = false;
+  private startRoomJoinTimeout() {
+    this.clearRoomJoinTimeout();
+    this.roomJoinTimeout = setTimeout(() => {
+      this.roomJoinTimeout = null;
+      if (!appState.roomJoinOpen || appState.connectedPeerId) return;
+
+      this.failRoomJoinTimeout();
+    }, ROOM_JOIN_TIMEOUT_MS);
   }
 
-  private async enableAutoKey() {
-    const stored = await localForage.getItem<string>(AUTO_KEY_STORAGE_KEY);
-    const key = stored ?? this.generateAutoKey();
-    if (!stored) {
-      await localForage.setItem(AUTO_KEY_STORAGE_KEY, key);
-    }
-    appState.autoKey = key;
-    this.announce();
-    appState.autoKeyModalOpen = true;
-  }
-
-  async regenerateAutoKey() {
-    const key = this.generateAutoKey();
-    await localForage.setItem(AUTO_KEY_STORAGE_KEY, key);
-    appState.autoKey = key;
-    this.announce();
-    toastStore.showToast("Nova chave gerada", "success");
-  }
-
-  handleAutoKeyModalClose() {
-    appState.autoKeyModalOpen = false;
-  }
-
-  handleAutoConnectClick(targetPeerId: string) {
-    const peerInfo = this.findPeer(targetPeerId);
-    if (!peerInfo) return;
-    appState.enterKeyPeer = peerInfo;
-    appState.enterKeyModalOpen = true;
-  }
-
-  handleEnterKeyModalClose() {
-    appState.enterKeyModalOpen = false;
-    setTimeout(() => {
-      appState.enterKeyPeer = null;
-    }, 300);
-  }
-
-  handleEnterKeyNoKey() {
-    if (!appState.enterKeyPeer) return;
-    const targetPeerId = appState.enterKeyPeer.peerId;
-    this.handleConnect(targetPeerId);
-  }
-
-  handleEnterKeySubmit(key: string) {
-    if (!appState.enterKeyPeer) return;
-    const targetPeerId = appState.enterKeyPeer.peerId;
-    appState.enterKeyModalOpen = false;
-    setTimeout(() => {
-      appState.enterKeyPeer = null;
-    }, 300);
-
+  private tryRoomJoinConnect() {
+    if (!appState.roomJoinOpen || appState.roomJoinPhase !== "waiting") return;
     if (appState.connectingPeerId || appState.connectedPeerId) return;
-    appState.connectingPeerId = targetPeerId;
-    const peerInfo = this.findPeer(targetPeerId);
-    if (peerInfo) appState.connectedPeerInfo = peerInfo;
-    toastStore.showToast("Conectando com chave…", "info");
-    this.signaling.send({ type: "connect-request", targetPeerId, autoKey: key });
+
+    const peer = appState.peers[0];
+    if (!peer) return;
+
+    appState.roomJoinPhase = "connecting";
+    appState.roomJoinTargetPeerId = peer.peerId;
+    appState.connectingPeerId = peer.peerId;
+    appState.connectedPeerInfo = peer;
+
+    if (appState.roomJoinMode === "auto" && appState.roomJoinCode) {
+      this.signaling.send({
+        type: "connect-request",
+        targetPeerId: peer.peerId,
+        roomCode: appState.roomJoinCode,
+      });
+      return;
+    }
+
+    this.signaling.send({ type: "connect-request", targetPeerId: peer.peerId });
+  }
+
+  startRoomJoin(mode: "auto" | "ask", code?: string) {
+    if (appState.connectedPeerId) return;
+    appState.roomJoinOpen = true;
+    appState.roomJoinMode = mode;
+    appState.roomJoinCode = mode === "auto" ? (code ?? null) : null;
+    appState.roomJoinPhase = "waiting";
+    appState.roomJoinTargetPeerId = null;
+    this.startRoomJoinTimeout();
+    this.tryRoomJoinConnect();
+  }
+
+  unlockRoomJoin(message?: string, type: "error" | "warning" | "info" | "success" = "error") {
+    if (appState.connectingPeerId && !appState.connectedPeerId) {
+      appState.connectingPeerId = null;
+      appState.connectedPeerInfo = null;
+    }
+    this.clearRoomJoinState();
+    if (message) toastStore.showToast(message, type);
+  }
+
+  cancelRoomJoin() {
+    if (!appState.roomJoinOpen) return;
+
+    const wasConnecting = appState.roomJoinPhase === "connecting";
+    this.clearRoomJoinTimers();
+
+    if (wasConnecting && !appState.connectedPeerId) {
+      appState.connectingPeerId = null;
+      appState.connectedPeerInfo = null;
+
+      if (this.peerConnection) {
+        this.peerDisconnectHandled = true;
+        const pc = this.peerConnection;
+        this.peerConnection = null;
+        this.activeTargetPeerId = null;
+        pc.onConnectionStateChange = null;
+        pc.close();
+        void this.resumeSignaling();
+      }
+    }
+
+    this.clearRoomJoinState();
   }
 
   async joinSignaling() {
@@ -568,6 +639,7 @@ export class SessionManager {
   }
 
   wakeSignaling(reason: "online" | "visibility") {
+    if (appState.roomJoinPhase === "failed") return;
     this.signaling.wakeReconnect(reason);
   }
 
@@ -588,12 +660,25 @@ export class SessionManager {
           this.clearPendingRequest();
           toastStore.showToast(`${requesterName} desconectou`, "warning");
         }
-      },
-      onConnectRequest: (message: { requester: PeerInfo; autoKey?: string }) => {
-        const requesterId = message.requester.peerId;
 
-        if (message.autoKey) {
-          if (appState.autoKey && message.autoKey === appState.autoKey) {
+        if (appState.roomJoinOpen && appState.connectedPeerId) {
+          this.finishRoomJoinSuccess();
+        }
+
+        if (
+          appState.roomJoinOpen &&
+          appState.roomJoinPhase !== "failed" &&
+          appState.roomJoinPhase === "waiting"
+        ) {
+          this.tryRoomJoinConnect();
+        }
+      },
+      onConnectRequest: (message: { requester: PeerInfo; roomCode?: string }) => {
+        const requesterId = message.requester.peerId;
+        const hostRoomCode = this.getRoomCode();
+
+        if (message.roomCode) {
+          if (hostRoomCode && message.roomCode === hostRoomCode) {
             if (appState.connectedPeerId || appState.connectingPeerId || appState.pendingRequest) {
               this.signaling.send({
                 type: "connect-response",
@@ -652,6 +737,14 @@ export class SessionManager {
       onConnectResponse: async (message: { accepted: boolean; targetPeerId: string }) => {
         if (!message.accepted) {
           if (appState.connectingPeerId === message.targetPeerId) {
+            if (appState.roomJoinOpen) {
+              if (appState.roomJoinMode === "auto") {
+                this.unlockRoomJoin("Código incorreto", "error");
+              } else {
+                this.unlockRoomJoin("Conexão recusada", "warning");
+              }
+              return;
+            }
             toastStore.showToast("Conexão recusada", "warning");
             appState.connectingPeerId = null;
             appState.connectedPeerInfo = null;
@@ -710,6 +803,12 @@ export class SessionManager {
     this.transferManager = null;
     this.signaling.disconnect();
     this.peerConnection?.close();
+    this.clearRoomJoinTimers();
+    appState.roomJoinOpen = false;
+    appState.roomJoinPhase = "waiting";
+    appState.roomJoinMode = null;
+    appState.roomJoinCode = null;
+    appState.roomJoinTargetPeerId = null;
     if (this.queueNotifyDelayTimeout) {
       clearTimeout(this.queueNotifyDelayTimeout);
       this.queueNotifyDelayTimeout = null;
