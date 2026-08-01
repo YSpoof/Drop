@@ -2,6 +2,7 @@
   import "./layout.css";
   import { dev } from "$app/env";
   import { updated } from "$app/state";
+  import Fab from "$lib/components/layout/Fab.svelte";
   import NavBar from "$lib/components/layout/NavBar.svelte";
   import ToastRenderer from "$lib/components/ui/ToastRenderer.svelte";
   import { siteData } from "$lib/siteData";
@@ -16,6 +17,7 @@
     if (appState.tutorialModalOpen) lazyLoad.mark("tutorialModal");
     if (appState.infoModalOpen) lazyLoad.mark("infoModal");
     if (appState.statsModalOpen) lazyLoad.mark("statsModal");
+    if (appState.settingsModalOpen) lazyLoad.mark("settingsModal");
     if (updated.current) lazyLoad.mark("updateModal");
   });
 
@@ -59,6 +61,7 @@
     {@render children()}
   </main>
 </div>
+<Fab />
 
 <ToastRenderer />
 
@@ -75,6 +78,11 @@
 {#if lazyLoad.has("statsModal")}
   {const StatsModal = (await import("$lib/components/modals/StatsModal.svelte")).default}
   <StatsModal />
+{/if}
+
+{#if lazyLoad.has("settingsModal")}
+  {const SettingsModal = (await import("$lib/components/modals/SettingsModal.svelte")).default}
+  <SettingsModal />
 {/if}
 
 {#if lazyLoad.has("updateModal")}

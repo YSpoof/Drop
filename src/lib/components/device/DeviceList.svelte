@@ -1,8 +1,6 @@
 <script lang="ts">
   import DeviceCard from "$lib/components/device/DeviceCard.svelte";
   import type { PeerInfo } from "$lib/utils/signaling/types";
-  import LinkIcon from "~icons/mdi/link";
-  import LinkOffIcon from "~icons/mdi/link-off";
   import RadioTowerIcon from "~icons/mdi/radio-tower";
 
   interface Props {
@@ -14,7 +12,6 @@
     connected?: boolean;
     onConnect: (peerId: string) => void;
     onDisconnect?: () => void;
-    onRoomClick?: () => void;
   }
 
   let {
@@ -26,7 +23,6 @@
     connected = false,
     onConnect,
     onDisconnect,
-    onRoomClick,
   }: Props = $props();
 
   const connecting = $derived(!!connectedPeerId);
@@ -44,20 +40,6 @@
         {/if}
       </h2>
     </div>
-    {#if !connected}
-      <div class="flex items-center gap-1">
-        <button
-          class="btn btn-ghost btn-circle tooltip tooltip-left"
-          data-tip={inRoom ? "Gerenciar link" : "Compartilhar link"}
-          onclick={onRoomClick}>
-          {#if inRoom}
-            <LinkIcon class="text-success text-lg" />
-          {:else}
-            <LinkOffIcon class="text-primary text-lg" />
-          {/if}
-        </button>
-      </div>
-    {/if}
   </div>
   {#if !peers.length}
     {#if pollingStopped}

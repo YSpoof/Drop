@@ -1,23 +1,16 @@
 <script lang="ts">
   import { formatBytes } from "$lib/utils/files/format";
-  import { saveAutoDownload } from "$lib/utils/files/prefs";
   import type { QueuedFile } from "$lib/utils/files/queue";
   import type { TransferItem } from "$lib/utils/files/transferTypes";
   import ProgressDownloadIcon from "~icons/mdi/progress-download";
   import ProgressUploadIcon from "~icons/mdi/progress-upload";
 
   interface Props {
-    autoDownload?: boolean;
-    connected?: boolean;
     transfers: TransferItem[];
     queue: QueuedFile[];
   }
 
-  let { autoDownload = $bindable(true), connected = false, transfers, queue }: Props = $props();
-
-  $effect(() => {
-    saveAutoDownload(autoDownload);
-  });
+  let { transfers, queue }: Props = $props();
 
   const transferIds = $derived(new Set(transfers.map((t) => t.id)));
   const pendingQueueBytes = $derived(
@@ -82,17 +75,7 @@
 
 <section class="card bg-base-100 dark:bg-base-300 min-w-0 flex-1 overflow-hidden shadow-sm">
   <div class="card-body min-w-0 gap-4">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 class="text-lg font-semibold">Transferência</h2>
-      <div class="flex items-center gap-1 sm:gap-3">
-        <span class="text-sm font-bold">Download automático:</span>
-        <input
-          type="checkbox"
-          class="toggle toggle-primary"
-          bind:checked={autoDownload}
-          disabled={connected} />
-      </div>
-    </div>
+    <h2 class="text-lg font-semibold">Transferência</h2>
 
     {#if totalBytes > 0}
       <div class="space-y-3">

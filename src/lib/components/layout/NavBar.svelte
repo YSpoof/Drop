@@ -5,7 +5,6 @@
   import { toastStore } from "$lib/stores/toast.svelte";
   import vibrate from "$lib/utils/vibrate";
   import BugIcon from "~icons/mdi/bug";
-  import InfoIcon from "~icons/mdi/information-outline";
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   const TAP_WINDOW_MS = 2000;
@@ -61,13 +60,6 @@
       </div>
       <div class="flex flex-none items-center gap-2">
         <InstallAppButton />
-        <button
-          type="button"
-          onclick={() => (appState.infoModalOpen = true)}
-          class="btn btn-ghost btn-circle btn-primary btn-soft tooltip tooltip-left"
-          data-tip="Sobre">
-          <InfoIcon class="text-lg" />
-        </button>
       </div>
     </div>
   </div>

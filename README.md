@@ -145,8 +145,6 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 > De alguma forma precisamos conseguir re-conectar e transferir apenas os bytes faltantes, para não sobrecarregar o WS, poderiamos ter um cooldown de 30s antes de forçar o reset de tudo
 - Documentar/Refatorar algumas partes do código
 > Algumas coisas estão bem complexas, se desse para simplificar seria o ideal.
-- Centralizar as configurações em um modal com tabs
-> Isso deixaria a UI mais clean e organizada
 
 ---
 

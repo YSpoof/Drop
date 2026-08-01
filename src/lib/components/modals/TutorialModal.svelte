@@ -10,7 +10,7 @@
   import DownloadIcon from "~icons/mdi/download";
   import FolderMultipleIcon from "~icons/mdi/folder-multiple";
   import LinkIcon from "~icons/mdi/link";
-  import LockOpenOutlineIcon from "~icons/mdi/lock-open-outline";
+  import PlusIcon from "~icons/mdi/plus";
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   type IntroStep = {
@@ -26,13 +26,18 @@
       Icon: WaterSyncIcon,
     },
     {
+      title: "Botão flutuante",
+      body: "Toque no botão + no canto da tela para acessar configurações, estatísticas, tutorial, informações e compartilhamento de link.",
+      Icon: PlusIcon,
+    },
+    {
       title: "Identifique seu dispositivo",
-      body: "Altere o seu nome no card 'Seu dispositivo' para que outras pessoas reconheçam você na lista.",
+      body: "Altere o seu nome no menu de Configurações para que outras pessoas reconheçam você na lista.",
       Icon: AccountEditIcon,
     },
     {
       title: "Modos de download",
-      body: "Escolha entre download automático ou manual. No modo manual, você decide quando baixar cada arquivo enquanto estiver conectado à um amigo.",
+      body: "Escolha entre download automático ou manual no menu de Configurações. No modo manual, você decide quando baixar cada arquivo enquanto estiver conectado a um amigo.",
       Icon: DownloadIcon,
     },
     {
@@ -44,11 +49,6 @@
       title: "Conexão por link",
       body: "Gere um link de sala para se conectar com pessoas que não estão na mesma rede que você.",
       Icon: LinkIcon,
-    },
-    {
-      title: "Conexão automática",
-      body: "O ícone de cadeado gera uma senha de uso único. Quem possuir essa senha entra diretamente na sala, sem precisar da sua aprovação.",
-      Icon: LockOpenOutlineIcon,
     },
   ];
 

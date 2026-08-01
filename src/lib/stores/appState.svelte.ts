@@ -11,6 +11,7 @@ import {
 import type { TransferItem } from "$lib/utils/files/transferTypes";
 import { localForage } from "$lib/utils/localForage";
 import type { PeerInfo } from "$lib/utils/signaling/types";
+import vibrate from "$lib/utils/vibrate";
 
 const identity = await loadIdentity();
 const tutorialViewed = await localForage.getItem<boolean>("tutorialViewed");
@@ -42,6 +43,10 @@ class AppState {
   tutorialModalOpen = $state(!tutorialViewed);
   infoModalOpen = $state(false);
   statsModalOpen = $state(false);
+  settingsModalOpen = $state(false);
+  shareModalOpen = $state(false);
+  shareNotifyModalOpen = $state(false);
+  shareNotifyDenied = $state(false);
   devMode = $state(initialDevMode);
   installPrompt = $state<BeforeInstallPromptEvent | null>(null);
 
@@ -63,6 +68,20 @@ class AppState {
 
   handleDisplayNameBlur() {
     saveDisplayName(this.displayName);
+  }
+
+  handleShareLinkClick(inRoom: boolean) {
+    vibrate.light();
+    if (inRoom) {
+      this.shareModalOpen = true;
+      return;
+    }
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      this.shareModalOpen = true;
+      return;
+    }
+    this.shareNotifyDenied = false;
+    this.shareNotifyModalOpen = true;
   }
 
   setDevMode(value: boolean) {

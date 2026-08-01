@@ -146,34 +146,36 @@
             class="btn btn-ghost btn-xs"
             onclick={onclearQueue}>Limpar fila</button>
         {/if}
-        <div class="dropdown dropdown-end">
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-          <!-- svelte-ignore a11y_label_has_associated_control -->
-          <label
-            tabindex="0"
-            class="btn btn-primary btn-sm gap-1">
-            <PlusIcon class="text-base" />
-            Adicionar
-          </label>
-          <ul class="dropdown-content menu bg-base-100 rounded-box z-10 mt-2 w-52 p-2 shadow">
-            <li class="mb-1">
-              <button
-                type="button"
-                onclick={() => filePicker.click()}>
-                <FilePlusIcon class="text-sm" />
-                Selecionar Arquivos
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                onclick={() => folderPicker.click()}>
-                <FolderPlusIcon class="text-sm" />
-                Selecionar Pasta
-              </button>
-            </li>
-          </ul>
-        </div>
+        <button
+          type="button"
+          popovertarget="add-files-menu"
+          style="anchor-name:--add-files-anchor"
+          class="btn btn-primary btn-sm gap-1">
+          <PlusIcon class="text-base" />
+          Adicionar
+        </button>
+        <ul
+          class="dropdown dropdown-end menu bg-base-100 rounded-box z-10 mt-2 w-52 p-2 shadow"
+          popover
+          id="add-files-menu"
+          style="position-anchor:--add-files-anchor">
+          <li class="mb-1">
+            <button
+              type="button"
+              onclick={() => filePicker.click()}>
+              <FilePlusIcon class="text-sm" />
+              Selecionar Arquivos
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => folderPicker.click()}>
+              <FolderPlusIcon class="text-sm" />
+              Selecionar Pasta
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
 

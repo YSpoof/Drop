@@ -2,7 +2,6 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import DeviceList from "$lib/components/device/DeviceList.svelte";
-  import YourDeviceCard from "$lib/components/device/YourDeviceCard.svelte";
   import Files from "$lib/components/transfer/Files.svelte";
   import TransferProgress from "$lib/components/transfer/TransferProgress.svelte";
   import { appState } from "$lib/stores/appState.svelte";
@@ -36,36 +35,19 @@
   registerSession(session);
 
   let visibilityState = $state(document.visibilityState);
-  let shareModalOpen = $state(false);
-  let shareNotifyModalOpen = $state(false);
-  let shareNotifyDenied = $state(false);
 
   function generateRoomId() {
     return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   }
 
-  function handleRoomClick() {
-    vibrate.light();
-    if (inRoom) {
-      shareModalOpen = true;
-      return;
-    }
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      shareModalOpen = true;
-      return;
-    }
-    shareNotifyDenied = false;
-    shareNotifyModalOpen = true;
-  }
-
   async function handleShareNotifyContinue() {
     const granted = await ensureNotificationPermission();
     if (granted) {
-      shareNotifyModalOpen = false;
-      shareModalOpen = true;
+      appState.shareNotifyModalOpen = false;
+      appState.shareModalOpen = true;
       return;
     }
-    shareNotifyDenied = true;
+    appState.shareNotifyDenied = true;
   }
 
   async function applyShareParams(mode: "manual" | "auto") {
@@ -99,7 +81,7 @@
     vibrate.light();
     if (!room) return;
 
-    shareModalOpen = false;
+    appState.shareModalOpen = false;
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     if (appState.connectedPeerId) session.disconnectPeer();
@@ -152,8 +134,8 @@
   $effect.pre(() => {
     if (appState.connectionModalOpen) lazyLoad.mark("connectionRequest");
     if (appState.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
-    if (shareModalOpen) lazyLoad.mark("shareLink");
-    if (shareNotifyModalOpen) lazyLoad.mark("shareNotify");
+    if (appState.shareModalOpen) lazyLoad.mark("shareLink");
+    if (appState.shareNotifyModalOpen) lazyLoad.mark("shareNotify");
     if (appState.roomJoinOpen) lazyLoad.mark("roomJoin");
   });
 
@@ -220,36 +202,23 @@
     connectedPeerId={appState.connectedPeerId}
     connected={appState.connected}
     onConnect={(id) => session.handleConnect(id)}
-    onDisconnect={() => session.disconnectPeer()}
-    onRoomClick={handleRoomClick} />
+    onDisconnect={() => session.disconnectPeer()} />
 
-  <div class="grid min-w-0 gap-6 lg:grid-cols-2">
-    <div class="flex flex-col gap-4 lg:col-span-1">
-      <YourDeviceCard
-        bind:displayName={appState.displayName}
-        handleDisplayNameBlur={() => session.handleDisplayNameBlur()} />
-    </div>
+  <div class="flex flex-col gap-6">
+    <TransferProgress
+      transfers={appState.transfers}
+      queue={appState.visibleQueue} />
 
-    <div class="flex flex-col gap-4 lg:col-span-1">
-      <TransferProgress
-        bind:autoDownload={appState.autoDownload}
-        connected={appState.connected}
-        transfers={appState.transfers}
-        queue={appState.visibleQueue} />
-    </div>
-
-    <div class="min-w-0 lg:col-span-2">
-      <Files
-        autoDownload={appState.autoDownload}
-        history={appState.transfers}
-        queue={appState.visibleQueue}
-        onadd={(files) => session.addFiles(files)}
-        onremoveQueue={(id) => appState.removeFile(id)}
-        onclearQueue={() => session.clearQueue()}
-        onPull={(id) => session.handlePull(id)}
-        onPullBatch={(ids, name) => session.handlePullBatch(ids, name)}
-        onDeleteHistory={(id) => session.handleDeleteTransfer(id)} />
-    </div>
+    <Files
+      autoDownload={appState.autoDownload}
+      history={appState.transfers}
+      queue={appState.visibleQueue}
+      onadd={(files) => session.addFiles(files)}
+      onremoveQueue={(id) => appState.removeFile(id)}
+      onclearQueue={() => session.clearQueue()}
+      onPull={(id) => session.handlePull(id)}
+      onPullBatch={(ids, name) => session.handlePullBatch(ids, name)}
+      onDeleteHistory={(id) => session.handleDeleteTransfer(id)} />
   </div>
 </div>
 
@@ -275,23 +244,23 @@
     await import("$lib/components/modals/ShareNotifyPermissionModal.svelte")
   ).default}
   <ShareNotifyPermissionModal
-    open={shareNotifyModalOpen}
-    denied={shareNotifyDenied}
-    onClose={() => (shareNotifyModalOpen = false)}
+    open={appState.shareNotifyModalOpen}
+    denied={appState.shareNotifyDenied}
+    onClose={() => (appState.shareNotifyModalOpen = false)}
     onContinue={handleShareNotifyContinue} />
 {/if}
 
 {#if lazyLoad.has("shareLink")}
   {const ShareLinkModal = (await import("$lib/components/modals/ShareLinkModal.svelte")).default}
   <ShareLinkModal
-    open={shareModalOpen}
+    open={appState.shareModalOpen}
     {inRoom}
     mode={shareMode}
     link={shareLink}
     onSelectManual={chooseManualShare}
     onSelectAuto={chooseAutoShare}
     onLeaveRoom={leaveRoom}
-    onClose={() => (shareModalOpen = false)} />
+    onClose={() => (appState.shareModalOpen = false)} />
 {/if}
 
 {#if lazyLoad.has("roomJoin")}
