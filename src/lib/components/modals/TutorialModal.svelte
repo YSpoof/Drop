@@ -7,10 +7,10 @@
   import type { Component } from "svelte";
   import { Tween } from "svelte/motion";
   import AccountEditIcon from "~icons/mdi/account-edit";
+  import CogIcon from "~icons/mdi/cog";
   import DownloadIcon from "~icons/mdi/download";
   import FolderMultipleIcon from "~icons/mdi/folder-multiple";
   import LinkIcon from "~icons/mdi/link";
-  import PlusIcon from "~icons/mdi/plus";
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   type IntroStep = {
@@ -27,8 +27,8 @@
     },
     {
       title: "Botão flutuante",
-      body: "Toque no botão + no canto da tela para acessar configurações, estatísticas, tutorial, informações e compartilhamento de link.",
-      Icon: PlusIcon,
+      body: "Toque no botão de engrenagem no canto da tela para acessar configurações, estatísticas, tutorial, informações e compartilhamento de link.",
+      Icon: CogIcon,
     },
     {
       title: "Identifique seu dispositivo",

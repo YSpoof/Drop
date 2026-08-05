@@ -69,7 +69,7 @@
   bind:this={modalRef}
   class="modal modal-bottom sm:modal-middle backdrop-blur-xs"
   onclose={(e) => handleClose(e, true)}>
-  <div class={`modal-box w-[min(100%,24rem)] sm:w-fit md:max-w-6/12 ${modalClass}`}>
+  <div class={`modal-box ${modalClass}`}>
     <div class="mb-2 flex w-full {title ? 'justify-between' : 'justify-end'}">
       {#if title}
         <h1 class={`text-primary text-xl font-bold ${titleClass}`}>

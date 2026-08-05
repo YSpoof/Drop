@@ -12,7 +12,7 @@
   open={appState.settingsModalOpen}
   title="Configurações"
   onClose={() => (appState.settingsModalOpen = false)}
-  modalClass="w-full md:max-w-md">
+  modalClass="w-full md:max-w-sm">
   <div class="flex flex-col gap-4">
     <label class="floating-label">
       <input

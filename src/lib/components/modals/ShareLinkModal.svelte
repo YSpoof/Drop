@@ -76,7 +76,7 @@
 
 <GenericModal
   {open}
-  title="Compartilhar link"
+  title="Conectar remotamente"
   onClose={handleClose}>
   {#if inRoom}
     <div class="flex flex-col items-center gap-5 py-2 text-center">
@@ -92,7 +92,7 @@
 
       <div class="flex flex-col gap-1">
         <p class="text-lg font-semibold">
-          {isAuto ? "Conexão automática" : "Conexão manual"}
+          {isAuto ? "Modo automático" : "Modo manual"}
         </p>
         <p class="text-base-content/70 max-w-xs text-sm text-balance">
           {#if isAuto}
@@ -124,7 +124,7 @@
         class="btn btn-ghost btn-sm gap-1.5"
         onclick={isAuto ? handleSelectManual : handleSelectAuto}>
         <SwapHorizontalIcon class="text-base" />
-        Trocar para {isAuto ? "conexão manual" : "conexão automática"}
+        Trocar para {isAuto ? "modo manual" : "modo automático"}
       </button>
     </div>
   {:else}
@@ -136,7 +136,7 @@
         <div class="card-body gap-1 p-4">
           <div class="flex items-center gap-2">
             <LinkVariantIcon class="text-primary text-xl" />
-            <h3 class="font-semibold">Conexão manual</h3>
+            <h3 class="font-semibold">Modo manual</h3>
           </div>
           <p class="text-base-content/70 text-sm">
             Copie o link e envie. A outra pessoa solicita conexão e você aprova.
@@ -151,7 +151,7 @@
         <div class="card-body gap-1 p-4">
           <div class="flex items-center gap-2">
             <LightningBoltIcon class="text-primary text-xl" />
-            <h3 class="font-semibold">Conexão automática</h3>
+            <h3 class="font-semibold">Modo automático</h3>
           </div>
           <p class="text-base-content/70 text-sm">
             Um código vai embutido no link, a outra pessoa conecta na hora, sem aprovação.

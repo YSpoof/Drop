@@ -43,6 +43,12 @@
   const hasActiveDownload = $derived(
     transfers.some((item) => item.direction === "received" && item.status === "in-progress"),
   );
+  const sentFiles = $derived(transfers.filter((t) => t.direction === "sent"));
+  const sentCompleted = $derived(sentFiles.filter((t) => t.status === "completed").length);
+  const sentTotal = $derived(sentFiles.length + queue.filter((q) => !transferIds.has(q.id)).length);
+  const receivedFiles = $derived(transfers.filter((t) => t.direction === "received"));
+  const receivedCompleted = $derived(receivedFiles.filter((t) => t.status === "completed").length);
+  const receivedTotal = $derived(receivedFiles.length);
 
   let uploadSpeedBytesPerSec = $state(0);
   let downloadSpeedBytesPerSec = $state(0);
@@ -95,7 +101,7 @@
         <div class="flex justify-between text-sm">
           <div class="flex items-center gap-2">
             <div
-              class="tooltip"
+              class="tooltip tooltip-right"
               data-tip="Velocidade de envio">
               <ProgressUploadIcon
                 class="text-base"
@@ -107,7 +113,7 @@
           </div>
           <div class="flex items-center gap-2">
             <div
-              class="tooltip"
+              class="tooltip tooltip-left"
               data-tip="Velocidade de recebimento">
               <ProgressDownloadIcon
                 class="text-base"
@@ -117,6 +123,11 @@
               {hasActiveDownload ? formatSpeed(downloadSpeedBytesPerSec) : "—"}
             </span>
           </div>
+        </div>
+
+        <div class="text-base-content/70 flex justify-between text-sm">
+          <span>{sentCompleted}/{sentTotal} enviados</span>
+          <span>{receivedCompleted}/{receivedTotal} recebidos</span>
         </div>
       </div>
     {:else}

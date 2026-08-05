@@ -339,6 +339,10 @@ export class SessionManager {
             bytesTransferred: entry.size,
           });
 
+          if (entry.status !== "failed") {
+            appState.recordTransferFile(entry.direction);
+          }
+
           this.handleHistoryToast(entry);
         },
         onBatchDone: (info) => this.handleBatchDoneToast(info),

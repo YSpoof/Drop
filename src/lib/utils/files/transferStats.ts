@@ -3,10 +3,17 @@ import { localForage } from "$lib/utils/localForage";
 export interface TransferStats {
   uploadBytes: number;
   downloadBytes: number;
+  uploadFiles: number;
+  downloadFiles: number;
 }
 
 const KEY = "transferStats";
-const EMPTY: TransferStats = { uploadBytes: 0, downloadBytes: 0 };
+const EMPTY: TransferStats = {
+  uploadBytes: 0,
+  downloadBytes: 0,
+  uploadFiles: 0,
+  downloadFiles: 0,
+};
 const SAVE_DEBOUNCE_MS = 2000;
 
 let pendingStats: TransferStats | null = null;
@@ -18,6 +25,8 @@ export async function loadTransferStats(): Promise<TransferStats> {
   return {
     uploadBytes: stored.uploadBytes ?? 0,
     downloadBytes: stored.downloadBytes ?? 0,
+    uploadFiles: stored.uploadFiles ?? 0,
+    downloadFiles: stored.downloadFiles ?? 0,
   };
 }
 

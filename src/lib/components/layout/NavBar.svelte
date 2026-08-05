@@ -45,7 +45,9 @@
           <button
             type="button"
             onclick={handleLogoClick}
-            class="bg-primary grid aspect-square h-10 w-10 place-items-center rounded-sm">
+            class="grid aspect-square h-10 w-10 place-items-center rounded-sm transition-transform active:scale-95"
+            class:bg-error={appState.devMode}
+            class:bg-primary={!appState.devMode}>
             {#if appState.devMode}
               <BugIcon class="text-2xl text-white" />
             {:else}

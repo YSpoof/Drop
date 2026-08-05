@@ -6,7 +6,6 @@
   import InfoIcon from "~icons/mdi/information-outline";
   import LinkIcon from "~icons/mdi/link";
   import LinkOffIcon from "~icons/mdi/link-off";
-  import PlusIcon from "~icons/mdi/plus";
   import SchoolIcon from "~icons/mdi/school-outline";
 
   const inRoom = $derived(!!page.url.searchParams.get("room"));
@@ -20,7 +19,7 @@
     tabindex="0"
     role="button"
     class="btn btn-lg btn-circle btn-primary">
-    <PlusIcon class="text-2xl" />
+    <CogIcon class="text-2xl" />
   </div>
 
   <div class="fab-close">
@@ -29,14 +28,14 @@
   </div>
 
   <div>
-    <span class={labelClass}>{inRoom ? "Gerenciar link" : "Compartilhar link"}</span>
+    <span class={labelClass}>{inRoom ? "Gerenciar conexão" : "Conectar remotamente"}</span>
     <button
       class="btn btn-lg btn-circle {inRoom ? 'btn-success' : 'btn-primary'}"
       onclick={() => appState.handleShareLinkClick(inRoom)}>
       {#if inRoom}
-        <LinkIcon class="text-xl" />
-      {:else}
         <LinkOffIcon class="text-xl" />
+      {:else}
+        <LinkIcon class="text-xl" />
       {/if}
     </button>
   </div>

@@ -106,8 +106,22 @@ class AppState {
     scheduleSaveTransferStats(next);
   }
 
+  recordTransferFile(direction: "sent" | "received") {
+    const next: TransferStats =
+      direction === "sent"
+        ? { ...this.transferStats, uploadFiles: this.transferStats.uploadFiles + 1 }
+        : { ...this.transferStats, downloadFiles: this.transferStats.downloadFiles + 1 };
+    this.transferStats = next;
+    scheduleSaveTransferStats(next);
+  }
+
   resetTransferStats() {
-    this.transferStats = { uploadBytes: 0, downloadBytes: 0 };
+    this.transferStats = {
+      uploadBytes: 0,
+      downloadBytes: 0,
+      uploadFiles: 0,
+      downloadFiles: 0,
+    };
     void flushTransferStats().then(() => persistResetTransferStats());
   }
 
