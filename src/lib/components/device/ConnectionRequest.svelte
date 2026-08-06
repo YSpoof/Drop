@@ -1,8 +1,7 @@
 <script lang="ts">
   import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { sfx } from "$lib/utils/audio";
   import type { PeerInfo } from "$lib/utils/signaling/types";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
 
   interface Props {
     open: boolean;
@@ -18,8 +17,7 @@
 
   $effect(() => {
     if (requester) {
-      vibrate.warning();
-      sfx.warning();
+      feedback.warning();
     }
   });
 
@@ -45,12 +43,12 @@
   });
 
   function handleDeny() {
-    vibrate.light();
+    feedback.light();
     ondeny();
   }
 
   function handleAccept() {
-    vibrate.light();
+    feedback.light();
     onaccept();
   }
 </script>

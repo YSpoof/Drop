@@ -14,12 +14,12 @@ export class TransferReceiver {
 
   private usesZip(meta: FileMeta): boolean {
     const { session } = this;
-    if (session.manualDownload) return session.batchUsesZip;
-    return session.batchUsesZip || !!meta.zip;
+    if (session.manualDownload) return session.sender.batchUsesZip;
+    return session.sender.batchUsesZip || !!meta.zip;
   }
 
   private findActiveReceive(): [string, ReceiveState] | undefined {
-    return [...this.session.receiving.entries()].find(
+    return [...this.session.receiver.receiving.entries()].find(
       ([, state]) => state.receivedBytes < state.meta.size,
     );
   }
@@ -35,7 +35,7 @@ export class TransferReceiver {
     state.receivedBytes += chunkBytes;
     this.session.callbacks.onChunkBytes?.("receive", chunkBytes);
     if (state.receivedBytes >= state.meta.size) {
-      this.session.expectingBinary = false;
+      this.session.sender.expectingBinary = false;
     }
   }
 
@@ -90,7 +90,7 @@ export class TransferReceiver {
 
   onSendDone(fileId: string) {
     const { session } = this;
-    const state = session.receiving.get(fileId);
+    const state = session.receiver.receiving.get(fileId);
     if (!state) return;
     state.senderDone = true;
     if (state.receivedBytes === state.meta.size) {
@@ -100,6 +100,7 @@ export class TransferReceiver {
 
   beginReceive(meta: FileMeta) {
     const { session } = this;
+    const sender = session.sender;
     const useZip = this.usesZip(meta);
 
     const state: ReceiveState = {
@@ -110,19 +111,19 @@ export class TransferReceiver {
       useZip,
       senderDone: false,
     };
-    session.receiving.set(meta.fileId, state);
-    session.expectingBinary = true;
+    session.receiver.receiving.set(meta.fileId, state);
+    sender.expectingBinary = true;
 
-    if (session.preReceiveChunks.length) {
-      state.pendingChunks.push(...session.preReceiveChunks);
-      session.preReceiveChunks = [];
+    if (session.receiver.preReceiveChunks.length) {
+      state.pendingChunks.push(...session.receiver.preReceiveChunks);
+      session.receiver.preReceiveChunks = [];
     }
 
     session.chunkWriteQueue = session.chunkWriteQueue
       .then(async () => {
         if (useZip) {
           state.streamWriter = await this.getOrCreateZipSession(
-            session.activePullBatchFilename,
+            sender.activePullBatchFilename,
           ).openEntry(meta.name, meta.size);
         } else {
           const basename = meta.name.split("/").pop() || meta.name;
@@ -144,12 +145,12 @@ export class TransferReceiver {
           session.emitReceiveProgress(meta, "in-progress", state.receivedBytes);
         }
 
-        if (state.senderDone && state.receivedBytes === meta.size) {
+        if (state.senderDone && state.receivedBytes === state.meta.size) {
           await this.finishReceive(meta.fileId);
         }
       })
       .catch((error) => {
-        const current = session.receiving.get(meta.fileId);
+        const current = session.receiver.receiving.get(meta.fileId);
         if (!current) return;
         const message =
           error instanceof DownloadError
@@ -163,24 +164,26 @@ export class TransferReceiver {
 
   failReceive(fileId: string, state: ReceiveState, message: string) {
     const { session } = this;
+    const sender = session.sender;
     if (session.cancelledFileIds.has(fileId)) return;
-    if (!session.receiving.has(fileId)) return;
+    if (!session.receiver.receiving.has(fileId)) return;
     if (message === "Download cancelled") {
       this.abortBrowserDownload(fileId);
       return;
     }
-    session.expectingBinary = false;
+    sender.expectingBinary = false;
     void session.io.sendControl({ type: "cancel", fileId });
     session.callbacks.onDownloadError?.(message);
     this.abortStream(state);
-    session.receiving.delete(fileId);
+    session.receiver.receiving.delete(fileId);
     session.emitReceiveHistory(state.meta, "failed");
     session.emitReceiveProgress(state.meta, "failed", state.receivedBytes);
   }
 
   async finishReceive(fileId: string) {
     const { session } = this;
-    const state = session.receiving.get(fileId);
+    const sender = session.sender;
+    const state = session.receiver.receiving.get(fileId);
     if (!state) return;
 
     if (state.receivedBytes !== state.meta.size) {
@@ -202,13 +205,13 @@ export class TransferReceiver {
     if (
       state.useZip &&
       session.manualDownload &&
-      session.activePullBatch &&
-      session.activePullBatch.length > 1
+      sender.activePullBatch &&
+      sender.activePullBatch.length > 1
     ) {
-      session.pullBatchReceivedCount += 1;
-      if (session.pullBatchReceivedCount >= session.activePullBatch.length) {
+      sender.pullBatchReceivedCount += 1;
+      if (sender.pullBatchReceivedCount >= sender.activePullBatch.length) {
         try {
-          await session.zipSession?.finalize();
+          await sender.zipSession?.finalize();
         } catch (error) {
           this.failReceive(
             fileId,
@@ -217,8 +220,8 @@ export class TransferReceiver {
           );
           return;
         }
-        session.zipSession = null;
-        session.clearPullBatch();
+        sender.zipSession = null;
+        sender.clearPullBatch();
         session.completeReceiveBatch();
       }
     } else if (!state.useZip && session.manualDownload) {
@@ -226,7 +229,7 @@ export class TransferReceiver {
     }
 
     session.emitReceiveHistory(state.meta, "completed");
-    session.receiving.delete(fileId);
+    session.receiver.receiving.delete(fileId);
     session.emitReceiveProgress(state.meta, "completed", state.meta.size);
 
     void session.io.sendControl({ type: "ack", fileId });
@@ -234,35 +237,37 @@ export class TransferReceiver {
   }
 
   private getOrCreateZipSession(filename?: string) {
-    const { session } = this;
-    if (!session.zipSession || session.zipSession.isFinalized()) {
-      session.zipSession = new ZipDownloadSession(filename, {
+    const sender = this.session.sender;
+    if (!sender.zipSession || sender.zipSession.isFinalized()) {
+      sender.zipSession = new ZipDownloadSession(filename, {
         onAbort: () => this.onZipDownloadAborted(),
       });
     }
-    return session.zipSession;
+    return sender.zipSession;
   }
 
   private onZipDownloadAborted() {
     const { session } = this;
-    for (const fileId of [...session.receiving.keys()]) {
+    const sender = session.sender;
+    for (const fileId of [...session.receiver.receiving.keys()]) {
       this.abortBrowserDownload(fileId);
     }
-    session.zipSession = null;
-    session.clearPullBatch();
+    sender.zipSession = null;
+    sender.clearPullBatch();
   }
 
   abortBrowserDownload(fileId: string) {
     const { session } = this;
-    const state = session.receiving.get(fileId);
+    const sender = session.sender;
+    const state = session.receiver.receiving.get(fileId);
 
     if (state) {
       this.abortStream(state);
-      session.receiving.delete(fileId);
-      session.pendingMetas.set(fileId, state.meta);
+      session.receiver.receiving.delete(fileId);
+      session.receiver.pendingMetas.set(fileId, state.meta);
 
-      if (session.receiving.size === 0) {
-        session.expectingBinary = false;
+      if (session.receiver.receiving.size === 0) {
+        sender.expectingBinary = false;
       }
 
       session.emitReceiveProgress(state.meta, "pending");
@@ -273,60 +278,65 @@ export class TransferReceiver {
 
   dismissReceived(fileId: string) {
     const { session } = this;
+    const sender = session.sender;
     if (session.dismissedReceivedIds.has(fileId)) return;
     session.dismissedReceivedIds.add(fileId);
 
-    session.pendingMetas.delete(fileId);
+    session.receiver.pendingMetas.delete(fileId);
 
-    const recvState = session.receiving.get(fileId);
+    const recvState = session.receiver.receiving.get(fileId);
     if (recvState) {
       this.abortStream(recvState);
-      session.receiving.delete(fileId);
+      session.receiver.receiving.delete(fileId);
 
-      if (!session.receiving.size) {
-        session.expectingBinary = false;
+      if (!session.receiver.receiving.size) {
+        sender.expectingBinary = false;
       }
 
       void session.io.sendControl({ type: "download-aborted", fileId });
     }
 
     session.callbacks.onFileDismissed?.(fileId);
+    session.releaseFileTracking(fileId);
+    session.pruneIdleTracking();
   }
 
   async finalizeZipDownload() {
-    const { session } = this;
-    if (session.zipSession && !session.zipSession.isFinalized()) {
-      await session.zipSession.finalize();
-      session.zipSession = null;
+    const sender = this.session.sender;
+    if (sender.zipSession && !sender.zipSession.isFinalized()) {
+      await sender.zipSession.finalize();
+      sender.zipSession = null;
     }
 
-    session.batchUsesZip = false;
+    sender.batchUsesZip = false;
   }
 
   async cleanupReceives() {
     const { session } = this;
+    const sender = session.sender;
     await session.chunkWriteQueue.catch(() => undefined);
 
-    for (const [, state] of session.receiving) {
+    for (const [, state] of session.receiver.receiving) {
       await state.streamWriter?.abort().catch(() => undefined);
     }
 
-    if (session.zipSession && !session.zipSession.isFinalized()) {
-      await session.zipSession.finalize().catch(() => undefined);
+    if (sender.zipSession && !sender.zipSession.isFinalized()) {
+      await sender.zipSession.finalize().catch(() => undefined);
     }
-    session.zipSession = null;
+    sender.zipSession = null;
   }
 
   requestPull(fileId: string) {
     const { session } = this;
-    const meta = session.pendingMetas.get(fileId);
+    const sender = session.sender;
+    const meta = session.receiver.pendingMetas.get(fileId);
     if (!meta) return;
 
-    session.pendingMetas.delete(fileId);
-    session.expectingBinary = true;
-    session.activePullBatch = null;
-    session.batchUsesZip = false;
-    session.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 1 };
+    session.receiver.pendingMetas.delete(fileId);
+    sender.expectingBinary = true;
+    sender.activePullBatch = null;
+    sender.batchUsesZip = false;
+    session.receiver.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 1 };
 
     this.armReceive(meta);
     void session.io.sendControl({ type: "pull", fileId });
@@ -334,34 +344,35 @@ export class TransferReceiver {
 
   requestPullBatch(fileIds: string[], zipFilename?: string) {
     const { session } = this;
-    const validIds = fileIds.filter((id) => session.pendingMetas.has(id));
+    const sender = session.sender;
+    const validIds = fileIds.filter((id) => session.receiver.pendingMetas.has(id));
     if (!validIds.length) return;
 
-    session.activePullBatch = validIds;
-    session.activePullBatchFilename = zipFilename;
-    session.pullBatchReceivedCount = 0;
-    session.batchUsesZip = validIds.length > 1;
-    session.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: validIds.length };
+    sender.activePullBatch = validIds;
+    sender.activePullBatchFilename = zipFilename;
+    sender.pullBatchReceivedCount = 0;
+    sender.batchUsesZip = validIds.length > 1;
+    session.receiver.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: validIds.length };
 
     for (const fileId of validIds) {
-      const meta = session.pendingMetas.get(fileId)!;
-      session.pendingMetas.delete(fileId);
+      const meta = session.receiver.pendingMetas.get(fileId)!;
+      session.receiver.pendingMetas.delete(fileId);
       this.armReceive(meta);
     }
 
-    session.expectingBinary = true;
+    sender.expectingBinary = true;
     void session.io.sendControl({ type: "pull-batch", fileIds: validIds });
   }
 
   onMeta(message: FileMeta) {
     const { session } = this;
     if (session.dismissedReceivedIds.has(message.fileId)) return;
-    session.pendingMetas.set(message.fileId, message);
+    session.receiver.pendingMetas.set(message.fileId, message);
 
-    if (!session.activeReceiveBatch) {
-      session.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 0 };
+    if (!session.receiver.activeReceiveBatch) {
+      session.receiver.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 0 };
     }
-    session.activeReceiveBatch.fileCount += 1;
+    session.receiver.activeReceiveBatch.fileCount += 1;
 
     session.emitReceiveProgress(message, "pending");
   }
@@ -371,10 +382,10 @@ export class TransferReceiver {
     if (session.cancelledFileIds.has(fileId)) return;
     if (session.dismissedReceivedIds.has(fileId)) return;
 
-    const meta = session.pendingMetas.get(fileId);
+    const meta = session.receiver.pendingMetas.get(fileId);
     if (!meta) return;
 
-    session.pendingMetas.delete(fileId);
+    session.receiver.pendingMetas.delete(fileId);
     this.armReceive(meta);
   }
 

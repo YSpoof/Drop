@@ -2,7 +2,7 @@
   import ToastProgressBar from "$lib/components/ui/ToastProgressBar.svelte";
   import { toastStore } from "$lib/stores/toast.svelte";
   import type { Toast } from "$lib/types";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
   import { flip } from "svelte/animate";
   import { fade } from "svelte/transition";
   import AlertOctagon from "~icons/mdi/alert-octagon-outline";
@@ -30,7 +30,7 @@
   };
 
   const handleRemoveToast = (toast: Toast) => {
-    vibrate.light();
+    feedback.light();
     toastStore.removeToast(toast.id);
   };
 </script>
@@ -39,8 +39,8 @@
   class="toast toast-top toast-center top-20! z-50"
   aria-live="polite">
   {#each toastStore.visibleToasts as toast (toast.id)}
-    {@const meta = toastMeta[toast.type]}
-    {@const Icon = meta.icon}
+    {const meta = toastMeta[toast.type]}
+    {const Icon = meta.icon}
     <div
       class={`alert ${meta.class} relative overflow-hidden`}
       role="status"

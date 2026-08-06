@@ -1,6 +1,6 @@
 <script lang="ts">
   import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
   import { tick } from "svelte";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
@@ -45,31 +45,31 @@
   }
 
   async function handleSelectManual() {
-    vibrate.light();
+    feedback.light();
     await onSelectManual();
     await tick();
     await copyLink();
   }
 
   async function handleSelectAuto() {
-    vibrate.light();
+    feedback.light();
     await onSelectAuto();
     await tick();
     await copyLink();
   }
 
   async function handleCopy() {
-    vibrate.light();
+    feedback.light();
     await copyLink();
   }
 
   function handleLeaveRoom() {
-    vibrate.medium();
+    feedback.medium();
     onLeaveRoom();
   }
 
   function handleClose() {
-    vibrate.light();
+    feedback.light();
     onClose();
   }
 </script>

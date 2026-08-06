@@ -3,7 +3,7 @@
   import { siteData } from "$lib/siteData";
   import { appState } from "$lib/stores/appState.svelte";
   import { localForage } from "$lib/utils/localForage";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
   import type { Component } from "svelte";
   import { Tween } from "svelte/motion";
   import AccountEditIcon from "~icons/mdi/account-edit";
@@ -60,7 +60,7 @@
   const progress = new Tween((1 / steps.length) * 100, { duration: 100 });
 
   function handleClose() {
-    vibrate.light();
+    feedback.light();
     appState.tutorialModalOpen = false;
     localForage.setItem("tutorialViewed", true);
     setTimeout(() => {
@@ -70,7 +70,7 @@
   }
 
   function handlePrevious() {
-    vibrate.light();
+    feedback.light();
 
     if (currentStep > 0) {
       currentStep--;
@@ -78,7 +78,7 @@
   }
 
   function handleNext() {
-    vibrate.light();
+    feedback.light();
 
     if (isLastStep) {
       handleClose();

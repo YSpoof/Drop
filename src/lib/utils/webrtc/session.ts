@@ -20,44 +20,22 @@ export interface ReceiveState {
   streamWriter?: WritableStreamDefaultWriter<Uint8Array>;
 }
 
-/** Shared mutable session state for sender + receiver + coordinator. */
-export class TransferSession {
-  receiving = new Map<string, ReceiveState>();
-  pendingMetas = new Map<string, FileMeta>();
+/** Sending-side mutable state owned by TransferSender. */
+export class SenderState {
   sending = false;
   expectingBinary = false;
   currentSendFile: QueuedFile | null = null;
   zipSession: ZipDownloadSession | null = null;
   batchUsesZip = false;
-  aborted = false;
-  manualDownload: boolean | null = null;
-  peerManualDownload = true;
   announcedFiles = new Map<string, QueuedFile>();
   pendingPulls: string[] = [];
   activePullBatch: string[] | null = null;
   activePullBatchFilename?: string;
   pullBatchReceivedCount = 0;
   activeSendBatch: ActiveBatch | null = null;
-  activeReceiveBatch: ActiveBatch | null = null;
-  chunkWriteQueue = Promise.resolve();
-  preReceiveChunks: ArrayBuffer[] = [];
-  cancelledFileIds = new Set<string>();
-  dismissedReceivedIds = new Set<string>();
+  announcedOrder: string[] = [];
   downloadAbortedSendIds = new Set<string>();
   servedFileIds = new Set<string>();
-  announcedOrder: string[] = [];
-
-  constructor(
-    readonly controlChannel: RTCDataChannel,
-    readonly filesChannel: RTCDataChannel,
-    readonly callbacks: TransferCallbacks,
-    readonly io: DataChannelIo,
-    readonly chunkSize: number,
-  ) {}
-
-  channelsOpen(): boolean {
-    return this.controlChannel.readyState === "open" && this.filesChannel.readyState === "open";
-  }
 
   clearSending() {
     this.sending = false;
@@ -71,24 +49,95 @@ export class TransferSession {
     this.batchUsesZip = false;
   }
 
-  resetForAbort() {
-    this.aborted = true;
-    this.receiving.clear();
-    this.pendingMetas.clear();
+  reset() {
+    this.clearSending();
+    this.expectingBinary = false;
     this.announcedFiles.clear();
     this.announcedOrder = [];
     this.pendingPulls = [];
     this.clearPullBatch();
     this.zipSession = null;
     this.activeSendBatch = null;
-    this.activeReceiveBatch = null;
-    this.clearSending();
-    this.expectingBinary = false;
-    this.preReceiveChunks = [];
     this.downloadAbortedSendIds.clear();
     this.servedFileIds.clear();
+  }
+
+  releaseFileTracking(fileId: string) {
+    this.downloadAbortedSendIds.delete(fileId);
+    this.servedFileIds.delete(fileId);
+  }
+}
+
+/** Receiving-side mutable state owned by TransferReceiver. */
+export class ReceiverState {
+  receiving = new Map<string, ReceiveState>();
+  pendingMetas = new Map<string, FileMeta>();
+  preReceiveChunks: ArrayBuffer[] = [];
+  activeReceiveBatch: ActiveBatch | null = null;
+
+  reset() {
+    this.receiving.clear();
+    this.pendingMetas.clear();
+    this.preReceiveChunks = [];
+    this.activeReceiveBatch = null;
+  }
+}
+
+/** Shared mutable session state for sender + receiver + coordinator. */
+export class TransferSession {
+  readonly sender = new SenderState();
+  readonly receiver = new ReceiverState();
+  aborted = false;
+  manualDownload: boolean | null = null;
+  peerManualDownload = true;
+  chunkWriteQueue = Promise.resolve();
+  cancelledFileIds = new Set<string>();
+  dismissedReceivedIds = new Set<string>();
+
+  constructor(
+    readonly controlChannel: RTCDataChannel,
+    readonly filesChannel: RTCDataChannel,
+    readonly callbacks: TransferCallbacks,
+    readonly io: DataChannelIo,
+    readonly chunkSize: number,
+  ) {}
+
+  channelsOpen(): boolean {
+    return this.controlChannel.readyState === "open" && this.filesChannel.readyState === "open";
+  }
+
+  resetForAbort() {
+    this.aborted = true;
+    this.sender.reset();
+    this.receiver.reset();
+    this.cancelledFileIds.clear();
+    this.dismissedReceivedIds.clear();
     this.controlChannel.onmessage = null;
     this.filesChannel.onmessage = null;
+  }
+
+  /** Drop per-file tracking once transfer lifecycle for that id is finished. */
+  releaseFileTracking(fileId: string) {
+    this.cancelledFileIds.delete(fileId);
+    this.dismissedReceivedIds.delete(fileId);
+    this.sender.releaseFileTracking(fileId);
+  }
+
+  /** Prune tracking sets when no files are in flight. */
+  pruneIdleTracking() {
+    if (
+      this.sender.announcedFiles.size > 0 ||
+      this.sender.pendingPulls.length > 0 ||
+      this.sender.sending ||
+      this.receiver.receiving.size > 0 ||
+      this.receiver.pendingMetas.size > 0
+    ) {
+      return;
+    }
+    this.cancelledFileIds.clear();
+    this.dismissedReceivedIds.clear();
+    this.sender.downloadAbortedSendIds.clear();
+    this.sender.servedFileIds.clear();
   }
 
   emitProgress(progress: TransferProgress) {
@@ -101,6 +150,8 @@ export class TransferSession {
     if (this.cancelledFileIds.has(entry.id)) return;
     if (this.dismissedReceivedIds.has(entry.id)) return;
     this.callbacks.onHistory?.(entry);
+    this.releaseFileTracking(entry.id);
+    this.pruneIdleTracking();
   }
 
   emitQueuedProgress(
@@ -147,7 +198,8 @@ export class TransferSession {
   }
 
   withBatchContext(entry: HistoryEntry): HistoryEntry {
-    const batch = entry.direction === "sent" ? this.activeSendBatch : this.activeReceiveBatch;
+    const batch =
+      entry.direction === "sent" ? this.sender.activeSendBatch : this.receiver.activeReceiveBatch;
     if (!batch) return entry;
     return {
       ...entry,
@@ -157,21 +209,23 @@ export class TransferSession {
   }
 
   ensureSendBatch(fileCount: number) {
-    if (!this.activeSendBatch) {
-      this.activeSendBatch = { id: crypto.randomUUID(), fileCount };
+    if (!this.sender.activeSendBatch) {
+      this.sender.activeSendBatch = { id: crypto.randomUUID(), fileCount };
     }
   }
 
   completeBatch(direction: "sent" | "received") {
-    const batch = direction === "sent" ? this.activeSendBatch : this.activeReceiveBatch;
+    const batch =
+      direction === "sent" ? this.sender.activeSendBatch : this.receiver.activeReceiveBatch;
     if (!batch) return;
     this.callbacks.onBatchDone?.({
       batchId: batch.id,
       direction,
       fileCountInBatch: batch.fileCount,
     });
-    if (direction === "sent") this.activeSendBatch = null;
-    else this.activeReceiveBatch = null;
+    if (direction === "sent") this.sender.activeSendBatch = null;
+    else this.receiver.activeReceiveBatch = null;
+    this.pruneIdleTracking();
   }
 
   completeSendBatch() {
@@ -196,55 +250,9 @@ export class TransferSession {
 
   /** Returns true when an in-flight send for `fileId` should stop. */
   shouldStopSend(fileId: string): boolean {
+    const { sender } = this;
     return (
-      this.aborted || this.cancelledFileIds.has(fileId) || this.downloadAbortedSendIds.has(fileId)
+      this.aborted || this.cancelledFileIds.has(fileId) || sender.downloadAbortedSendIds.has(fileId)
     );
-  }
-
-  /** Shared chunk loop used by pull-send and auto-send. */
-  async sendFileChunks(queued: QueuedFile): Promise<boolean> {
-    const totalChunks = Math.ceil(queued.file.size / this.chunkSize);
-    let bytesSent = 0;
-
-    for (let index = 0; index < totalChunks; index += 1) {
-      if (this.shouldStopSend(queued.id)) {
-        this.clearSending();
-        return false;
-      }
-      const offset = index * this.chunkSize;
-      const slice = queued.file.slice(offset, offset + this.chunkSize);
-      const buffer = await slice.arrayBuffer();
-      if (this.shouldStopSend(queued.id)) {
-        this.clearSending();
-        return false;
-      }
-      await this.io.sendBuffer(buffer);
-      if (this.shouldStopSend(queued.id)) {
-        this.clearSending();
-        return false;
-      }
-      this.callbacks.onChunkBytes?.("send", buffer.byteLength);
-      bytesSent += buffer.byteLength;
-      this.emitQueuedProgress(queued, "in-progress", bytesSent);
-    }
-
-    if (this.shouldStopSend(queued.id)) {
-      this.clearSending();
-      return false;
-    }
-
-    await this.io.sendControl({ type: "done", fileId: queued.id });
-
-    this.emitHistory(
-      this.withBatchContext({
-        id: queued.id,
-        name: queued.path,
-        size: queued.file.size,
-        direction: "sent",
-        status: "completed",
-        timestamp: Date.now(),
-      }),
-    );
-    return true;
   }
 }

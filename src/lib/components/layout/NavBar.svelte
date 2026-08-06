@@ -3,7 +3,7 @@
   import { siteData } from "$lib/siteData";
   import { appState } from "$lib/stores/appState.svelte";
   import { toastStore } from "$lib/stores/toast.svelte";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
   import BugIcon from "~icons/mdi/bug";
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
@@ -14,7 +14,7 @@
   let lastTapAt = 0;
 
   const handleLogoClick = () => {
-    vibrate.heavy();
+    feedback.heavy();
     if (appState.devMode) {
       appState.setDevMode(false);
       toastStore.showToast("Modo desenvolvedor desativado", "info");

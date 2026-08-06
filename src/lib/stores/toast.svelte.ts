@@ -1,5 +1,5 @@
 import type { Toast } from "$lib/types";
-import vibrate from "$lib/utils/vibrate";
+import { feedback } from "$lib/utils/feedback";
 
 const TOAST_DURATION_BY_TYPE: Record<Toast["type"], number> = {
   success: 3000,
@@ -32,16 +32,16 @@ class ToastStore {
 
     switch (type) {
       case "success":
-        vibrate.success();
+        feedback.success();
         break;
       case "info":
-        vibrate.info();
+        feedback.info();
         break;
       case "warning":
-        vibrate.warning();
+        feedback.warning();
         break;
       case "error":
-        vibrate.error();
+        feedback.error();
         break;
     }
   }

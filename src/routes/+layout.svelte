@@ -6,28 +6,28 @@
   import NavBar from "$lib/components/layout/NavBar.svelte";
   import ToastRenderer from "$lib/components/ui/ToastRenderer.svelte";
   import { siteData } from "$lib/siteData";
-  import { appState } from "$lib/stores/appState.svelte";
   import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
+  import { uiStore } from "$lib/stores/uiStore.svelte";
+  import { layoutModals } from "$lib/utils/layoutModals";
   import { abortOnPageClose, flushStatsOnHide } from "$lib/utils/pageUnload";
   import { onMount } from "svelte";
 
   let { children } = $props();
 
   $effect.pre(() => {
-    if (appState.tutorialModalOpen) lazyLoad.mark("tutorialModal");
-    if (appState.infoModalOpen) lazyLoad.mark("infoModal");
-    if (appState.statsModalOpen) lazyLoad.mark("statsModal");
-    if (appState.settingsModalOpen) lazyLoad.mark("settingsModal");
+    for (const modal of layoutModals) {
+      if (modal.isOpen()) lazyLoad.mark(modal.key);
+    }
     if (updated.current) lazyLoad.mark("updateModal");
   });
 
   const handleBeforeInstallPrompt = (e: Event) => {
     e.preventDefault();
-    appState.setInstallPrompt(e as BeforeInstallPromptEvent);
+    uiStore.setInstallPrompt(e as BeforeInstallPromptEvent);
   };
 
   const handleAppInstalled = () => {
-    appState.clearInstallPrompt();
+    uiStore.clearInstallPrompt();
   };
 
   onMount(() => {
@@ -65,25 +65,12 @@
 
 <ToastRenderer />
 
-{#if lazyLoad.has("tutorialModal")}
-  {const TutorialModal = (await import("$lib/components/modals/TutorialModal.svelte")).default}
-  <TutorialModal />
-{/if}
-
-{#if lazyLoad.has("infoModal")}
-  {const InfoModal = (await import("$lib/components/modals/InfoModal.svelte")).default}
-  <InfoModal />
-{/if}
-
-{#if lazyLoad.has("statsModal")}
-  {const StatsModal = (await import("$lib/components/modals/StatsModal.svelte")).default}
-  <StatsModal />
-{/if}
-
-{#if lazyLoad.has("settingsModal")}
-  {const SettingsModal = (await import("$lib/components/modals/SettingsModal.svelte")).default}
-  <SettingsModal />
-{/if}
+{#each layoutModals as modal (modal.key)}
+  {#if lazyLoad.has(modal.key)}
+    {const Component = (await modal.load()).default}
+    <Component />
+  {/if}
+{/each}
 
 {#if lazyLoad.has("updateModal")}
   {const UpdateModal = (await import("$lib/components/modals/UpdateModal.svelte")).default}

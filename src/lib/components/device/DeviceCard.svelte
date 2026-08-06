@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PeerInfo } from "$lib/utils/signaling/types";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
   import CloudOutlineIcon from "~icons/mdi/cloud-outline";
   import TransitConnectionHorizontalIcon from "~icons/mdi/transit-connection-horizontal";
   import WifiIcon from "~icons/mdi/wifi";
@@ -24,12 +24,12 @@
   }: Props = $props();
 
   function handleConnect() {
-    vibrate.light();
+    feedback.light();
     onConnect(peer.peerId);
   }
 
   function handleDisconnect() {
-    vibrate.medium();
+    feedback.medium();
     onDisconnect?.();
   }
 </script>

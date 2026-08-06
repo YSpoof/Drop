@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatBytes } from "$lib/utils/files/format";
+  import { formatBytes, formatSpeed } from "$lib/utils/files/format";
   import type { QueuedFile } from "$lib/utils/files/queue";
   import type { TransferItem } from "$lib/utils/files/transferTypes";
   import ProgressDownloadIcon from "~icons/mdi/progress-download";
@@ -73,10 +73,7 @@
     }
   });
 
-  function formatSpeed(bytesPerSec: number): string {
-    if (bytesPerSec <= 0) return "0 B/s";
-    return `${formatBytes(bytesPerSec)}/s`;
-  }
+
 </script>
 
 <section class="card bg-base-100 dark:bg-base-300 min-w-0 flex-1 overflow-hidden shadow-sm">

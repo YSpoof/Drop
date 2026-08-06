@@ -13,19 +13,20 @@ export class TransferSender {
     const { session } = this;
     if (session.cancelledFileIds.has(fileId)) return undefined;
     return (
-      session.announcedFiles.get(fileId) ??
+      session.sender.announcedFiles.get(fileId) ??
       session.callbacks.getSendQueue().find((item) => item.id === fileId)
     );
   }
 
   async processNextPull() {
     const { session } = this;
-    if (session.aborted || session.sending || !session.pendingPulls.length) return;
-    while (session.pendingPulls.length && session.cancelledFileIds.has(session.pendingPulls[0]!)) {
-      session.pendingPulls.shift();
+    const { sender } = session;
+    if (session.aborted || sender.sending || !sender.pendingPulls.length) return;
+    while (sender.pendingPulls.length && session.cancelledFileIds.has(sender.pendingPulls[0]!)) {
+      sender.pendingPulls.shift();
     }
-    if (!session.pendingPulls.length) return;
-    const fileId = session.pendingPulls[0]!;
+    if (!sender.pendingPulls.length) return;
+    const fileId = sender.pendingPulls[0]!;
     await this.sendFileBinary(fileId);
   }
 
@@ -34,16 +35,17 @@ export class TransferSender {
     options: { sendStart?: boolean; retryOnIncomplete?: boolean } = {},
   ) {
     const { session } = this;
-    session.downloadAbortedSendIds.delete(queued.id);
-    session.sending = true;
-    session.currentSendFile = queued;
+    const sender = session.sender;
+    sender.downloadAbortedSendIds.delete(queued.id);
+    sender.sending = true;
+    sender.currentSendFile = queued;
 
     if (options.sendStart) {
       await session.io.sendControl({ type: "start", fileId: queued.id });
     }
 
     session.emitQueuedProgress(queued, "in-progress");
-    const completed = await session.sendFileChunks(queued);
+    const completed = await this.sendFileChunks(queued);
     if (!completed && options.retryOnIncomplete) {
       void this.trySendNext();
     }
@@ -51,28 +53,30 @@ export class TransferSender {
 
   private async sendFileBinary(fileId: string) {
     const { session } = this;
-    if (session.aborted || session.sending || !session.channelsOpen()) return;
+    const sender = session.sender;
+    if (session.aborted || sender.sending || !session.channelsOpen()) return;
 
     const queued = this.resolveQueuedFile(fileId);
     if (!queued) {
-      session.pendingPulls.shift();
+      sender.pendingPulls.shift();
       void this.processNextPull();
       return;
     }
 
-    session.ensureSendBatch(session.pendingPulls.length);
+    session.ensureSendBatch(sender.pendingPulls.length);
     await this.beginSend(queued);
   }
 
   announcePendingFiles() {
     const { session } = this;
-    if (session.sending) return;
+    const sender = session.sender;
+    if (sender.sending) return;
 
     const queue = session.callbacks
       .getSendQueue()
       .filter((item) => !session.cancelledFileIds.has(item.id));
     const toAnnounce = queue.filter(
-      (queued) => !session.announcedFiles.has(queued.id) && !session.servedFileIds.has(queued.id),
+      (queued) => !sender.announcedFiles.has(queued.id) && !sender.servedFileIds.has(queued.id),
     );
     if (toAnnounce.length) {
       session.ensureSendBatch(toAnnounce.length);
@@ -80,35 +84,36 @@ export class TransferSender {
 
     for (const queued of queue) {
       if (
-        session.announcedFiles.has(queued.id) ||
+        sender.announcedFiles.has(queued.id) ||
         session.cancelledFileIds.has(queued.id) ||
-        session.servedFileIds.has(queued.id)
+        sender.servedFileIds.has(queued.id)
       )
         continue;
 
       const meta = session.buildFileMeta(queued);
 
       void session.io.sendControl(meta);
-      session.announcedFiles.set(queued.id, queued);
-      session.announcedOrder.push(queued.id);
+      sender.announcedFiles.set(queued.id, queued);
+      sender.announcedOrder.push(queued.id);
       session.emitQueuedProgress(queued, "pending");
     }
   }
 
   private async sendNextAutoBinary() {
     const { session } = this;
-    if (session.sending || session.peerManualDownload) return;
+    const sender = session.sender;
+    if (sender.sending || session.peerManualDownload) return;
 
-    const fileId = session.announcedOrder.find(
+    const fileId = sender.announcedOrder.find(
       (id) =>
-        session.announcedFiles.has(id) &&
+        sender.announcedFiles.has(id) &&
         !session.cancelledFileIds.has(id) &&
-        !session.downloadAbortedSendIds.has(id) &&
-        !session.servedFileIds.has(id),
+        !sender.downloadAbortedSendIds.has(id) &&
+        !sender.servedFileIds.has(id),
     );
     if (!fileId) return;
 
-    const queued = session.announcedFiles.get(fileId);
+    const queued = sender.announcedFiles.get(fileId);
     if (!queued) return;
 
     await this.beginSend(queued, { sendStart: true, retryOnIncomplete: true });
@@ -116,18 +121,20 @@ export class TransferSender {
 
   private hasUnservedAnnounced(): boolean {
     const { session } = this;
-    for (const id of session.announcedOrder) {
+    const sender = session.sender;
+    for (const id of sender.announcedOrder) {
       if (session.cancelledFileIds.has(id)) continue;
-      if (!session.announcedFiles.has(id)) continue;
-      if (!session.servedFileIds.has(id)) return true;
+      if (!sender.announcedFiles.has(id)) continue;
+      if (!sender.servedFileIds.has(id)) return true;
     }
     return false;
   }
 
   notifyBatchDoneIfIdle() {
     const { session } = this;
-    if (session.sending) return;
-    if (session.pendingPulls.length) return;
+    const sender = session.sender;
+    if (sender.sending) return;
+    if (sender.pendingPulls.length) return;
 
     this.announcePendingFiles();
 
@@ -144,6 +151,7 @@ export class TransferSender {
 
   async trySendNext() {
     const { session } = this;
+    const sender = session.sender;
     if (session.aborted || !session.channelsOpen()) return;
 
     this.announcePendingFiles();
@@ -153,25 +161,29 @@ export class TransferSender {
       return;
     }
 
-    if (session.sending) return;
+    if (sender.sending) return;
 
     await this.sendNextAutoBinary();
   }
 
   onAck(fileId: string) {
     const { session } = this;
+    const sender = session.sender;
     if (session.cancelledFileIds.has(fileId)) {
-      session.clearSending();
+      sender.clearSending();
       void this.trySendNext();
       return;
     }
-    session.sending = false;
-    if (session.currentSendFile) {
-      session.servedFileIds.add(session.currentSendFile.id);
-      session.currentSendFile = null;
+    sender.sending = false;
+    if (sender.currentSendFile) {
+      sender.servedFileIds.add(sender.currentSendFile.id);
+      sender.announcedFiles.delete(sender.currentSendFile.id);
+      sender.announcedOrder = sender.announcedOrder.filter((id) => id !== fileId);
+      sender.currentSendFile = null;
+      session.releaseFileTracking(fileId);
     }
-    if (session.pendingPulls.length) {
-      session.pendingPulls.shift();
+    if (sender.pendingPulls.length) {
+      sender.pendingPulls.shift();
     }
     void this.trySendNext().then(() => {
       void this.processNextPull();
@@ -181,17 +193,18 @@ export class TransferSender {
 
   stopReceiveDownload(fileId: string) {
     const { session } = this;
+    const sender = session.sender;
     const queued =
-      session.currentSendFile?.id === fileId
-        ? session.currentSendFile
+      sender.currentSendFile?.id === fileId
+        ? sender.currentSendFile
         : this.resolveQueuedFile(fileId);
 
-    session.downloadAbortedSendIds.add(fileId);
+    sender.downloadAbortedSendIds.add(fileId);
 
-    if (session.currentSendFile?.id === fileId) {
-      session.clearSending();
+    if (sender.currentSendFile?.id === fileId) {
+      sender.clearSending();
     }
-    session.pendingPulls = session.pendingPulls.filter((id) => id !== fileId);
+    sender.pendingPulls = sender.pendingPulls.filter((id) => id !== fileId);
 
     if (queued) {
       session.emitQueuedProgress(queued, "pending");
@@ -203,9 +216,9 @@ export class TransferSender {
 
   private enqueuePullIds(fileIds: string[]) {
     for (const fileId of fileIds) {
-      this.session.downloadAbortedSendIds.delete(fileId);
+      this.session.sender.downloadAbortedSendIds.delete(fileId);
     }
-    this.session.pendingPulls.push(...fileIds);
+    this.session.sender.pendingPulls.push(...fileIds);
     void this.processNextPull();
   }
 
@@ -215,5 +228,54 @@ export class TransferSender {
 
   enqueuePullBatch(fileIds: string[]) {
     this.enqueuePullIds(fileIds);
+  }
+
+  /** Shared chunk loop used by pull-send and auto-send. */
+  async sendFileChunks(queued: QueuedFile): Promise<boolean> {
+    const { session } = this;
+    const sender = session.sender;
+    const totalChunks = Math.ceil(queued.file.size / session.chunkSize);
+    let bytesSent = 0;
+
+    for (let index = 0; index < totalChunks; index += 1) {
+      if (session.shouldStopSend(queued.id)) {
+        sender.clearSending();
+        return false;
+      }
+      const offset = index * session.chunkSize;
+      const slice = queued.file.slice(offset, offset + session.chunkSize);
+      const buffer = await slice.arrayBuffer();
+      if (session.shouldStopSend(queued.id)) {
+        sender.clearSending();
+        return false;
+      }
+      await session.io.sendBuffer(buffer);
+      if (session.shouldStopSend(queued.id)) {
+        sender.clearSending();
+        return false;
+      }
+      session.callbacks.onChunkBytes?.("send", buffer.byteLength);
+      bytesSent += buffer.byteLength;
+      session.emitQueuedProgress(queued, "in-progress", bytesSent);
+    }
+
+    if (session.shouldStopSend(queued.id)) {
+      sender.clearSending();
+      return false;
+    }
+
+    await session.io.sendControl({ type: "done", fileId: queued.id });
+
+    session.emitHistory(
+      session.withBatchContext({
+        id: queued.id,
+        name: queued.path,
+        size: queued.file.size,
+        direction: "sent",
+        status: "completed",
+        timestamp: Date.now(),
+      }),
+    );
+    return true;
   }
 }

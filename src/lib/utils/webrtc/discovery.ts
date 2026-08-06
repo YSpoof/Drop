@@ -1,6 +1,6 @@
 import { isPrivateIp } from "$lib/utils/net/privateIp";
 
-import { ICE_SERVERS } from "./ice";
+import { ICE_SERVERS } from "./peer";
 
 function extractIpv4(candidate: string): string | null {
   const match = candidate.match(/(\d{1,3}(?:\.\d{1,3}){3})/);

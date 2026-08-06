@@ -1,4 +1,5 @@
-import { ICE_SERVERS } from "./ice";
+export const STUN_SERVER = "stun:stun.l.google.com:19302";
+export const ICE_SERVERS: RTCIceServer[] = [{ urls: STUN_SERVER }];
 
 export const CONTROL_CHANNEL_ID = 0;
 export const FILES_CHANNEL_ID = 1;

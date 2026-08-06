@@ -1,6 +1,6 @@
 <script lang="ts">
   import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import vibrate from "$lib/utils/vibrate";
+  import { feedback } from "$lib/utils/feedback";
 
   interface Props {
     open: boolean;
@@ -12,12 +12,12 @@
   let { open, denied, onClose, onContinue }: Props = $props();
 
   function handleClose() {
-    vibrate.light();
+    feedback.light();
     onClose();
   }
 
   async function handleContinue() {
-    vibrate.light();
+    feedback.light();
     await onContinue();
   }
 </script>

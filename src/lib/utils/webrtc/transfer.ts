@@ -31,9 +31,9 @@ export class TransferManager {
     );
     this.session = new TransferSession(control, files, callbacks, io, chunkSize);
     abortState.shouldAbort = () => {
-      const session = this.session;
+      const { session } = this;
       if (session.aborted) return true;
-      const fileId = session.currentSendFile?.id;
+      const fileId = session.sender.currentSendFile?.id;
       return fileId != null && session.shouldStopSend(fileId);
     };
     this.sender = new TransferSender(this.session);
@@ -75,23 +75,23 @@ export class TransferManager {
   }
 
   cancelFile(fileId: string, notifyPeer = true) {
-    const { session } = this;
+    const { session, sender } = this;
     if (session.aborted || session.cancelledFileIds.has(fileId)) return;
     session.cancelledFileIds.add(fileId);
 
-    session.announcedFiles.delete(fileId);
-    session.announcedOrder = session.announcedOrder.filter((id) => id !== fileId);
-    session.pendingMetas.delete(fileId);
-    session.pendingPulls = session.pendingPulls.filter((id) => id !== fileId);
+    session.sender.announcedFiles.delete(fileId);
+    session.sender.announcedOrder = session.sender.announcedOrder.filter((id) => id !== fileId);
+    session.receiver.pendingMetas.delete(fileId);
+    session.sender.pendingPulls = session.sender.pendingPulls.filter((id) => id !== fileId);
 
-    if (session.currentSendFile?.id === fileId) {
-      session.clearSending();
+    if (session.sender.currentSendFile?.id === fileId) {
+      session.sender.clearSending();
     }
 
-    const recvState = session.receiving.get(fileId);
+    const recvState = session.receiver.receiving.get(fileId);
     if (recvState) {
       void recvState.streamWriter?.abort().catch(() => undefined);
-      session.receiving.delete(fileId);
+      session.receiver.receiving.delete(fileId);
     }
 
     if (notifyPeer) {
@@ -99,7 +99,9 @@ export class TransferManager {
     }
 
     session.callbacks.onFileCancelled?.(fileId);
-    void this.sender.trySendNext();
+    session.releaseFileTracking(fileId);
+    session.pruneIdleTracking();
+    void sender.trySendNext();
   }
 
   abort() {
@@ -117,10 +119,10 @@ export class TransferManager {
     if (!(event.data instanceof ArrayBuffer)) return;
 
     const { session } = this;
-    if (session.receiving.size > 0 || session.expectingBinary) {
+    if (session.receiver.receiving.size > 0 || session.sender.expectingBinary) {
       this.receiver.handleBinaryChunk(event.data);
     } else {
-      session.preReceiveChunks.push(event.data);
+      session.receiver.preReceiveChunks.push(event.data);
     }
   }
 

@@ -1,17 +1,15 @@
 <script lang="ts">
   import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
-  import { getFilesFromDataTransfer } from "$lib/utils/files/drop";
+  import { feedback } from "$lib/utils/feedback";
   import type { QueuedFile } from "$lib/utils/files/queue";
   import type { TransferItem } from "$lib/utils/files/transferTypes";
-  import { buildTree } from "$lib/utils/files/tree";
-  import vibrate from "$lib/utils/vibrate";
+  import { buildTree, type UnifiedItem } from "$lib/utils/files/tree";
   import DownloadMultipleIcon from "~icons/mdi/download-multiple";
   import FilePlusIcon from "~icons/mdi/file-plus";
   import FolderPlusIcon from "~icons/mdi/folder-plus";
   import PlusIcon from "~icons/mdi/plus";
 
   import FileDropZone from "./FileDropZone.svelte";
-  import type { UnifiedItem } from "./fileTreeHelpers";
 
   interface Props {
     autoDownload: boolean;
@@ -38,7 +36,6 @@
   }: Props = $props();
 
   let pathStack = $state<string[]>([]);
-  let dragOver = $state(false);
 
   let filePicker!: HTMLInputElement;
   let folderPicker!: HTMLInputElement;
@@ -85,35 +82,14 @@
   function handleFiles(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
-      vibrate.light();
+      feedback.light();
       onadd(input.files);
     }
     input.value = "";
   }
 </script>
 
-<svelte:window
-  ondragover={(e) => {
-    e.preventDefault();
-    dragOver = true;
-  }}
-  ondragleave={(e) => {
-    if (e.clientX === 0 || e.clientY === 0) dragOver = false;
-  }}
-  ondrop={async (e) => {
-    e.preventDefault();
-    dragOver = false;
-    if (e.dataTransfer?.items) {
-      vibrate.light();
-      const files = await getFilesFromDataTransfer(e.dataTransfer.items);
-      if (files.length > 0) onadd(files);
-    } else if (e.dataTransfer?.files.length) {
-      vibrate.light();
-      onadd(e.dataTransfer.files);
-    }
-  }} />
-
-<FileDropZone {dragOver} />
+<FileDropZone onDrop={onadd} />
 
 <section class="card bg-base-100 dark:bg-base-300 col-span-full min-w-0 overflow-hidden shadow-sm">
   <div class="card-body min-w-0 gap-4">
