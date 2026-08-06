@@ -7,6 +7,10 @@
 build
 data
 node_modules
+playwrite-report
+scripts
+test_results
+tests
 .dockerignore
 .gitignore
 .oxfmtrc.json

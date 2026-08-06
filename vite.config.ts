@@ -43,5 +43,8 @@ export default defineConfig({
   server: {
     port: 4321,
     allowedHosts: ["dev.lzart.com.br"],
+    watch: {
+      ignored: ["**/tests/**", "**/fixtures/**", "**/playwright-report/**"],
+    },
   },
 });

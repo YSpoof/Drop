@@ -1,0 +1,19 @@
+export PNPM_HOME="/home/zero/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+esac
+
+pushing_to_main=false
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    pushing_to_main=true
+    break
+  fi
+done
+
+if [ "$pushing_to_main" = true ]; then
+  echo "Push targets main — running Playwright tests..."
+  pnpm run prepush || exit 1
+fi

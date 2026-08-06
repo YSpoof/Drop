@@ -5,7 +5,7 @@
   import CogIcon from "~icons/mdi/cog";
   import InfoIcon from "~icons/mdi/information-outline";
   import LinkIcon from "~icons/mdi/link";
-  import LinkOffIcon from "~icons/mdi/link-off";
+  import LinkEditIcon from "~icons/mdi/link-edit";
   import SchoolIcon from "~icons/mdi/school-outline";
 
   const inRoom = $derived(!!page.url.searchParams.get("room"));
@@ -33,7 +33,7 @@
       class="btn btn-lg btn-circle {inRoom ? 'btn-success' : 'btn-primary'}"
       onclick={() => appState.handleShareLinkClick(inRoom)}>
       {#if inRoom}
-        <LinkOffIcon class="text-xl" />
+        <LinkEditIcon class="text-xl" />
       {:else}
         <LinkIcon class="text-xl" />
       {/if}
