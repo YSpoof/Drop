@@ -16,6 +16,7 @@ export interface ReceiveState {
   pendingChunks: ArrayBuffer[];
   sessionOpen: boolean;
   useZip: boolean;
+  senderDone: boolean;
   streamWriter?: WritableStreamDefaultWriter<Uint8Array>;
 }
 
@@ -47,11 +48,48 @@ export class TransferSession {
   announcedOrder: string[] = [];
 
   constructor(
-    readonly channel: RTCDataChannel,
+    readonly controlChannel: RTCDataChannel,
+    readonly filesChannel: RTCDataChannel,
     readonly callbacks: TransferCallbacks,
     readonly io: DataChannelIo,
     readonly chunkSize: number,
   ) {}
+
+  channelsOpen(): boolean {
+    return this.controlChannel.readyState === "open" && this.filesChannel.readyState === "open";
+  }
+
+  clearSending() {
+    this.sending = false;
+    this.currentSendFile = null;
+  }
+
+  clearPullBatch() {
+    this.activePullBatch = null;
+    this.activePullBatchFilename = undefined;
+    this.pullBatchReceivedCount = 0;
+    this.batchUsesZip = false;
+  }
+
+  resetForAbort() {
+    this.aborted = true;
+    this.receiving.clear();
+    this.pendingMetas.clear();
+    this.announcedFiles.clear();
+    this.announcedOrder = [];
+    this.pendingPulls = [];
+    this.clearPullBatch();
+    this.zipSession = null;
+    this.activeSendBatch = null;
+    this.activeReceiveBatch = null;
+    this.clearSending();
+    this.expectingBinary = false;
+    this.preReceiveChunks = [];
+    this.downloadAbortedSendIds.clear();
+    this.servedFileIds.clear();
+    this.controlChannel.onmessage = null;
+    this.filesChannel.onmessage = null;
+  }
 
   emitProgress(progress: TransferProgress) {
     if (this.cancelledFileIds.has(progress.fileId)) return;
@@ -63,6 +101,49 @@ export class TransferSession {
     if (this.cancelledFileIds.has(entry.id)) return;
     if (this.dismissedReceivedIds.has(entry.id)) return;
     this.callbacks.onHistory?.(entry);
+  }
+
+  emitQueuedProgress(
+    queued: QueuedFile,
+    status: NonNullable<TransferProgress["status"]>,
+    bytesTransferred = 0,
+  ) {
+    this.emitProgress({
+      fileId: queued.id,
+      fileName: queued.path,
+      fileSize: queued.file.size,
+      bytesTransferred,
+      direction: "send",
+      status,
+    });
+  }
+
+  emitReceiveProgress(
+    meta: FileMeta,
+    status: NonNullable<TransferProgress["status"]>,
+    bytesTransferred = 0,
+  ) {
+    this.emitProgress({
+      fileId: meta.fileId,
+      fileName: meta.name,
+      fileSize: meta.size,
+      bytesTransferred,
+      direction: "receive",
+      status,
+    });
+  }
+
+  emitReceiveHistory(meta: FileMeta, status: "completed" | "failed") {
+    this.emitHistory(
+      this.withBatchContext({
+        id: meta.fileId,
+        name: meta.name,
+        size: meta.size,
+        direction: "received",
+        status,
+        timestamp: Date.now(),
+      }),
+    );
   }
 
   withBatchContext(entry: HistoryEntry): HistoryEntry {
@@ -81,24 +162,24 @@ export class TransferSession {
     }
   }
 
-  completeSendBatch() {
-    if (!this.activeSendBatch) return;
+  completeBatch(direction: "sent" | "received") {
+    const batch = direction === "sent" ? this.activeSendBatch : this.activeReceiveBatch;
+    if (!batch) return;
     this.callbacks.onBatchDone?.({
-      batchId: this.activeSendBatch.id,
-      direction: "sent",
-      fileCountInBatch: this.activeSendBatch.fileCount,
+      batchId: batch.id,
+      direction,
+      fileCountInBatch: batch.fileCount,
     });
-    this.activeSendBatch = null;
+    if (direction === "sent") this.activeSendBatch = null;
+    else this.activeReceiveBatch = null;
+  }
+
+  completeSendBatch() {
+    this.completeBatch("sent");
   }
 
   completeReceiveBatch() {
-    if (!this.activeReceiveBatch) return;
-    this.callbacks.onBatchDone?.({
-      batchId: this.activeReceiveBatch.id,
-      direction: "received",
-      fileCountInBatch: this.activeReceiveBatch.fileCount,
-    });
-    this.activeReceiveBatch = null;
+    this.completeBatch("received");
   }
 
   buildFileMeta(queued: QueuedFile): FileMeta {
@@ -127,40 +208,28 @@ export class TransferSession {
 
     for (let index = 0; index < totalChunks; index += 1) {
       if (this.shouldStopSend(queued.id)) {
-        this.sending = false;
-        this.currentSendFile = null;
+        this.clearSending();
         return false;
       }
       const offset = index * this.chunkSize;
       const slice = queued.file.slice(offset, offset + this.chunkSize);
       const buffer = await slice.arrayBuffer();
       if (this.shouldStopSend(queued.id)) {
-        this.sending = false;
-        this.currentSendFile = null;
+        this.clearSending();
         return false;
       }
       await this.io.sendBuffer(buffer);
       if (this.shouldStopSend(queued.id)) {
-        this.sending = false;
-        this.currentSendFile = null;
+        this.clearSending();
         return false;
       }
       this.callbacks.onChunkBytes?.("send", buffer.byteLength);
       bytesSent += buffer.byteLength;
-
-      this.emitProgress({
-        fileId: queued.id,
-        fileName: queued.path,
-        fileSize: queued.file.size,
-        bytesTransferred: bytesSent,
-        direction: "send",
-        status: "in-progress",
-      });
+      this.emitQueuedProgress(queued, "in-progress", bytesSent);
     }
 
     if (this.shouldStopSend(queued.id)) {
-      this.sending = false;
-      this.currentSendFile = null;
+      this.clearSending();
       return false;
     }
 

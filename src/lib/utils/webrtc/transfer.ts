@@ -1,6 +1,8 @@
+import { logger } from "$lib/utils/logger";
+
 import { DataChannelIo } from "./channelIo";
 import { resolveBufferHighWater, resolveBufferLowWater } from "./chunkSize";
-import { parseControlMessage, type TransferCallbacks } from "./protocol";
+import { describeControlMessage, parseControlMessage, type TransferCallbacks } from "./protocol";
 import { TransferReceiver } from "./receiver";
 import { TransferSender } from "./sender";
 import { TransferSession } from "./session";
@@ -12,16 +14,22 @@ export class TransferManager {
   private readonly sender: TransferSender;
   private readonly receiver: TransferReceiver;
 
-  constructor(channel: RTCDataChannel, chunkSize: number, callbacks: TransferCallbacks) {
-    channel.binaryType = "arraybuffer";
+  constructor(
+    control: RTCDataChannel,
+    files: RTCDataChannel,
+    chunkSize: number,
+    callbacks: TransferCallbacks,
+  ) {
+    files.binaryType = "arraybuffer";
     const abortState = { shouldAbort: () => false };
     const io = new DataChannelIo(
-      channel,
+      control,
+      files,
       () => abortState.shouldAbort(),
       resolveBufferHighWater(chunkSize),
       resolveBufferLowWater(chunkSize),
     );
-    this.session = new TransferSession(channel, callbacks, io, chunkSize);
+    this.session = new TransferSession(control, files, callbacks, io, chunkSize);
     abortState.shouldAbort = () => {
       const session = this.session;
       if (session.aborted) return true;
@@ -30,7 +38,8 @@ export class TransferManager {
     };
     this.sender = new TransferSender(this.session);
     this.receiver = new TransferReceiver(this.session, this.sender);
-    channel.onmessage = (event) => this.handleMessage(event);
+    control.onmessage = (event) => this.handleControlEvent(event);
+    files.onmessage = (event) => this.handleFilesEvent(event);
   }
 
   start() {
@@ -76,8 +85,7 @@ export class TransferManager {
     session.pendingPulls = session.pendingPulls.filter((id) => id !== fileId);
 
     if (session.currentSendFile?.id === fileId) {
-      session.sending = false;
-      session.currentSendFile = null;
+      session.clearSending();
     }
 
     const recvState = session.receiving.get(fileId);
@@ -95,50 +103,31 @@ export class TransferManager {
   }
 
   abort() {
-    const { session } = this;
-    session.aborted = true;
     void this.receiver.cleanupReceives();
-    session.receiving.clear();
-    session.pendingMetas.clear();
-    session.announcedFiles.clear();
-    session.announcedOrder = [];
-    session.pendingPulls = [];
-    session.activePullBatch = null;
-    session.activePullBatchFilename = undefined;
-    session.pullBatchReceivedCount = 0;
-    session.batchUsesZip = false;
-    session.zipSession = null;
-    session.activeSendBatch = null;
-    session.activeReceiveBatch = null;
-    session.sending = false;
-    session.currentSendFile = null;
-    session.expectingBinary = false;
-    session.preReceiveChunks = [];
-    session.downloadAbortedSendIds.clear();
-    session.servedFileIds.clear();
-    session.channel.onmessage = null;
-    session.callbacks.onAbort?.();
+    this.session.resetForAbort();
+    this.session.callbacks.onAbort?.();
   }
 
-  private handleMessage(event: MessageEvent) {
-    if (typeof event.data === "string") {
-      this.handleControlMessage(event.data);
-      return;
-    }
+  private handleControlEvent(event: MessageEvent) {
+    if (typeof event.data !== "string") return;
+    this.handleControlMessage(event.data);
+  }
 
-    if (event.data instanceof ArrayBuffer) {
-      const { session } = this;
-      if (session.receiving.size > 0 || session.expectingBinary) {
-        this.receiver.handleBinaryChunk(event.data);
-      } else {
-        session.preReceiveChunks.push(event.data);
-      }
+  private handleFilesEvent(event: MessageEvent) {
+    if (!(event.data instanceof ArrayBuffer)) return;
+
+    const { session } = this;
+    if (session.receiving.size > 0 || session.expectingBinary) {
+      this.receiver.handleBinaryChunk(event.data);
+    } else {
+      session.preReceiveChunks.push(event.data);
     }
   }
 
   private handleControlMessage(raw: string) {
     const message = parseControlMessage(raw);
     if (!message) return;
+    logger.log(`(Ctrl) ← ${describeControlMessage(message)}`);
 
     switch (message.type) {
       case "meta":
@@ -149,7 +138,7 @@ export class TransferManager {
         break;
       case "done":
         this.session.chunkWriteQueue = this.session.chunkWriteQueue.then(() =>
-          this.receiver.finishReceive(message.fileId),
+          this.receiver.onSendDone(message.fileId),
         );
         break;
       case "ack":

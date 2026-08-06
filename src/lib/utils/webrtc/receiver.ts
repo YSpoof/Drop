@@ -18,16 +18,39 @@ export class TransferReceiver {
     return session.batchUsesZip || !!meta.zip;
   }
 
+  private findActiveReceive(): [string, ReceiveState] | undefined {
+    return [...this.session.receiving.entries()].find(
+      ([, state]) => state.receivedBytes < state.meta.size,
+    );
+  }
+
   private async writeReceivedChunk(state: ReceiveState, data: ArrayBuffer): Promise<void> {
     if (!state.streamWriter) throw new DownloadError("Download stream not ready");
     await state.streamWriter.write(new Uint8Array(data));
   }
 
+  private async applyChunkBytes(state: ReceiveState, data: ArrayBuffer): Promise<void> {
+    await this.writeReceivedChunk(state, data);
+    const chunkBytes = data.byteLength;
+    state.receivedBytes += chunkBytes;
+    this.session.callbacks.onChunkBytes?.("receive", chunkBytes);
+    if (state.receivedBytes >= state.meta.size) {
+      this.session.expectingBinary = false;
+    }
+  }
+
+  private abortStream(state: ReceiveState) {
+    void state.streamWriter?.abort().catch(() => undefined);
+  }
+
+  private armReceive(meta: FileMeta) {
+    void this.beginReceive(meta);
+    this.session.emitReceiveProgress(meta, "in-progress");
+  }
+
   handleBinaryChunk(data: ArrayBuffer) {
     const { session } = this;
-    const active = [...session.receiving.entries()].find(
-      ([, state]) => state.receivedBytes < state.meta.size,
-    );
+    const active = this.findActiveReceive();
     if (!active) return;
 
     const [, state] = active;
@@ -42,16 +65,13 @@ export class TransferReceiver {
 
   private async processBinaryChunk(data: ArrayBuffer) {
     const { session } = this;
-    const active = [...session.receiving.entries()].find(
-      ([, state]) => state.receivedBytes < state.meta.size,
-    );
+    const active = this.findActiveReceive();
     if (!active) return;
 
     const [fileId, state] = active;
-    const chunkBytes = data.byteLength;
 
     try {
-      await this.writeReceivedChunk(state, data);
+      await this.applyChunkBytes(state, data);
     } catch (error) {
       this.failReceive(
         fileId,
@@ -61,20 +81,20 @@ export class TransferReceiver {
       return;
     }
 
-    state.receivedBytes += chunkBytes;
-    session.callbacks.onChunkBytes?.("receive", chunkBytes);
+    session.emitReceiveProgress(state.meta, "in-progress", state.receivedBytes);
 
-    session.emitProgress({
-      fileId,
-      fileName: state.meta.name,
-      fileSize: state.meta.size,
-      bytesTransferred: state.receivedBytes,
-      direction: "receive",
-      status: "in-progress",
-    });
+    if (state.senderDone && state.receivedBytes >= state.meta.size) {
+      await this.finishReceive(fileId);
+    }
+  }
 
-    if (state.receivedBytes >= state.meta.size) {
-      session.expectingBinary = false;
+  onSendDone(fileId: string) {
+    const { session } = this;
+    const state = session.receiving.get(fileId);
+    if (!state) return;
+    state.senderDone = true;
+    if (state.receivedBytes === state.meta.size) {
+      void this.finishReceive(fileId);
     }
   }
 
@@ -88,6 +108,7 @@ export class TransferReceiver {
       pendingChunks: [],
       sessionOpen: false,
       useZip,
+      senderDone: false,
     };
     session.receiving.set(meta.fileId, state);
     session.expectingBinary = true;
@@ -116,58 +137,27 @@ export class TransferReceiver {
         const buffered = state.pendingChunks;
         state.pendingChunks = [];
         for (const chunk of buffered) {
-          const chunkBytes = chunk.byteLength;
-          await this.writeReceivedChunk(state, chunk);
-          state.receivedBytes += chunkBytes;
-          session.callbacks.onChunkBytes?.("receive", chunkBytes);
+          await this.applyChunkBytes(state, chunk);
         }
 
         if (state.receivedBytes > 0) {
-          session.emitProgress({
-            fileId: meta.fileId,
-            fileName: meta.name,
-            fileSize: meta.size,
-            bytesTransferred: state.receivedBytes,
-            direction: "receive",
-            status: "in-progress",
-          });
+          session.emitReceiveProgress(meta, "in-progress", state.receivedBytes);
         }
 
-        if (state.receivedBytes >= meta.size) {
-          session.expectingBinary = false;
+        if (state.senderDone && state.receivedBytes === meta.size) {
+          await this.finishReceive(meta.fileId);
         }
       })
       .catch((error) => {
-        if (!session.receiving.has(meta.fileId)) return;
-        if (session.cancelledFileIds.has(meta.fileId)) return;
-        session.receiving.delete(meta.fileId);
-        session.expectingBinary = false;
+        const current = session.receiving.get(meta.fileId);
+        if (!current) return;
         const message =
           error instanceof DownloadError
             ? error.message
             : error instanceof Error
               ? error.message
               : "Download unavailable for receiving files";
-        void session.io.sendControl({ type: "cancel", fileId: meta.fileId });
-        session.callbacks.onDownloadError?.(message);
-        session.emitHistory(
-          session.withBatchContext({
-            id: meta.fileId,
-            name: meta.name,
-            size: meta.size,
-            direction: "received",
-            status: "failed",
-            timestamp: Date.now(),
-          }),
-        );
-        session.emitProgress({
-          fileId: meta.fileId,
-          fileName: meta.name,
-          fileSize: meta.size,
-          bytesTransferred: 0,
-          direction: "receive",
-          status: "failed",
-        });
+        this.failReceive(meta.fileId, current, message);
       });
   }
 
@@ -182,26 +172,10 @@ export class TransferReceiver {
     session.expectingBinary = false;
     void session.io.sendControl({ type: "cancel", fileId });
     session.callbacks.onDownloadError?.(message);
-    void state.streamWriter?.abort().catch(() => undefined);
+    this.abortStream(state);
     session.receiving.delete(fileId);
-    session.emitHistory(
-      session.withBatchContext({
-        id: fileId,
-        name: state.meta.name,
-        size: state.meta.size,
-        direction: "received",
-        status: "failed",
-        timestamp: Date.now(),
-      }),
-    );
-    session.emitProgress({
-      fileId,
-      fileName: state.meta.name,
-      fileSize: state.meta.size,
-      bytesTransferred: state.receivedBytes,
-      direction: "receive",
-      status: "failed",
-    });
+    session.emitReceiveHistory(state.meta, "failed");
+    session.emitReceiveProgress(state.meta, "failed", state.receivedBytes);
   }
 
   async finishReceive(fileId: string) {
@@ -244,36 +218,16 @@ export class TransferReceiver {
           return;
         }
         session.zipSession = null;
-        session.activePullBatch = null;
-        session.activePullBatchFilename = undefined;
-        session.pullBatchReceivedCount = 0;
-        session.batchUsesZip = false;
+        session.clearPullBatch();
         session.completeReceiveBatch();
       }
     } else if (!state.useZip && session.manualDownload) {
       session.completeReceiveBatch();
     }
 
-    session.emitHistory(
-      session.withBatchContext({
-        id: fileId,
-        name: state.meta.name,
-        size: state.meta.size,
-        direction: "received",
-        status: "completed",
-        timestamp: Date.now(),
-      }),
-    );
-
+    session.emitReceiveHistory(state.meta, "completed");
     session.receiving.delete(fileId);
-    session.emitProgress({
-      fileId,
-      fileName: state.meta.name,
-      fileSize: state.meta.size,
-      bytesTransferred: state.meta.size,
-      direction: "receive",
-      status: "completed",
-    });
+    session.emitReceiveProgress(state.meta, "completed", state.meta.size);
 
     void session.io.sendControl({ type: "ack", fileId });
     void this.sender.trySendNext();
@@ -295,10 +249,7 @@ export class TransferReceiver {
       this.abortBrowserDownload(fileId);
     }
     session.zipSession = null;
-    session.activePullBatch = null;
-    session.activePullBatchFilename = undefined;
-    session.pullBatchReceivedCount = 0;
-    session.batchUsesZip = false;
+    session.clearPullBatch();
   }
 
   abortBrowserDownload(fileId: string) {
@@ -306,7 +257,7 @@ export class TransferReceiver {
     const state = session.receiving.get(fileId);
 
     if (state) {
-      void state.streamWriter?.abort().catch(() => undefined);
+      this.abortStream(state);
       session.receiving.delete(fileId);
       session.pendingMetas.set(fileId, state.meta);
 
@@ -314,14 +265,7 @@ export class TransferReceiver {
         session.expectingBinary = false;
       }
 
-      session.emitProgress({
-        fileId,
-        fileName: state.meta.name,
-        fileSize: state.meta.size,
-        bytesTransferred: 0,
-        direction: "receive",
-        status: "pending",
-      });
+      session.emitReceiveProgress(state.meta, "pending");
     }
 
     void session.io.sendControl({ type: "download-aborted", fileId });
@@ -336,7 +280,7 @@ export class TransferReceiver {
 
     const recvState = session.receiving.get(fileId);
     if (recvState) {
-      void recvState.streamWriter?.abort().catch(() => undefined);
+      this.abortStream(recvState);
       session.receiving.delete(fileId);
 
       if (!session.receiving.size) {
@@ -384,16 +328,8 @@ export class TransferReceiver {
     session.batchUsesZip = false;
     session.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 1 };
 
-    void this.beginReceive(meta);
+    this.armReceive(meta);
     void session.io.sendControl({ type: "pull", fileId });
-    session.emitProgress({
-      fileId: meta.fileId,
-      fileName: meta.name,
-      fileSize: meta.size,
-      bytesTransferred: 0,
-      direction: "receive",
-      status: "in-progress",
-    });
   }
 
   requestPullBatch(fileIds: string[], zipFilename?: string) {
@@ -410,15 +346,7 @@ export class TransferReceiver {
     for (const fileId of validIds) {
       const meta = session.pendingMetas.get(fileId)!;
       session.pendingMetas.delete(fileId);
-      void this.beginReceive(meta);
-      session.emitProgress({
-        fileId: meta.fileId,
-        fileName: meta.name,
-        fileSize: meta.size,
-        bytesTransferred: 0,
-        direction: "receive",
-        status: "in-progress",
-      });
+      this.armReceive(meta);
     }
 
     session.expectingBinary = true;
@@ -435,14 +363,7 @@ export class TransferReceiver {
     }
     session.activeReceiveBatch.fileCount += 1;
 
-    session.emitProgress({
-      fileId: message.fileId,
-      fileName: message.name,
-      fileSize: message.size,
-      bytesTransferred: 0,
-      direction: "receive",
-      status: "pending",
-    });
+    session.emitReceiveProgress(message, "pending");
   }
 
   onStart(fileId: string) {
@@ -454,15 +375,7 @@ export class TransferReceiver {
     if (!meta) return;
 
     session.pendingMetas.delete(fileId);
-    void this.beginReceive(meta);
-    session.emitProgress({
-      fileId: meta.fileId,
-      fileName: meta.name,
-      fileSize: meta.size,
-      bytesTransferred: 0,
-      direction: "receive",
-      status: "in-progress",
-    });
+    this.armReceive(meta);
   }
 
   onBatchDone() {

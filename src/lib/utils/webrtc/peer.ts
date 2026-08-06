@@ -1,17 +1,19 @@
 import { ICE_SERVERS } from "./ice";
 
+export const CONTROL_CHANNEL_ID = 0;
+export const FILES_CHANNEL_ID = 1;
+
 export type IceCandidateHandler = (candidate: RTCIceCandidate) => void;
-export type DataChannelHandler = (channel: RTCDataChannel) => void;
 export type ConnectionStateHandler = (state: RTCPeerConnectionState) => void;
 
 export class PeerConnection {
   readonly pc: RTCPeerConnection;
-  channel: RTCDataChannel | null = null;
+  readonly controlChannel: RTCDataChannel;
+  readonly filesChannel: RTCDataChannel;
   onIceCandidate: IceCandidateHandler | null = null;
-  onDataChannel: DataChannelHandler | null = null;
   onConnectionStateChange: ConnectionStateHandler | null = null;
 
-  constructor(private readonly isOfferer: boolean) {
+  constructor() {
     this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     this.pc.onicecandidate = (event) => {
@@ -24,19 +26,17 @@ export class PeerConnection {
       this.onConnectionStateChange?.(this.pc.connectionState);
     };
 
-    this.pc.ondatachannel = (event) => {
-      this.channel = event.channel;
-      this.onDataChannel?.(event.channel);
-    };
-  }
+    this.controlChannel = this.pc.createDataChannel("ctrl", {
+      negotiated: true,
 
-  /** Call after `onDataChannel` is assigned — offerer channel is created here, not in the constructor. */
-  prepareChannel() {
-    if (!this.isOfferer || this.channel) return;
-    this.channel = this.pc.createDataChannel("drop", {
+      id: CONTROL_CHANNEL_ID,
       ordered: true,
     });
-    this.onDataChannel?.(this.channel);
+    this.filesChannel = this.pc.createDataChannel("files", {
+      negotiated: true,
+      id: FILES_CHANNEL_ID,
+      ordered: true,
+    });
   }
 
   async createOffer(): Promise<RTCSessionDescriptionInit> {
@@ -62,7 +62,8 @@ export class PeerConnection {
   }
 
   close() {
-    this.channel?.close();
+    this.controlChannel.close();
+    this.filesChannel.close();
     this.pc.close();
   }
 }

@@ -230,8 +230,10 @@
           <span class="text-base-content/60 hidden w-16 shrink-0 text-right text-xs sm:block">
             {#if u.type === "queue"}
               0 B<br />{formatBytes(u.item.file.size)}
-            {:else}
+            {:else if u.item.status === "in-progress" && u.item.bytesTransferred > 0 && u.item.bytesTransferred < u.item.size}
               {formatBytes(u.item.bytesTransferred)}<br />{formatBytes(u.item.size)}
+            {:else}
+              {formatBytes(u.item.size)}
             {/if}
           </span>
         </div>

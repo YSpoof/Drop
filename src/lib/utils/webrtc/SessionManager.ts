@@ -133,6 +133,13 @@ export class SessionManager {
 
   addFiles(files: FileList | File[] | { file: File; path: string }[]) {
     const newItems = appState.createAndQueue(files);
+    if (newItems.length === 1) {
+      const item = newItems[0]!;
+      logger.log(`(Queue) +1 file: ${item.path} (${item.file.size}b)`);
+    } else if (newItems.length > 1) {
+      const root = newItems[0]!.path.split("/")[0];
+      logger.log(`(Queue) +${newItems.length} files${newItems[0]?.zip ? " zip" : ""}: ${root}/...`);
+    }
 
     if (appState.connected) {
       appState.promoteToHistory(newItems);
@@ -201,7 +208,7 @@ export class SessionManager {
     const item = appState.transfers.find((entry) => entry.id === fileId);
     if (!item || item.status !== "pending") return;
 
-    appState.upsertTransfer({ ...item, status: "in-progress", bytesTransferred: 0 });
+    this.markTransfersInProgress([fileId]);
     this.transferManager?.requestPull(fileId);
   }
 
@@ -209,10 +216,7 @@ export class SessionManager {
     const pendingIds = appState.pendingReceivedIds(fileIds);
     if (!pendingIds.length) return;
 
-    for (const id of pendingIds) {
-      const item = appState.transfers.find((entry) => entry.id === id)!;
-      appState.upsertTransfer({ ...item, status: "in-progress", bytesTransferred: 0 });
-    }
+    this.markTransfersInProgress(pendingIds);
     this.transferManager?.requestPullBatch(pendingIds, zipFilename);
   }
 
@@ -249,12 +253,8 @@ export class SessionManager {
     appState.connectingPeerId = null;
     this.activeTargetPeerId = null;
 
-    const pc = this.peerConnection;
+    this.closePeerHandle(this.peerConnection);
     this.peerConnection = null;
-    if (pc) {
-      pc.onConnectionStateChange = null;
-      pc.close();
-    }
 
     if (roomJoinConnecting) {
       this.unlockRoomJoin("Falha na conexão", "error");
@@ -270,6 +270,66 @@ export class SessionManager {
     void this.resumeSignaling();
   }
 
+  private closePeerHandle(pc: PeerConnection | null) {
+    if (!pc) return;
+    pc.onConnectionStateChange = null;
+    pc.close();
+  }
+
+  private disposePeerConnection(options?: { markHandled?: boolean }) {
+    if (options?.markHandled) this.peerDisconnectHandled = true;
+    const pc = this.peerConnection;
+    this.peerConnection = null;
+    this.activeTargetPeerId = null;
+    this.closePeerHandle(pc);
+  }
+
+  private sendConnectResponse(targetPeerId: string, accepted: boolean, reason?: string) {
+    logger.log(
+      `(Room) connect-response → ${targetPeerId} ${accepted ? "accepted" : "rejected"}${reason ? ` (${reason})` : ""}`,
+    );
+    this.signaling.send({ type: "connect-response", targetPeerId, accepted });
+  }
+
+  private markTransfersInProgress(ids: string[]) {
+    for (const id of ids) {
+      const item = appState.transfers.find((entry) => entry.id === id);
+      if (!item) continue;
+      appState.upsertTransfer({ ...item, status: "in-progress", bytesTransferred: 0 });
+    }
+  }
+
+  private upsertFromProgress(progress: TransferProgressState) {
+    const status =
+      progress.status ??
+      (progress.bytesTransferred >= progress.fileSize ? "completed" : "in-progress");
+    appState.upsertTransfer({
+      id: progress.fileId,
+      name: progress.fileName,
+      size: progress.fileSize,
+      direction: progress.direction === "send" ? "sent" : "received",
+      status,
+      bytesTransferred: progress.bytesTransferred,
+    });
+  }
+
+  private upsertFromHistory(entry: HistoryEntry) {
+    appState.upsertTransfer({
+      id: entry.id,
+      name: entry.name,
+      size: entry.size,
+      direction: entry.direction,
+      status: entry.status === "failed" ? "failed" : "completed",
+      bytesTransferred: entry.size,
+    });
+
+    if (entry.status !== "failed") {
+      appState.recordTransferFile(entry.direction);
+    }
+
+    this.handleHistoryToast(entry);
+  }
+
   private handlePeerDisconnect() {
     this.cleanupPeerConnection();
   }
@@ -280,8 +340,18 @@ export class SessionManager {
     this.cleanupPeerConnection();
   }
 
-  private attachDataChannel(channel: RTCDataChannel, targetPeerId: string, offerer: boolean) {
-    channel.onopen = () => {
+  private attachDataChannels(targetPeerId: string, offerer: boolean) {
+    const peer = this.peerConnection;
+    if (!peer) return;
+
+    const { controlChannel: control, filesChannel: files } = peer;
+    let started = false;
+
+    const tryStart = () => {
+      if (started) return;
+      if (control.readyState !== "open" || files.readyState !== "open") return;
+      started = true;
+
       const peerInfo = this.findPeer(targetPeerId);
       if (peerInfo) appState.connectedPeerInfo = peerInfo;
 
@@ -299,15 +369,14 @@ export class SessionManager {
 
       let chunkSize: number;
       try {
-        const sctp = this.peerConnection?.pc.sctp ?? null;
-        chunkSize = resolveChunkSize(sctp);
+        chunkSize = resolveChunkSize(peer.pc.sctp ?? null);
       } catch {
         toastStore.showToast("Conexão incompatível com este navegador", "error");
         this.cleanupPeerConnection();
         return;
       }
 
-      this.transferManager = new TransferManager(channel, chunkSize, {
+      this.transferManager = new TransferManager(control, files, chunkSize, {
         isOfferer: offerer,
         getSendQueue: () => appState.queue,
         onBye: () => {
@@ -316,35 +385,8 @@ export class SessionManager {
         onChunkBytes: (direction, bytes) => {
           appState.recordTransferStats(direction === "send" ? "sent" : "received", bytes);
         },
-        onProgress: (progress: TransferProgressState) => {
-          const status =
-            progress.status ??
-            (progress.bytesTransferred >= progress.fileSize ? "completed" : "in-progress");
-          appState.upsertTransfer({
-            id: progress.fileId,
-            name: progress.fileName,
-            size: progress.fileSize,
-            direction: progress.direction === "send" ? "sent" : "received",
-            status,
-            bytesTransferred: progress.bytesTransferred,
-          });
-        },
-        onHistory: (entry) => {
-          appState.upsertTransfer({
-            id: entry.id,
-            name: entry.name,
-            size: entry.size,
-            direction: entry.direction,
-            status: entry.status === "failed" ? "failed" : "completed",
-            bytesTransferred: entry.size,
-          });
-
-          if (entry.status !== "failed") {
-            appState.recordTransferFile(entry.direction);
-          }
-
-          this.handleHistoryToast(entry);
-        },
+        onProgress: (progress) => this.upsertFromProgress(progress),
+        onHistory: (entry) => this.upsertFromHistory(entry),
         onBatchDone: (info) => this.handleBatchDoneToast(info),
         onFileCancelled: (fileId) => appState.removeFile(fileId),
         onFileDismissed: (fileId) => appState.removeTransfer(fileId),
@@ -360,26 +402,27 @@ export class SessionManager {
       this.transferManager.notifyQueueChanged();
     };
 
-    channel.onclose = () => {
-      this.handlePeerDisconnect();
-    };
+    for (const channel of [control, files]) {
+      channel.onopen = () => tryStart();
+      channel.onclose = () => {
+        this.handlePeerDisconnect();
+      };
+      if (channel.readyState === "open") tryStart();
+    }
   }
 
   /**
    * Orchestrates the creation of a WebRTC PeerConnection, configuring ICE candidate exchange
-   * via signaling, and preparing the underlying SCTP data channel for file transfer.
+   * via signaling, and preparing the underlying SCTP data channels for file transfer.
    */
   private setupPeerConnection(offerer: boolean, targetPeerId: string) {
     const previous = this.peerConnection;
     this.peerConnection = null;
-    if (previous) {
-      previous.onConnectionStateChange = null;
-      previous.close();
-    }
+    this.closePeerHandle(previous);
 
     this.peerDisconnectHandled = false;
     this.activeTargetPeerId = targetPeerId;
-    this.peerConnection = new PeerConnection(offerer);
+    this.peerConnection = new PeerConnection();
 
     this.peerConnection.onIceCandidate = (candidate) => {
       this.signaling.send({
@@ -389,17 +432,13 @@ export class SessionManager {
       });
     };
 
-    this.peerConnection.onDataChannel = (channel) => {
-      this.attachDataChannel(channel, targetPeerId, offerer);
-    };
-
     this.peerConnection.onConnectionStateChange = (state) => {
       if (state === "failed" || state === "disconnected" || state === "closed") {
         this.handlePeerDisconnect();
       }
     };
 
-    this.peerConnection.prepareChannel();
+    this.attachDataChannels(targetPeerId, offerer);
   }
 
   private isOfferer(peerId: string): boolean {
@@ -432,11 +471,8 @@ export class SessionManager {
   }
 
   private handleMutualConnect(requesterPeerId: string) {
-    this.signaling.send({
-      type: "connect-response",
-      targetPeerId: requesterPeerId,
-      accepted: true,
-    });
+    logger.log(`(Room) mutual connect with ${requesterPeerId}`);
+    this.sendConnectResponse(requesterPeerId, true);
 
     if (this.isOfferer(requesterPeerId)) {
       void this.beginAsOfferer(requesterPeerId);
@@ -451,11 +487,7 @@ export class SessionManager {
     this.clearPendingRequest();
     appState.connectedPeerInfo = requester;
 
-    this.signaling.send({
-      type: "connect-response",
-      targetPeerId: requester.peerId,
-      accepted: true,
-    });
+    this.sendConnectResponse(requester.peerId, true);
     this.beginAsAnswerer(requester.peerId);
   }
 
@@ -463,16 +495,12 @@ export class SessionManager {
     if (!appState.pendingRequest) return;
     const requester = appState.pendingRequest;
     this.clearPendingRequest();
-
-    this.signaling.send({
-      type: "connect-response",
-      targetPeerId: requester.peerId,
-      accepted: false,
-    });
+    this.sendConnectResponse(requester.peerId, false);
   }
 
   handleConnect(targetPeerId: string) {
     if (appState.connectingPeerId || appState.connectedPeerId) return;
+    logger.log(`(Room) connect-request → ${targetPeerId}`);
     appState.connectingPeerId = targetPeerId;
     const peerInfo = this.findPeer(targetPeerId);
     if (peerInfo) appState.connectedPeerInfo = peerInfo;
@@ -543,12 +571,7 @@ export class SessionManager {
 
   private failRoomJoinTimeout() {
     if (this.peerConnection) {
-      this.peerDisconnectHandled = true;
-      const pc = this.peerConnection;
-      this.peerConnection = null;
-      this.activeTargetPeerId = null;
-      pc.onConnectionStateChange = null;
-      pc.close();
+      this.disposePeerConnection({ markHandled: true });
     }
 
     appState.connectingPeerId = null;
@@ -581,6 +604,7 @@ export class SessionManager {
     appState.connectedPeerInfo = peer;
 
     if (appState.roomJoinMode === "auto" && appState.roomJoinCode) {
+      logger.log(`(Room) connect-request → ${peer.peerId} roomCode=${appState.roomJoinCode}`);
       this.signaling.send({
         type: "connect-request",
         targetPeerId: peer.peerId,
@@ -589,6 +613,7 @@ export class SessionManager {
       return;
     }
 
+    logger.log(`(Room) connect-request → ${peer.peerId}`);
     this.signaling.send({ type: "connect-request", targetPeerId: peer.peerId });
   }
 
@@ -623,12 +648,7 @@ export class SessionManager {
       appState.connectedPeerInfo = null;
 
       if (this.peerConnection) {
-        this.peerDisconnectHandled = true;
-        const pc = this.peerConnection;
-        this.peerConnection = null;
-        this.activeTargetPeerId = null;
-        pc.onConnectionStateChange = null;
-        pc.close();
+        this.disposePeerConnection({ markHandled: true });
         void this.resumeSignaling();
       }
     }
@@ -680,44 +700,31 @@ export class SessionManager {
       onConnectRequest: (message: { requester: PeerInfo; roomCode?: string }) => {
         const requesterId = message.requester.peerId;
         const hostRoomCode = this.getRoomCode();
+        logger.log(
+          `(Room) connect-request ← ${requesterId}${message.roomCode ? ` roomCode=${message.roomCode}` : ""}`,
+        );
 
         if (message.roomCode) {
           if (hostRoomCode && message.roomCode === hostRoomCode) {
             if (appState.connectedPeerId || appState.connectingPeerId || appState.pendingRequest) {
-              this.signaling.send({
-                type: "connect-response",
-                targetPeerId: requesterId,
-                accepted: false,
-              });
+              this.sendConnectResponse(requesterId, false, "busy");
               return;
             }
 
             const peerInfo = this.findPeer(requesterId) ?? message.requester;
             appState.connectedPeerInfo = peerInfo;
 
-            this.signaling.send({
-              type: "connect-response",
-              targetPeerId: requesterId,
-              accepted: true,
-            });
+            this.sendConnectResponse(requesterId, true);
             this.beginAsAnswerer(requesterId);
             return;
           }
 
-          this.signaling.send({
-            type: "connect-response",
-            targetPeerId: requesterId,
-            accepted: false,
-          });
+          this.sendConnectResponse(requesterId, false, "wrong-code");
           return;
         }
 
         if (appState.connectedPeerId) {
-          this.signaling.send({
-            type: "connect-response",
-            targetPeerId: requesterId,
-            accepted: false,
-          });
+          this.sendConnectResponse(requesterId, false, "busy");
           return;
         }
 
@@ -727,18 +734,18 @@ export class SessionManager {
         }
 
         if (appState.connectingPeerId || appState.pendingRequest) {
-          this.signaling.send({
-            type: "connect-response",
-            targetPeerId: requesterId,
-            accepted: false,
-          });
+          this.sendConnectResponse(requesterId, false, "busy");
           return;
         }
 
+        logger.log(`(Room) connect-request pending modal for ${requesterId}`);
         appState.pendingRequest = message.requester;
         appState.connectionModalOpen = true;
       },
       onConnectResponse: async (message: { accepted: boolean; targetPeerId: string }) => {
+        logger.log(
+          `(Room) connect-response ← ${message.targetPeerId} ${message.accepted ? "accepted" : "rejected"}`,
+        );
         if (!message.accepted) {
           if (appState.connectingPeerId === message.targetPeerId) {
             if (appState.roomJoinOpen) {
@@ -793,20 +800,14 @@ export class SessionManager {
   handlePageUnload() {
     this.transferManager?.abort();
     this.transferManager = null;
-
-    const pc = this.peerConnection;
-    this.peerConnection = null;
-    if (pc) {
-      pc.onConnectionStateChange = null;
-      pc.close();
-    }
+    this.disposePeerConnection();
   }
 
   destroy() {
     this.transferManager?.abort();
     this.transferManager = null;
     this.signaling.disconnect();
-    this.peerConnection?.close();
+    this.disposePeerConnection();
     this.clearRoomJoinTimers();
     appState.roomJoinOpen = false;
     appState.roomJoinPhase = "waiting";

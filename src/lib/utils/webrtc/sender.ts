@@ -29,9 +29,29 @@ export class TransferSender {
     await this.sendFileBinary(fileId);
   }
 
+  private async beginSend(
+    queued: QueuedFile,
+    options: { sendStart?: boolean; retryOnIncomplete?: boolean } = {},
+  ) {
+    const { session } = this;
+    session.downloadAbortedSendIds.delete(queued.id);
+    session.sending = true;
+    session.currentSendFile = queued;
+
+    if (options.sendStart) {
+      await session.io.sendControl({ type: "start", fileId: queued.id });
+    }
+
+    session.emitQueuedProgress(queued, "in-progress");
+    const completed = await session.sendFileChunks(queued);
+    if (!completed && options.retryOnIncomplete) {
+      void this.trySendNext();
+    }
+  }
+
   private async sendFileBinary(fileId: string) {
     const { session } = this;
-    if (session.aborted || session.sending || session.channel.readyState !== "open") return;
+    if (session.aborted || session.sending || !session.channelsOpen()) return;
 
     const queued = this.resolveQueuedFile(fileId);
     if (!queued) {
@@ -41,20 +61,7 @@ export class TransferSender {
     }
 
     session.ensureSendBatch(session.pendingPulls.length);
-    session.downloadAbortedSendIds.delete(fileId);
-    session.sending = true;
-    session.currentSendFile = queued;
-
-    session.emitProgress({
-      fileId: queued.id,
-      fileName: queued.path,
-      fileSize: queued.file.size,
-      bytesTransferred: 0,
-      direction: "send",
-      status: "in-progress",
-    });
-
-    await session.sendFileChunks(queued);
+    await this.beginSend(queued);
   }
 
   announcePendingFiles() {
@@ -84,14 +91,7 @@ export class TransferSender {
       void session.io.sendControl(meta);
       session.announcedFiles.set(queued.id, queued);
       session.announcedOrder.push(queued.id);
-      session.emitProgress({
-        fileId: queued.id,
-        fileName: queued.path,
-        fileSize: queued.file.size,
-        bytesTransferred: 0,
-        direction: "send",
-        status: "pending",
-      });
+      session.emitQueuedProgress(queued, "pending");
     }
   }
 
@@ -111,25 +111,7 @@ export class TransferSender {
     const queued = session.announcedFiles.get(fileId);
     if (!queued) return;
 
-    session.downloadAbortedSendIds.delete(fileId);
-    session.sending = true;
-    session.currentSendFile = queued;
-
-    await session.io.sendControl({ type: "start", fileId });
-
-    session.emitProgress({
-      fileId: queued.id,
-      fileName: queued.path,
-      fileSize: queued.file.size,
-      bytesTransferred: 0,
-      direction: "send",
-      status: "in-progress",
-    });
-
-    const completed = await session.sendFileChunks(queued);
-    if (!completed) {
-      void this.trySendNext();
-    }
+    await this.beginSend(queued, { sendStart: true, retryOnIncomplete: true });
   }
 
   private hasUnservedAnnounced(): boolean {
@@ -162,7 +144,7 @@ export class TransferSender {
 
   async trySendNext() {
     const { session } = this;
-    if (session.aborted || session.channel.readyState !== "open") return;
+    if (session.aborted || !session.channelsOpen()) return;
 
     this.announcePendingFiles();
 
@@ -179,8 +161,7 @@ export class TransferSender {
   onAck(fileId: string) {
     const { session } = this;
     if (session.cancelledFileIds.has(fileId)) {
-      session.sending = false;
-      session.currentSendFile = null;
+      session.clearSending();
       void this.trySendNext();
       return;
     }
@@ -203,43 +184,36 @@ export class TransferSender {
     const queued =
       session.currentSendFile?.id === fileId
         ? session.currentSendFile
-        : (session.announcedFiles.get(fileId) ??
-          session.callbacks.getSendQueue().find((item) => item.id === fileId));
+        : this.resolveQueuedFile(fileId);
 
     session.downloadAbortedSendIds.add(fileId);
 
     if (session.currentSendFile?.id === fileId) {
-      session.sending = false;
-      session.currentSendFile = null;
+      session.clearSending();
     }
     session.pendingPulls = session.pendingPulls.filter((id) => id !== fileId);
 
     if (queued) {
-      session.emitProgress({
-        fileId: queued.id,
-        fileName: queued.path,
-        fileSize: queued.file.size,
-        bytesTransferred: 0,
-        direction: "send",
-        status: "pending",
-      });
+      session.emitQueuedProgress(queued, "pending");
     }
 
     this.notifyBatchDoneIfIdle();
     void this.processNextPull();
   }
 
-  enqueuePull(fileId: string) {
-    this.session.downloadAbortedSendIds.delete(fileId);
-    this.session.pendingPulls.push(fileId);
-    void this.processNextPull();
-  }
-
-  enqueuePullBatch(fileIds: string[]) {
+  private enqueuePullIds(fileIds: string[]) {
     for (const fileId of fileIds) {
       this.session.downloadAbortedSendIds.delete(fileId);
     }
     this.session.pendingPulls.push(...fileIds);
     void this.processNextPull();
+  }
+
+  enqueuePull(fileId: string) {
+    this.enqueuePullIds([fileId]);
+  }
+
+  enqueuePullBatch(fileIds: string[]) {
+    this.enqueuePullIds(fileIds);
   }
 }

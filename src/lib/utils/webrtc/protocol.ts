@@ -110,3 +110,19 @@ export function parseControlMessage(raw: string): ControlMessage | null {
 export function encodeControlMessage(message: ControlMessage): string {
   return JSON.stringify(message);
 }
+
+export function describeControlMessage(message: ControlMessage): string {
+  switch (message.type) {
+    case "meta":
+      return `meta name=${message.name} size=${message.size}${message.zip ? " zip" : ""}`;
+    case "pull-batch":
+      return `pull-batch count=${message.fileIds.length}`;
+    case "batch-done":
+    case "bye":
+      return message.type;
+    case "download-mode":
+      return `download-mode manual=${message.manual}`;
+    default:
+      return `${message.type} fileId=${message.fileId}`;
+  }
+}
