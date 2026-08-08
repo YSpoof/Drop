@@ -64,7 +64,6 @@ export class SenderState {
 
   releaseFileTracking(fileId: string) {
     this.downloadAbortedSendIds.delete(fileId);
-    this.servedFileIds.delete(fileId);
   }
 }
 
@@ -137,7 +136,6 @@ export class TransferSession {
     this.cancelledFileIds.clear();
     this.dismissedReceivedIds.clear();
     this.sender.downloadAbortedSendIds.clear();
-    this.sender.servedFileIds.clear();
   }
 
   emitProgress(progress: TransferProgress) {

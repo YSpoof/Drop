@@ -49,7 +49,7 @@
 </script>
 
 {#if node.isDir}
-  {const progress = folderProgress(node)}
+  {const progress = $derived(folderProgress(node))}
   <li class="border-base-300 flex flex-col border-b py-1 last:border-b-0">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -98,7 +98,8 @@
     {/if}
   </li>
 {:else}
-  {const u = node.item!}
+  {const u = $derived(node.item!)}
+  {const fileProgress = $derived(u.type === "queue" ? 0 : filePercent(u.item))}
   <li
     class="group hover:bg-base-200 border-base-300 min-w-0 space-y-1 border-b px-3 py-3 transition-colors last:border-b-0"
     oncontextmenu={(event) => onContextMenu(event, node)}>
@@ -144,7 +145,7 @@
       <progress
         class="progress progress-secondary w-full"
         class:progress-success={u.type === "history" && u.item.status === "completed"}
-        value={u.type === "queue" ? 0 : filePercent(u.item)}
+        value={fileProgress}
         max="100"></progress>
     </div>
   </li>

@@ -53,7 +53,9 @@ class TransferStore {
   }
 
   upsertTransfer(update: TransferItem) {
-    const index = this.transfers.findIndex((item) => item.id === update.id);
+    const index = this.transfers.findIndex(
+      (item) => item.id === update.id && item.direction === update.direction,
+    );
     if (index >= 0) {
       this.transfers = this.transfers.with(index, { ...this.transfers[index]!, ...update });
     } else {

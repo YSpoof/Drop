@@ -175,13 +175,13 @@ export class TransferSender {
       return;
     }
     sender.sending = false;
-    if (sender.currentSendFile) {
-      sender.servedFileIds.add(sender.currentSendFile.id);
-      sender.announcedFiles.delete(sender.currentSendFile.id);
+    sender.servedFileIds.add(fileId);
+    if (sender.currentSendFile?.id === fileId) {
+      sender.announcedFiles.delete(fileId);
       sender.announcedOrder = sender.announcedOrder.filter((id) => id !== fileId);
       sender.currentSendFile = null;
-      session.releaseFileTracking(fileId);
     }
+    session.releaseFileTracking(fileId);
     if (sender.pendingPulls.length) {
       sender.pendingPulls.shift();
     }
@@ -266,6 +266,7 @@ export class TransferSender {
 
     await session.io.sendControl({ type: "done", fileId: queued.id });
 
+    sender.servedFileIds.add(queued.id);
     session.emitHistory(
       session.withBatchContext({
         id: queued.id,
