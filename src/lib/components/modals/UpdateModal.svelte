@@ -1,5 +1,5 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
 
   interface Props {
     open: boolean;

@@ -1,4 +1,4 @@
-import { isPrivateIp } from "$lib/utils/net/privateIp";
+import { isPrivateIp } from "#lib/utils/net/privateIp.js";
 
 import { ICE_SERVERS } from "./peer";
 

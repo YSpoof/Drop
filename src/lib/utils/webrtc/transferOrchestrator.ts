@@ -1,14 +1,14 @@
-import { appState } from "$lib/stores/appState.svelte";
-import { toastStore } from "$lib/stores/toast.svelte";
-import type { QueuedFile } from "$lib/utils/files/queue";
-import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
-import { resolveChunkSize } from "$lib/utils/webrtc/chunkSize";
-import { PeerConnection } from "$lib/utils/webrtc/peer";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { toastStore } from "#lib/stores/toast.svelte.js";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import type { BatchDoneInfo, HistoryEntry } from "#lib/utils/files/transferTypes.js";
+import { resolveChunkSize } from "#lib/utils/webrtc/chunkSize.js";
+import { PeerConnection } from "#lib/utils/webrtc/peer.js";
 import {
   TransferManager,
   type TransferCallbacks,
   type TransferProgress as TransferProgressState,
-} from "$lib/utils/webrtc/transfer";
+} from "#lib/utils/webrtc/transfer.js";
 
 type PendingBatchCompletion = {
   direction: HistoryEntry["direction"];

@@ -1,5 +1,5 @@
-import type { QueuedFile } from "$lib/utils/files/queue";
-import type { BatchDoneInfo, HistoryEntry } from "$lib/utils/files/transferTypes";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import type { BatchDoneInfo, HistoryEntry } from "#lib/utils/files/transferTypes.js";
 
 export interface FileMeta {
   type: "meta";

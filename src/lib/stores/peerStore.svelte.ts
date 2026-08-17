@@ -1,4 +1,4 @@
-import type { PeerInfo } from "$lib/utils/signaling/types";
+import type { PeerInfo } from "#lib/utils/signaling/types.js";
 
 class PeerStore {
   peers = $state<PeerInfo[]>([]);

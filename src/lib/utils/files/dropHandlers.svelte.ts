@@ -1,5 +1,5 @@
-import { feedback } from "$lib/utils/feedback";
-import { getFilesFromDataTransfer } from "$lib/utils/files/drop";
+import { feedback } from "#lib/utils/feedback.js";
+import { getFilesFromDataTransfer } from "#lib/utils/files/drop.js";
 
 export type FileDropHandler = (files: FileList | File[] | { file: File; path: string }[]) => void;
 

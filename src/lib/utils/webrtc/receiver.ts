@@ -1,6 +1,6 @@
-import { createDirectDownloadWriter } from "$lib/utils/files/swDownload";
-import { DownloadError } from "$lib/utils/files/transferTypes";
-import { ZipDownloadSession } from "$lib/utils/files/zipDownload";
+import { createDirectDownloadWriter } from "#lib/utils/files/swDownload.js";
+import { DownloadError } from "#lib/utils/files/transferTypes.js";
+import { ZipDownloadSession } from "#lib/utils/files/zipDownload.js";
 
 import type { FileMeta } from "./protocol";
 import type { TransferSender } from "./sender";

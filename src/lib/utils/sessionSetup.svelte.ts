@@ -1,18 +1,18 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { appState } from "$lib/stores/appState.svelte";
-import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
-import { toastStore } from "$lib/stores/toast.svelte";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+import { toastStore } from "#lib/stores/toast.svelte.js";
 import {
   closeHostBackgroundNotify,
   notifyHostBackground,
-} from "$lib/utils/device/backgroundNotify";
-import { releaseWakeLock, requestWakeLock } from "$lib/utils/device/wakelock";
-import { feedback } from "$lib/utils/feedback";
-import { createQueuedFile } from "$lib/utils/files/queue";
-import { ensureServiceWorkerReady } from "$lib/utils/files/swDownload";
-import { consumeSharedRecords } from "$lib/utils/files/webShare";
-import type { SessionManager } from "$lib/utils/webrtc/SessionManager";
+} from "#lib/utils/device/backgroundNotify.js";
+import { releaseWakeLock, requestWakeLock } from "#lib/utils/device/wakelock.js";
+import { feedback } from "#lib/utils/feedback.js";
+import { createQueuedFile } from "#lib/utils/files/queue.js";
+import { ensureServiceWorkerReady } from "#lib/utils/files/swDownload.js";
+import { consumeSharedRecords } from "#lib/utils/files/webShare.js";
+import type { SessionManager } from "#lib/utils/webrtc/SessionManager.js";
 import { tick } from "svelte";
 
 export function generateRoomId() {
@@ -27,7 +27,7 @@ export async function applyShareParams(
   feedback.light();
 
   const roomId = room ?? generateRoomId();
-  const url = new URL(page.url);
+  const url = new URL(page.url.href);
   url.searchParams.set("room", roomId);
   url.searchParams.set("host", appState.identity.peerId);
 
@@ -37,7 +37,7 @@ export async function applyShareParams(
     url.searchParams.delete("auto");
   }
 
-  await goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
+  await goto(`${url.pathname}${url.search}`, { reset: true });
   await tick();
   session.announce();
 }
@@ -53,12 +53,12 @@ export async function leaveRoom(session: SessionManager, room: string | undefine
 
   if (appState.connectedPeerId) session.disconnectPeer();
 
-  const url = new URL(page.url);
+  const url = new URL(page.url.href);
   url.searchParams.delete("room");
   url.searchParams.delete("host");
   url.searchParams.delete("auto");
   const target = url.search ? `${url.pathname}${url.search}` : url.pathname;
-  await goto(target, { keepFocus: true, noScroll: true });
+  await goto(target, { reset: true });
   await tick();
   session.announce();
   toastStore.showToast("Saiu da sala", "info");

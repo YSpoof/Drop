@@ -1,6 +1,6 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { appState } from "$lib/stores/appState.svelte";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
 </script>
 
 <GenericModal

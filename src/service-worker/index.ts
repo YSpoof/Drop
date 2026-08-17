@@ -1,14 +1,11 @@
-/// <reference types="@sveltejs/kit" />
-/// <reference lib="webworker" />
+import { version } from "$app/env";
+import { assets, immutable, prerendered } from "$app/manifest";
+import { self } from "$app/service-worker";
 
-declare let self: ServiceWorkerGlobalScope;
-
-import { build, files, prerendered, version } from "$service-worker";
-
-import { pushSharedRecord } from "./lib/utils/files/webShare";
+import { pushSharedRecord } from "../lib/utils/files/webShare";
 
 const CACHE_NAME = `drop-${version}`;
-const ASSETS = [...build, ...files, ...prerendered];
+const ASSETS = [...immutable, ...assets, ...prerendered].map((asset) => `/${asset.path}`);
 const DOWNLOAD_PREFIX = "/__download__/";
 
 type PendingDownload = {

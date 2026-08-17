@@ -1,6 +1,6 @@
-import type { QueuedFile } from "$lib/utils/files/queue";
-import type { HistoryEntry } from "$lib/utils/files/transferTypes";
-import { ZipDownloadSession } from "$lib/utils/files/zipDownload";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import type { HistoryEntry } from "#lib/utils/files/transferTypes.js";
+import { ZipDownloadSession } from "#lib/utils/files/zipDownload.js";
 
 import type { DataChannelIo } from "./channelIo";
 import {

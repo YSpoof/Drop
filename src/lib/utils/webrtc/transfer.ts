@@ -1,4 +1,4 @@
-import { logger } from "$lib/utils/logger";
+import { logger } from "#lib/utils/logger.js";
 
 import { DataChannelIo } from "./channelIo";
 import { resolveBufferHighWater, resolveBufferLowWater } from "./chunkSize";

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { appState } from "$lib/stores/appState.svelte";
-  import { toastStore } from "$lib/stores/toast.svelte";
-  import { formatBytes } from "$lib/utils/files/format";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { toastStore } from "#lib/stores/toast.svelte.js";
+  import { formatBytes } from "#lib/utils/files/format.js";
   import ProgressDownloadIcon from "~icons/mdi/progress-download";
   import ProgressTotalIcon from "~icons/mdi/progress-star";
   import ProgressUploadIcon from "~icons/mdi/progress-upload";

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { appState } from "$lib/stores/appState.svelte";
-  import { toastStore } from "$lib/stores/toast.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { toastStore } from "#lib/stores/toast.svelte.js";
   import TrayArrowDownIcon from "~icons/mdi/tray-arrow-down";
 
   const installApp = async () => {

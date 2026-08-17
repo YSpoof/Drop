@@ -1,7 +1,7 @@
-import { appState } from "$lib/stores/appState.svelte";
-import type { QueuedFile } from "$lib/utils/files/queue";
-import { logger } from "$lib/utils/logger";
-import type { TransferManager } from "$lib/utils/webrtc/transfer";
+import { appState } from "#lib/stores/appState.svelte.js";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import { logger } from "#lib/utils/logger.js";
+import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
 
 export class QueueCoordinator {
   private notifyDelayTimeout: ReturnType<typeof setTimeout> | null = null;

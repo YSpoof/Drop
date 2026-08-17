@@ -1,5 +1,5 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
   import AlertCircleIcon from "~icons/mdi/alert-circle";
   import CheckCircleIcon from "~icons/mdi/check-circle";
 

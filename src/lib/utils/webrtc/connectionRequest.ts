@@ -1,6 +1,6 @@
-import { appState } from "$lib/stores/appState.svelte";
-import { logger } from "$lib/utils/logger";
-import type { PeerInfo } from "$lib/utils/signaling/types";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { logger } from "#lib/utils/logger.js";
+import type { PeerInfo } from "#lib/utils/signaling/types.js";
 
 export type ConnectionRequestActions = {
   sendConnectResponse: (targetPeerId: string, accepted: boolean, reason?: string) => void;

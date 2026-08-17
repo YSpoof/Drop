@@ -1,9 +1,9 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { siteData } from "$lib/siteData";
-  import { appState } from "$lib/stores/appState.svelte";
-  import { localForage } from "$lib/utils/localForage";
-  import { feedback } from "$lib/utils/feedback";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { localForage } from "#lib/utils/localForage.js";
+  import { feedback } from "#lib/utils/feedback.js";
   import type { Component } from "svelte";
   import { Tween } from "svelte/motion";
   import AccountEditIcon from "~icons/mdi/account-edit";

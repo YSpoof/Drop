@@ -1,6 +1,6 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { feedback } from "$lib/utils/feedback";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { feedback } from "#lib/utils/feedback.js";
   import { tick } from "svelte";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";

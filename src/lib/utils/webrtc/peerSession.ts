@@ -1,12 +1,12 @@
-import { appState } from "$lib/stores/appState.svelte";
-import { toastStore } from "$lib/stores/toast.svelte";
-import { abortAllDownloadStreams } from "$lib/utils/files/swDownload";
-import { logger } from "$lib/utils/logger";
-import type { ClientMessage, PeerInfo } from "$lib/utils/signaling/types";
-import { PeerConnection } from "$lib/utils/webrtc/peer";
-import type { RoomJoinController } from "$lib/utils/webrtc/roomJoin";
-import type { TransferManager } from "$lib/utils/webrtc/transfer";
-import { TransferOrchestrator } from "$lib/utils/webrtc/transferOrchestrator";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { toastStore } from "#lib/stores/toast.svelte.js";
+import { abortAllDownloadStreams } from "#lib/utils/files/swDownload.js";
+import { logger } from "#lib/utils/logger.js";
+import type { ClientMessage, PeerInfo } from "#lib/utils/signaling/types.js";
+import { PeerConnection } from "#lib/utils/webrtc/peer.js";
+import type { RoomJoinController } from "#lib/utils/webrtc/roomJoin.js";
+import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
+import { TransferOrchestrator } from "#lib/utils/webrtc/transferOrchestrator.js";
 
 export type PeerSessionSignaling = {
   send: (message: ClientMessage) => void;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { appState } from "$lib/stores/appState.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
   import ChartBarIcon from "~icons/mdi/chart-bar";
   import CogIcon from "~icons/mdi/cog";
   import InfoIcon from "~icons/mdi/information-outline";

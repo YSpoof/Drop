@@ -1,4 +1,4 @@
-import { localForage } from "$lib/utils/localForage";
+import { localForage } from "#lib/utils/localForage.js";
 
 const PEER_ID_KEY = "peerId";
 const DISPLAY_NAME_KEY = "displayName";

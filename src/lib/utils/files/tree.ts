@@ -63,8 +63,8 @@ export function getTreeFileIds<T extends { id: string }>(node: TreeNode<T>): str
 
 // === Integrated from fileTreeHelpers.ts ===
 
-import type { QueuedFile } from "$lib/utils/files/queue";
-import type { TransferItem } from "$lib/utils/files/transferTypes";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import type { TransferItem } from "#lib/utils/files/transferTypes.js";
 
 export type UnifiedItem =
   | { type: "queue"; item: QueuedFile; path: string }

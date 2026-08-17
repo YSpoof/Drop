@@ -3,8 +3,8 @@ import { peerStore } from "./peerStore.svelte";
 import { transferStore } from "./transferStore.svelte";
 import { uiStore } from "./uiStore.svelte";
 
-import type { QueuedFile } from "$lib/utils/files/queue";
-import type { TransferItem } from "$lib/utils/files/transferTypes";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import type { TransferItem } from "#lib/utils/files/transferTypes.js";
 
 class AppStateFacade {
   // --- Device Store ---

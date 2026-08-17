@@ -1,4 +1,4 @@
-import type { QueuedFile } from "$lib/utils/files/queue";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
 
 import type { TransferSession } from "./session";
 

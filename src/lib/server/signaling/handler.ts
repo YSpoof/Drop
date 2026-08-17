@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 
-import type { ClientMessage, PeerInfo, ServerMessage } from "$lib/utils/signaling/types";
+import type { ClientMessage, PeerInfo, ServerMessage } from "#lib/utils/signaling/types.js";
 import type { WebSocket } from "ws";
 
 import { isPrivateOctet } from "../../utils/net/privateIp.ts";

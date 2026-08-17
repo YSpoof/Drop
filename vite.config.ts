@@ -5,8 +5,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
-
-import { wsServer } from "./src/plugins/wsServer.ts";
+import { svelteKitWebSocket } from "vite-plugin-sveltekit-ws";
 
 export default defineConfig({
   plugins: [
@@ -34,7 +33,10 @@ export default defineConfig({
       },
     }),
     Icons({ compiler: "svelte" }),
-    wsServer(),
+    svelteKitWebSocket({
+      handlerPath:  "./src/lib/server/signaling/handler.ts",
+      exportName: "handleSignalingConnection",
+    }),
   ],
   build: {
     target: "esnext",
@@ -43,6 +45,7 @@ export default defineConfig({
   server: {
     port: 4321,
     allowedHosts: ["dev.lzart.com.br"],
+    forwardConsole: true,
     watch: {
       ignored: ["**/tests/**", "**/fixtures/**", "**/playwright-report/**"],
     },

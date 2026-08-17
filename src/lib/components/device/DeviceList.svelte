@@ -1,6 +1,6 @@
 <script lang="ts">
-  import DeviceCard from "$lib/components/device/DeviceCard.svelte";
-  import type { PeerInfo } from "$lib/utils/signaling/types";
+  import DeviceCard from "#lib/components/device/DeviceCard.svelte";
+  import type { PeerInfo } from "#lib/utils/signaling/types.js";
   import RadioTowerIcon from "~icons/mdi/radio-tower";
 
   interface Props {
