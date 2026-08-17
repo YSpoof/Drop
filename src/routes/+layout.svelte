@@ -2,14 +2,14 @@
   import "./layout.css";
   import { dev } from "$app/env";
   import { updated } from "$app/state";
-  import Fab from "$lib/components/layout/Fab.svelte";
-  import NavBar from "$lib/components/layout/NavBar.svelte";
-  import ToastRenderer from "$lib/components/ui/ToastRenderer.svelte";
-  import { siteData } from "$lib/siteData";
-  import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
-  import { uiStore } from "$lib/stores/uiStore.svelte";
-  import { layoutModals } from "$lib/utils/layoutModals";
-  import { abortOnPageClose, flushStatsOnHide } from "$lib/utils/pageUnload";
+  import Fab from "#lib/components/layout/Fab.svelte";
+  import NavBar from "#lib/components/layout/NavBar.svelte";
+  import ToastRenderer from "#lib/components/ui/ToastRenderer.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
+  import { layoutModals } from "#lib/utils/layoutModals.js";
+  import { abortOnPageClose, flushStatsOnHide } from "#lib/utils/pageUnload.js";
   import { onMount } from "svelte";
 
   let { children } = $props();
@@ -73,6 +73,6 @@
 {/each}
 
 {#if lazyLoad.has("updateModal")}
-  {const UpdateModal = (await import("$lib/components/modals/UpdateModal.svelte")).default}
+  {const UpdateModal = (await import("#lib/components/modals/UpdateModal.svelte")).default}
   <UpdateModal open={updated.current} />
 {/if}

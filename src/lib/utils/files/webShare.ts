@@ -1,4 +1,4 @@
-import { localForage } from "$lib/utils/localForage";
+import { localForage } from "#lib/utils/localForage.js";
 
 export const WEB_SHARE_KEY = "drop:web-share-queue";
 

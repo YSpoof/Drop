@@ -1,14 +1,14 @@
-import { appState } from "$lib/stores/appState.svelte";
-import type { QueuedFile } from "$lib/utils/files/queue";
-import { logger } from "$lib/utils/logger";
-import { SignalingClient } from "$lib/utils/signaling/client";
-import type { ClientMessage } from "$lib/utils/signaling/types";
-import { discoverLocalIps } from "$lib/utils/webrtc/discovery";
-import { PeerSessionCoordinator } from "$lib/utils/webrtc/peerSession";
-import { QueueCoordinator } from "$lib/utils/webrtc/queueCoordinator";
-import { RoomJoinController } from "$lib/utils/webrtc/roomJoin";
-import { createSignalingHandlers } from "$lib/utils/webrtc/signalingHandlers";
-import { TransferOrchestrator } from "$lib/utils/webrtc/transferOrchestrator";
+import { appState } from "#lib/stores/appState.svelte.js";
+import type { QueuedFile } from "#lib/utils/files/queue.js";
+import { logger } from "#lib/utils/logger.js";
+import { SignalingClient } from "#lib/utils/signaling/client.js";
+import type { ClientMessage } from "#lib/utils/signaling/types.js";
+import { discoverLocalIps } from "#lib/utils/webrtc/discovery.js";
+import { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
+import { QueueCoordinator } from "#lib/utils/webrtc/queueCoordinator.js";
+import { RoomJoinController } from "#lib/utils/webrtc/roomJoin.js";
+import { createSignalingHandlers } from "#lib/utils/webrtc/signalingHandlers.js";
+import { TransferOrchestrator } from "#lib/utils/webrtc/transferOrchestrator.js";
 
 let activeSession: SessionManager | null = null;
 

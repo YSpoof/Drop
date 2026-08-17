@@ -1,7 +1,7 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import type { PeerInfo } from "$lib/utils/signaling/types";
-  import { feedback } from "$lib/utils/feedback";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import type { PeerInfo } from "#lib/utils/signaling/types.js";
+  import { feedback } from "#lib/utils/feedback.js";
 
   interface Props {
     open: boolean;

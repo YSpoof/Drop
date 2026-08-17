@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { PeerInfo } from "$lib/utils/signaling/types";
-  import { feedback } from "$lib/utils/feedback";
+  import type { PeerInfo } from "#lib/utils/signaling/types.js";
+  import { feedback } from "#lib/utils/feedback.js";
   import CloudOutlineIcon from "~icons/mdi/cloud-outline";
   import TransitConnectionHorizontalIcon from "~icons/mdi/transit-connection-horizontal";
   import WifiIcon from "~icons/mdi/wifi";

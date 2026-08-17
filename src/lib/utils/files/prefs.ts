@@ -1,4 +1,4 @@
-import { localForage } from "$lib/utils/localForage";
+import { localForage } from "#lib/utils/localForage.js";
 
 const AUTO_DOWNLOAD_KEY = "autoDownload";
 

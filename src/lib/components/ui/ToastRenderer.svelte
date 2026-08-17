@@ -1,8 +1,8 @@
 <script lang="ts">
-  import ToastProgressBar from "$lib/components/ui/ToastProgressBar.svelte";
-  import { toastStore } from "$lib/stores/toast.svelte";
-  import type { Toast } from "$lib/types";
-  import { feedback } from "$lib/utils/feedback";
+  import ToastProgressBar from "#lib/components/ui/ToastProgressBar.svelte";
+  import { toastStore } from "#lib/stores/toast.svelte.js";
+  import type { Toast } from "#lib/types.js";
+  import { feedback } from "#lib/utils/feedback.js";
   import { flip } from "svelte/animate";
   import { fade } from "svelte/transition";
   import AlertOctagon from "~icons/mdi/alert-octagon-outline";

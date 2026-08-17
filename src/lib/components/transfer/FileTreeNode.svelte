@@ -1,12 +1,12 @@
 <script lang="ts">
-  import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+  import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
   import {
     canShowFileDownload,
     unifiedFileSubtitle,
     unifiedSizeDisplay,
-  } from "$lib/utils/files/fileTreeDisplay";
-  import { filePercent, folderProgress, type UnifiedItem } from "$lib/utils/files/tree";
-  import type { TreeNode } from "$lib/utils/files/tree";
+  } from "#lib/utils/files/fileTreeDisplay.js";
+  import { filePercent, folderProgress, type UnifiedItem } from "#lib/utils/files/tree.js";
+  import type { TreeNode } from "#lib/utils/files/tree.js";
   import CloseIcon from "~icons/mdi/close";
   import FileIcon from "~icons/mdi/file";
   import FileDownloadIcon from "~icons/mdi/file-download";

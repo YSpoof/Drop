@@ -1,4 +1,4 @@
-import { localForage } from "$lib/utils/localForage";
+import { localForage } from "#lib/utils/localForage.js";
 
 export interface TransferStats {
   uploadBytes: number;

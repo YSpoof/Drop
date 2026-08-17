@@ -1,13 +1,13 @@
-import { loadAutoDownload } from "$lib/utils/files/prefs";
-import { createQueuedFiles, type QueuedFile } from "$lib/utils/files/queue";
+import { loadAutoDownload } from "#lib/utils/files/prefs.js";
+import { createQueuedFiles, type QueuedFile } from "#lib/utils/files/queue.js";
 import {
   flushTransferStats,
   loadTransferStats,
   resetTransferStats as persistResetTransferStats,
   scheduleSaveTransferStats,
   type TransferStats,
-} from "$lib/utils/files/transferStats";
-import type { TransferItem } from "$lib/utils/files/transferTypes";
+} from "#lib/utils/files/transferStats.js";
+import type { TransferItem } from "#lib/utils/files/transferTypes.js";
 
 const autoDownload = await loadAutoDownload();
 const initialTransferStats = await loadTransferStats();

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import InstallAppButton from "$lib/components/layout/InstallAppButton.svelte";
-  import { siteData } from "$lib/siteData";
-  import { appState } from "$lib/stores/appState.svelte";
-  import { toastStore } from "$lib/stores/toast.svelte";
-  import { feedback } from "$lib/utils/feedback";
+  import InstallAppButton from "#lib/components/layout/InstallAppButton.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { toastStore } from "#lib/stores/toast.svelte.js";
+  import { feedback } from "#lib/utils/feedback.js";
   import BugIcon from "~icons/mdi/bug";
   import WaterSyncIcon from "~icons/mdi/water-sync";
 

@@ -1,5 +1,5 @@
-import type { Toast } from "$lib/types";
-import { feedback } from "$lib/utils/feedback";
+import type { Toast } from "#lib/types.js";
+import { feedback } from "#lib/utils/feedback.js";
 
 const TOAST_DURATION_BY_TYPE: Record<Toast["type"], number> = {
   success: 3000,

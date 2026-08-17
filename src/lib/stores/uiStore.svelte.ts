@@ -1,5 +1,5 @@
-import { localForage } from "$lib/utils/localForage";
-import { feedback } from "$lib/utils/feedback";
+import { localForage } from "#lib/utils/localForage.js";
+import { feedback } from "#lib/utils/feedback.js";
 
 const tutorialViewed = await localForage.getItem<boolean>("tutorialViewed");
 const initialDevMode = (await localForage.getItem<boolean>("devMode")) ?? false;

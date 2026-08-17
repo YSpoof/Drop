@@ -1,11 +1,11 @@
-import { appState } from "$lib/stores/appState.svelte";
-import { toastStore } from "$lib/stores/toast.svelte";
-import { logger } from "$lib/utils/logger";
-import type { SignalingClient } from "$lib/utils/signaling/client";
-import type { PeerInfo } from "$lib/utils/signaling/types";
-import { handleConnectionRequest } from "$lib/utils/webrtc/connectionRequest";
-import type { PeerSessionCoordinator } from "$lib/utils/webrtc/peerSession";
-import type { RoomJoinController } from "$lib/utils/webrtc/roomJoin";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { toastStore } from "#lib/stores/toast.svelte.js";
+import { logger } from "#lib/utils/logger.js";
+import type { SignalingClient } from "#lib/utils/signaling/client.js";
+import type { PeerInfo } from "#lib/utils/signaling/types.js";
+import { handleConnectionRequest } from "#lib/utils/webrtc/connectionRequest.js";
+import type { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
+import type { RoomJoinController } from "#lib/utils/webrtc/roomJoin.js";
 
 export type SignalingHandlerDeps = {
   signaling: SignalingClient;

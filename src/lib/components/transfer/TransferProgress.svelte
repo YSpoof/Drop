@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { formatBytes, formatSpeed } from "$lib/utils/files/format";
-  import type { QueuedFile } from "$lib/utils/files/queue";
-  import type { TransferItem } from "$lib/utils/files/transferTypes";
+  import { formatBytes, formatSpeed } from "#lib/utils/files/format.js";
+  import type { QueuedFile } from "#lib/utils/files/queue.js";
+  import type { TransferItem } from "#lib/utils/files/transferTypes.js";
   import ProgressDownloadIcon from "~icons/mdi/progress-download";
   import ProgressUploadIcon from "~icons/mdi/progress-upload";
 

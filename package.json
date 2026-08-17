@@ -18,33 +18,38 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
-    "ws": "^8.21.2"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@playwright/test": "^1.62.1",
-    "@sveltejs/adapter-node": "^5.5.7",
-    "@sveltejs/kit": "^2.70.2",
-    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@sveltejs/adapter-node": "6.0.0-next.10",
+    "@sveltejs/kit": "3.0.0-next.23",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@types/ws": "^8.18.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "client-zip": "^2.5.0",
-    "daisyui": "^5.7.16",
+    "daisyui": "^5.7.17",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "localforage": "^1.10.0",
-    "oxfmt": "^0.62.0",
-    "svelte": "^5.56.8",
-    "svelte-check": "^4.7.5",
+    "oxfmt": "^0.63.0",
+    "svelte": "^5.56.9",
+    "svelte-check": "^4.7.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "unplugin-icons": "^23.0.1",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "vite-plugin-sveltekit-ws": "^1.0.1"
   },
   "lint-staged": {
     "*.{json,ts,js,svelte}": "oxfmt"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "pnpm@11.20.0",
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
+  }
 }

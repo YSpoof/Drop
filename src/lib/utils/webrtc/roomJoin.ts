@@ -1,6 +1,6 @@
-import { appState } from "$lib/stores/appState.svelte";
-import { toastStore } from "$lib/stores/toast.svelte";
-import { logger } from "$lib/utils/logger";
+import { appState } from "#lib/stores/appState.svelte.js";
+import { toastStore } from "#lib/stores/toast.svelte.js";
+import { logger } from "#lib/utils/logger.js";
 
 const ROOM_JOIN_TIMEOUT_MS = 15_000;
 const ROOM_JOIN_CONNECTED_CLOSE_MS = 3_000;

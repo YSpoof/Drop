@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createDropHandlers } from "$lib/utils/files/dropHandlers.svelte";
+  import { createDropHandlers } from "#lib/utils/files/dropHandlers.svelte.js";
   import FolderOpenIcon from "~icons/mdi/folder-open";
 
   interface Props {

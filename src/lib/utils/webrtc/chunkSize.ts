@@ -1,4 +1,4 @@
-import { logger } from "$lib/utils/logger";
+import { logger } from "#lib/utils/logger.js";
 
 const BUFFER_LOW_WATER = 16 * 1024;
 const BUFFER_HIGH_WATER = 256 * 1024;

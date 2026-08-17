@@ -1,4 +1,4 @@
-import { uiStore } from "$lib/stores/uiStore.svelte";
+import { uiStore } from "#lib/stores/uiStore.svelte.js";
 import type { Component } from "svelte";
 
 type LayoutModal = {
@@ -11,21 +11,21 @@ export const layoutModals: LayoutModal[] = [
   {
     key: "tutorialModal",
     isOpen: () => uiStore.tutorialModalOpen,
-    load: () => import("$lib/components/modals/TutorialModal.svelte"),
+    load: () => import("#lib/components/modals/TutorialModal.svelte"),
   },
   {
     key: "infoModal",
     isOpen: () => uiStore.infoModalOpen,
-    load: () => import("$lib/components/modals/InfoModal.svelte"),
+    load: () => import("#lib/components/modals/InfoModal.svelte"),
   },
   {
     key: "statsModal",
     isOpen: () => uiStore.statsModalOpen,
-    load: () => import("$lib/components/modals/StatsModal.svelte"),
+    load: () => import("#lib/components/modals/StatsModal.svelte"),
   },
   {
     key: "settingsModal",
     isOpen: () => uiStore.settingsModalOpen,
-    load: () => import("$lib/components/modals/SettingsModal.svelte"),
+    load: () => import("#lib/components/modals/SettingsModal.svelte"),
   },
 ];

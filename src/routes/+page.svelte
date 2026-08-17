@@ -1,23 +1,23 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import DeviceList from "$lib/components/device/DeviceList.svelte";
-  import Files from "$lib/components/transfer/Files.svelte";
-  import TransferProgress from "$lib/components/transfer/TransferProgress.svelte";
-  import { appState } from "$lib/stores/appState.svelte";
-  import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
-  import { ensureNotificationPermission } from "$lib/utils/device/backgroundNotify";
+  import DeviceList from "#lib/components/device/DeviceList.svelte";
+  import Files from "#lib/components/transfer/Files.svelte";
+  import TransferProgress from "#lib/components/transfer/TransferProgress.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+  import { ensureNotificationPermission } from "#lib/utils/device/backgroundNotify.js";
   import {
     applyShareParams,
     initSessionPage,
     leaveRoom,
     setupSessionEffects,
     teardownSessionPage,
-  } from "$lib/utils/sessionSetup.svelte";
+  } from "#lib/utils/sessionSetup.svelte.js";
   import {
     SessionManager,
     registerSession,
     unregisterSession,
-  } from "$lib/utils/webrtc/SessionManager";
+  } from "#lib/utils/webrtc/SessionManager.js";
   import { onDestroy, onMount } from "svelte";
 
   const room = $derived(page.url.searchParams.get("room") ?? undefined);
@@ -90,7 +90,7 @@
 </div>
 
 {#if lazyLoad.has("connectionRequest")}
-  {const ConnectionRequest = (await import("$lib/components/device/ConnectionRequest.svelte"))
+  {const ConnectionRequest = (await import("#lib/components/device/ConnectionRequest.svelte"))
     .default}
   <ConnectionRequest
     open={appState.connectionModalOpen}
@@ -101,14 +101,14 @@
 
 {#if lazyLoad.has("unsupportedBrowser")}
   {const UnsupportedBrowserModal = (
-    await import("$lib/components/modals/UnsupportedBrowserModal.svelte")
+    await import("#lib/components/modals/UnsupportedBrowserModal.svelte")
   ).default}
   <UnsupportedBrowserModal />
 {/if}
 
 {#if lazyLoad.has("shareNotify")}
   {const ShareNotifyPermissionModal = (
-    await import("$lib/components/modals/ShareNotifyPermissionModal.svelte")
+    await import("#lib/components/modals/ShareNotifyPermissionModal.svelte")
   ).default}
   <ShareNotifyPermissionModal
     open={appState.shareNotifyModalOpen}
@@ -118,7 +118,7 @@
 {/if}
 
 {#if lazyLoad.has("shareLink")}
-  {const ShareLinkModal = (await import("$lib/components/modals/ShareLinkModal.svelte")).default}
+  {const ShareLinkModal = (await import("#lib/components/modals/ShareLinkModal.svelte")).default}
   <ShareLinkModal
     open={appState.shareModalOpen}
     {inRoom}
@@ -131,7 +131,7 @@
 {/if}
 
 {#if lazyLoad.has("roomJoin")}
-  {const RoomJoinModal = (await import("$lib/components/modals/RoomJoinModal.svelte")).default}
+  {const RoomJoinModal = (await import("#lib/components/modals/RoomJoinModal.svelte")).default}
   <RoomJoinModal
     open={appState.roomJoinOpen}
     phase={appState.roomJoinPhase}

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { appState } from "$lib/stores/appState.svelte";
-  import { saveAutoDownload } from "$lib/utils/files/prefs";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { appState } from "#lib/stores/appState.svelte.js";
+  import { saveAutoDownload } from "#lib/utils/files/prefs.js";
 
   $effect(() => {
     saveAutoDownload(appState.autoDownload);

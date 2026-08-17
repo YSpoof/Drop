@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { lazyLoad } from "$lib/stores/lazyLoad.svelte";
-  import { feedback } from "$lib/utils/feedback";
-  import type { QueuedFile } from "$lib/utils/files/queue";
-  import type { TransferItem } from "$lib/utils/files/transferTypes";
-  import { buildTree, type UnifiedItem } from "$lib/utils/files/tree";
+  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+  import { feedback } from "#lib/utils/feedback.js";
+  import type { QueuedFile } from "#lib/utils/files/queue.js";
+  import type { TransferItem } from "#lib/utils/files/transferTypes.js";
+  import { buildTree, type UnifiedItem } from "#lib/utils/files/tree.js";
   import DownloadMultipleIcon from "~icons/mdi/download-multiple";
   import FilePlusIcon from "~icons/mdi/file-plus";
   import FolderPlusIcon from "~icons/mdi/folder-plus";

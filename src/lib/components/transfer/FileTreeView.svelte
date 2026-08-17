@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+  import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
   import {
     canDelete,
     canDeleteFolder,
@@ -7,8 +7,8 @@
     getFolderPendingReceivedIds,
     hasPendingReceived,
     type UnifiedItem,
-  } from "$lib/utils/files/tree";
-  import type { TreeNode } from "$lib/utils/files/tree";
+  } from "#lib/utils/files/tree.js";
+  import type { TreeNode } from "#lib/utils/files/tree.js";
 
   import FileTreeActionsModal, { type FileTreeAction } from "./FileTreeActionsModal.svelte";
   import FileTreeNode from "./FileTreeNode.svelte";

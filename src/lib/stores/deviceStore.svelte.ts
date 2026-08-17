@@ -1,4 +1,4 @@
-import { loadIdentity, saveDisplayName } from "$lib/utils/device/identity";
+import { loadIdentity, saveDisplayName } from "#lib/utils/device/identity.js";
 
 const identity = await loadIdentity();
 

@@ -1,6 +1,6 @@
-import { formatBytes } from "$lib/utils/files/format";
-import type { TransferItem } from "$lib/utils/files/transferTypes";
-import type { UnifiedItem } from "$lib/utils/files/tree";
+import { formatBytes } from "#lib/utils/files/format.js";
+import type { TransferItem } from "#lib/utils/files/transferTypes.js";
+import type { UnifiedItem } from "#lib/utils/files/tree.js";
 
 export function queueFileSubtitle(item: { file: { size: number } }): string {
   return `A enviar · ${formatBytes(item.file.size)}`;

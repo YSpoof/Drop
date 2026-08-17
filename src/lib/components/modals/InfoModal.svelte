@@ -1,7 +1,7 @@
 <script lang="ts">
-  import GenericModal from "$lib/components/ui/GenericModal.svelte";
-  import { siteData } from "$lib/siteData";
-  import { appState } from "$lib/stores/appState.svelte";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { appState } from "#lib/stores/appState.svelte.js";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
   import EmailAlertIcon from "~icons/mdi/email-alert-outline";
