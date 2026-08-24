@@ -245,3 +245,12 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+
+self.addEventListener("message", async (e) => {
+  if (e.data?.type === "KILL") {
+    console.warn("(SW): ☠ - killing");
+    const keys = await caches.keys();
+    await Promise.allSettled(keys.map((key) => caches.delete(key)));
+    await self.registration.unregister();
+  }
+});

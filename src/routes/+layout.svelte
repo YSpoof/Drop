@@ -30,8 +30,16 @@
     uiStore.clearInstallPrompt();
   };
 
+  $effect(() => {
+    if (updated.current) {
+      console.log("New version available.");
+    }
+  });
+
   onMount(() => {
-    updated.check();
+    queueMicrotask(() => {
+      updated.check();
+    });
 
     if (!dev) {
       const script = document.createElement("script");

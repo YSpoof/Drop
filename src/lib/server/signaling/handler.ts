@@ -113,7 +113,8 @@ function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
 
   switch (message.type) {
     case "announce": {
-      const subnets = extractSubnets(message.localIps);
+      const localIps = Array.isArray(message.localIps) ? message.localIps : [];
+      const subnets = extractSubnets(localIps);
       const existing = peers.get(message.peerId);
       const publicIp = existing?.publicIp || connectionPublicIp;
 
@@ -123,7 +124,7 @@ function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
         displayName: message.displayName,
         deviceHint: message.deviceHint,
         room: message.room,
-        localIps: message.localIps,
+        localIps,
         subnets,
         publicIp,
       });
