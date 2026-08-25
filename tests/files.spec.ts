@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
 
-import { gotoApp } from "./helpers/app";
+import { gotoShare } from "./helpers/app";
 import { addFiles, addFolder, fileNameFromPath } from "./helpers/files";
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures/test-files");
@@ -12,7 +12,7 @@ const sampleFolder = path.join(fixturesDir, "sample-folder");
 
 test.describe("files", () => {
   test.beforeEach(async ({ page }) => {
-    await gotoApp(page);
+    await gotoShare(page);
   });
 
   test("adds a single file via picker", async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe("files", () => {
 });
 
 test("empty state file picker shortcut adds file", async ({ page }) => {
-  await gotoApp(page);
+  await gotoShare(page);
 
   await page.locator('input[type="file"][multiple]').setInputFiles(helloFile);
 

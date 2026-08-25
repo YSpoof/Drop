@@ -1,22 +1,23 @@
 <script lang="ts">
-  import { appState } from "#lib/stores/appState.svelte.js";
-  import { toastStore } from "#lib/stores/toast.svelte.js";
   import TrayArrowDownIcon from "~icons/mdi/tray-arrow-down";
 
+  import { toastStore } from "#lib/stores/toast.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
+
   const installApp = async () => {
-    const prompt = appState.installPrompt;
+    const prompt = uiStore.installPrompt;
     if (!prompt) return;
 
     await prompt.prompt();
     const { outcome } = await prompt.userChoice;
     if (outcome === "accepted") {
       toastStore.showToast("Instalando, confira suas notificações.");
-      appState.clearInstallPrompt();
+      uiStore.clearInstallPrompt();
     }
   };
 </script>
 
-{#if appState.installPrompt}
+{#if uiStore.installPrompt}
   <button
     type="button"
     onclick={installApp}

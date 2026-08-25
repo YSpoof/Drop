@@ -1,11 +1,12 @@
 <script lang="ts">
-  import InstallAppButton from "#lib/components/layout/InstallAppButton.svelte";
-  import { siteData } from "#lib/siteData.js";
-  import { appState } from "#lib/stores/appState.svelte.js";
-  import { toastStore } from "#lib/stores/toast.svelte.js";
-  import { feedback } from "#lib/utils/feedback.js";
   import BugIcon from "~icons/mdi/bug";
   import WaterSyncIcon from "~icons/mdi/water-sync";
+
+  import InstallAppButton from "#lib/components/layout/InstallAppButton.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { toastStore } from "#lib/stores/toast.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
+  import { feedback } from "#lib/utils/feedback.js";
 
   const TAP_WINDOW_MS = 2000;
   const DEV_MODE_TAPS = 5;
@@ -15,8 +16,8 @@
 
   const handleLogoClick = () => {
     feedback.heavy();
-    if (appState.devMode) {
-      appState.setDevMode(false);
+    if (uiStore.devMode) {
+      uiStore.setDevMode(false);
       toastStore.showToast("Modo desenvolvedor desativado", "info");
       tapCount = 0;
       return;
@@ -30,7 +31,7 @@
     tapCount += 1;
 
     if (tapCount >= DEV_MODE_TAPS) {
-      appState.setDevMode(true);
+      uiStore.setDevMode(true);
       toastStore.showToast("Modo desenvolvedor ativado", "info");
       tapCount = 0;
     }
@@ -46,9 +47,9 @@
             type="button"
             onclick={handleLogoClick}
             class="grid aspect-square h-10 w-10 place-items-center rounded-sm transition-transform active:scale-95"
-            class:bg-error={appState.devMode}
-            class:bg-primary={!appState.devMode}>
-            {#if appState.devMode}
+            class:bg-error={uiStore.devMode}
+            class:bg-primary={!uiStore.devMode}>
+            {#if uiStore.devMode}
               <BugIcon class="text-2xl text-white" />
             {:else}
               <WaterSyncIcon class="text-3xl text-white" />

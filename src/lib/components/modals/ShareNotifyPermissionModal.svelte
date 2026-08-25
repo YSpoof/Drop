@@ -28,7 +28,7 @@
   onClose={handleClose}>
   {#if denied}
     <p class="text-base-content/80 text-sm">
-      Sem permissão de notificações o compartilhamento remoto não pode ser ativado.
+      Sem permissão de notificações, não é possível gerar um código de compartilhamento.
     </p>
     <p class="text-base-content/70 mt-3 text-sm">
       Se o navegador bloqueou o pedido, ative as notificações nas configurações do site e tente
@@ -36,8 +36,8 @@
     </p>
   {:else}
     <p class="text-base-content/80 text-sm">
-      No modo de compartilhamento remoto, avisamos você quando o app fica em segundo plano. O que
-      irá causar problemas de conexão.
+      Ao gerar um código, avisamos você quando o app fica em segundo plano, o que causa problemas de
+      conexão.
     </p>
   {/if}
 

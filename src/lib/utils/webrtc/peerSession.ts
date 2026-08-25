@@ -1,25 +1,24 @@
-import { appState } from "#lib/stores/appState.svelte.js";
+import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
+import { transferStore } from "#lib/stores/transferStore.svelte.js";
+import { uiStore } from "#lib/stores/uiStore.svelte.js";
 import { abortAllDownloadStreams } from "#lib/utils/files/swDownload.js";
 import { logger } from "#lib/utils/logger.js";
-import type { ClientMessage, PeerInfo } from "#lib/utils/signaling/types.js";
+import type { SignalingClient } from "#lib/utils/signaling/client.js";
+import type { IceMode } from "#lib/utils/signaling/types.js";
+import type { CodeJoinController } from "#lib/utils/webrtc/codeJoin.js";
 import { PeerConnection } from "#lib/utils/webrtc/peer.js";
-import type { RoomJoinController } from "#lib/utils/webrtc/roomJoin.js";
 import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
 import { TransferOrchestrator } from "#lib/utils/webrtc/transferOrchestrator.js";
 
-export type PeerSessionSignaling = {
-  send: (message: ClientMessage) => void;
-  suspend: () => void;
-  resume: () => void | Promise<void>;
-};
+const LOCAL_ICE_TIMEOUT_MS = 3_000;
+const LOCAL_ICE_TRIES = 3;
+const RESUME_AFTER_DISCONNECT_MS = 2_000;
 
 export type PeerSessionDeps = {
-  signaling: PeerSessionSignaling;
+  signaling: SignalingClient;
   transferOrchestrator: TransferOrchestrator;
-  roomJoin: RoomJoinController;
-  findPeer: (peerId: string) => PeerInfo | undefined;
-  getRoomCode: () => string | undefined;
+  codeJoin: CodeJoinController;
 };
 
 export class PeerSessionCoordinator {
@@ -27,6 +26,10 @@ export class PeerSessionCoordinator {
   private transferManager: TransferManager | null = null;
   private activeTargetPeerId: string | null = null;
   private peerDisconnectHandled = false;
+  private iceLan = false;
+  private iceMode: IceMode = "all";
+  private localAttempt = 0;
+  private iceRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly deps: PeerSessionDeps) {}
 
@@ -42,86 +45,29 @@ export class PeerSessionCoordinator {
     this.transferManager?.setManualDownload(manual);
   }
 
-  suspendSignaling() {
-    logger.log("(Room) suspend");
-    this.deps.signaling.suspend();
-    appState.peers = [];
-  }
-
-  resumeSignaling() {
-    logger.log("(Room) resume");
-    this.deps.signaling.resume();
-  }
-
-  sendConnectResponse(targetPeerId: string, accepted: boolean, reason?: string) {
-    logger.log(
-      `(Room) connect-response → ${targetPeerId} ${accepted ? "accepted" : "rejected"}${reason ? ` (${reason})` : ""}`,
-    );
-    this.deps.signaling.send({ type: "connect-response", targetPeerId, accepted });
-  }
-
-  acceptPendingRequest() {
-    if (!appState.pendingRequest) return;
-    const requester = appState.pendingRequest;
-    this.clearPendingRequest();
-    appState.connectedPeerInfo = requester;
-
-    this.sendConnectResponse(requester.peerId, true);
-    this.beginAsAnswerer(requester.peerId);
-  }
-
-  denyPendingRequest() {
-    if (!appState.pendingRequest) return;
-    const requester = appState.pendingRequest;
-    this.clearPendingRequest();
-    this.sendConnectResponse(requester.peerId, false);
-  }
-
-  handleConnect(targetPeerId: string) {
-    if (appState.connectingPeerId || appState.connectedPeerId) return;
-    logger.log(`(Room) connect-request → ${targetPeerId}`);
-    appState.connectingPeerId = targetPeerId;
-    const peerInfo = this.deps.findPeer(targetPeerId);
-    if (peerInfo) appState.connectedPeerInfo = peerInfo;
-    toastStore.showToast("Solicitando conexão…", "info");
-    const roomCode = this.deps.getRoomCode();
-    if (roomCode) {
-      this.deps.signaling.send({ type: "connect-request", targetPeerId, roomCode });
-    } else {
-      this.deps.signaling.send({ type: "connect-request", targetPeerId });
-    }
-  }
-
-  handleMutualConnect(requesterPeerId: string) {
-    logger.log(`(Room) mutual connect with ${requesterPeerId}`);
-    this.sendConnectResponse(requesterPeerId, true);
-
-    if (this.isOfferer(requesterPeerId)) {
-      void this.beginAsOfferer(requesterPeerId);
-    } else {
-      this.beginAsAnswerer(requesterPeerId);
-    }
+  setIceLan(lan: boolean) {
+    this.iceLan = lan;
   }
 
   beginAsAnswerer(requesterPeerId: string) {
-    const peerInfo =
-      this.deps.findPeer(requesterPeerId) ??
-      (appState.pendingRequest?.peerId === requesterPeerId
-        ? appState.pendingRequest
-        : appState.connectedPeerInfo);
-    if (peerInfo) appState.connectedPeerInfo = peerInfo;
+    this.prepareIce();
     this.setupPeerConnection(false, requesterPeerId);
   }
 
   async beginAsOfferer(targetPeerId: string) {
+    this.prepareIce();
     this.setupPeerConnection(true, targetPeerId);
     await this.sendOffer(targetPeerId);
+    this.armIceRetry();
   }
 
-  async handleSdpOffer(fromPeerId: string, sdp: RTCSessionDescriptionInit) {
-    if (!this.peerConnection || this.activeTargetPeerId !== fromPeerId) {
-      this.setupPeerConnection(false, fromPeerId);
-    }
+  async handleSdpOffer(
+    fromPeerId: string,
+    sdp: RTCSessionDescriptionInit,
+    iceMode: IceMode = "all",
+  ) {
+    this.iceMode = iceMode;
+    this.setupPeerConnection(false, fromPeerId);
     const answer = await this.peerConnection!.handleOffer(sdp);
     this.deps.signaling.send({
       type: "sdp-answer",
@@ -137,10 +83,6 @@ export class PeerSessionCoordinator {
   async handleIceCandidate(fromPeerId: string, candidate: RTCIceCandidateInit) {
     if (this.activeTargetPeerId !== fromPeerId) return;
     await this.peerConnection?.addIceCandidate(candidate);
-  }
-
-  shouldSkipConnectResponse(targetPeerId: string) {
-    return this.peerConnection !== null && this.activeTargetPeerId === targetPeerId;
   }
 
   disconnectPeer() {
@@ -162,21 +104,48 @@ export class PeerSessionCoordinator {
 
   disposePeerConnection(options?: { markHandled?: boolean }) {
     if (options?.markHandled) this.peerDisconnectHandled = true;
+    this.clearIceRetry();
     const pc = this.peerConnection;
     this.peerConnection = null;
     this.activeTargetPeerId = null;
     this.closePeerHandle(pc);
   }
 
-  private clearPendingRequest() {
-    appState.connectionModalOpen = false;
-    setTimeout(() => {
-      appState.pendingRequest = null;
-    }, 300);
+  private prepareIce() {
+    this.iceMode = this.iceLan ? "local" : "all";
+    this.localAttempt = this.iceLan ? 1 : 0;
   }
 
-  private isOfferer(peerId: string) {
-    return appState.identity.peerId < peerId;
+  private armIceRetry() {
+    this.clearIceRetry();
+    if (this.iceMode !== "local") return;
+    this.iceRetryTimer = setTimeout(() => {
+      this.iceRetryTimer = null;
+      this.retryIce();
+    }, LOCAL_ICE_TIMEOUT_MS);
+  }
+
+  private clearIceRetry() {
+    if (!this.iceRetryTimer) return;
+    clearTimeout(this.iceRetryTimer);
+    this.iceRetryTimer = null;
+  }
+
+  private retryIce() {
+    if (peerStore.connectedPeerId) return;
+    const target = this.activeTargetPeerId;
+    if (!target) return;
+
+    if (this.iceMode === "local" && this.localAttempt < LOCAL_ICE_TRIES) {
+      this.localAttempt += 1;
+    } else {
+      this.iceMode = "all";
+    }
+
+    logger.log(`(Share) ICE retry mode=${this.iceMode} attempt=${this.localAttempt}`);
+    this.setupPeerConnection(true, target);
+    void this.sendOffer(target);
+    this.armIceRetry();
   }
 
   private async sendOffer(targetPeerId: string) {
@@ -186,6 +155,7 @@ export class PeerSessionCoordinator {
       type: "sdp-offer",
       targetPeerId,
       sdp: offer,
+      iceMode: this.iceMode,
     });
   }
 
@@ -196,7 +166,7 @@ export class PeerSessionCoordinator {
 
     this.peerDisconnectHandled = false;
     this.activeTargetPeerId = targetPeerId;
-    this.peerConnection = new PeerConnection();
+    this.peerConnection = new PeerConnection(this.iceMode);
 
     this.peerConnection.onIceCandidate = (candidate) => {
       this.deps.signaling.send({
@@ -207,8 +177,9 @@ export class PeerSessionCoordinator {
     };
 
     this.peerConnection.onConnectionStateChange = (state) => {
+      if (this.iceMode === "local" && this.iceRetryTimer) return;
       if (state === "failed" || state === "disconnected" || state === "closed") {
-        this.handlePeerDisconnect();
+        this.cleanupPeerConnection();
       }
     };
 
@@ -227,20 +198,20 @@ export class PeerSessionCoordinator {
       if (control.readyState !== "open" || files.readyState !== "open") return;
       started = true;
 
-      const peerInfo = this.deps.findPeer(targetPeerId);
-      if (peerInfo) appState.connectedPeerInfo = peerInfo;
+      this.clearIceRetry();
 
-      appState.connectedPeerId = targetPeerId;
-      appState.connectingPeerId = null;
+      peerStore.connectedPeerId = targetPeerId;
+      peerStore.connectingPeerId = null;
+      peerStore.connectedViaLan = this.iceMode === "local";
       this.peerDisconnectHandled = false;
-      logger.log("(Room) peer connect");
+      logger.log(`(Share) peer connect iceMode=${this.iceMode}`);
 
-      if (appState.roomJoinOpen) {
-        this.deps.roomJoin.onPeerConnected();
+      if (uiStore.codeJoinOpen) {
+        this.deps.codeJoin.onPeerConnected();
       } else {
         toastStore.showToast("Conectado", "success");
       }
-      this.suspendSignaling();
+      this.deps.signaling.suspend();
 
       this.transferManager = this.deps.transferOrchestrator.startTransferManager(
         peer,
@@ -255,49 +226,55 @@ export class PeerSessionCoordinator {
 
     for (const channel of [control, files]) {
       channel.onopen = () => tryStart();
-      channel.onclose = () => this.handlePeerDisconnect();
+      channel.onclose = () => this.cleanupPeerConnection();
       if (channel.readyState === "open") tryStart();
     }
-  }
-
-  private handlePeerDisconnect() {
-    this.cleanupPeerConnection();
   }
 
   private cleanupPeerConnection() {
     if (this.peerDisconnectHandled) return;
     this.peerDisconnectHandled = true;
+    this.clearIceRetry();
 
-    logger.log("(Room) peer disconnect");
+    logger.log("(Share) peer disconnect");
 
-    const roomJoinConnecting = appState.roomJoinOpen && appState.roomJoinPhase === "connecting";
+    const joinConnecting = uiStore.codeJoinOpen && peerStore.codeJoinPhase === "connecting";
 
-    appState.resetTransferState();
+    transferStore.resetTransferState();
     this.deps.transferOrchestrator.clearPendingBatchCompletions();
     this.transferManager?.abort();
     this.transferManager = null;
 
-    appState.connectedPeerId = null;
-    appState.connectedPeerInfo = null;
-    appState.connectingPeerId = null;
+    peerStore.connectedPeerId = null;
+    peerStore.connectedPeerInfo = null;
+    peerStore.connectingPeerId = null;
+    peerStore.connectedViaLan = false;
     this.activeTargetPeerId = null;
+    this.iceLan = false;
+    this.iceMode = "all";
+    this.localAttempt = 0;
 
     this.closePeerHandle(this.peerConnection);
     this.peerConnection = null;
 
-    if (roomJoinConnecting) {
-      this.deps.roomJoin.onPeerDisconnectWhileConnecting();
+    if (joinConnecting) {
+      this.deps.codeJoin.fail("Falha na conexão");
       return;
     }
 
-    this.deps.roomJoin.onPeerDisconnectCleanup();
+    this.deps.codeJoin.onPeerDisconnectCleanup();
     toastStore.showToast("Desconectado", "info");
-    void this.resumeSignaling();
+    this.deps.signaling.resume(RESUME_AFTER_DISCONNECT_MS);
   }
 
   private closePeerHandle(pc: PeerConnection | null) {
     if (!pc) return;
     pc.onConnectionStateChange = null;
+    pc.onIceCandidate = null;
+    pc.controlChannel.onopen = null;
+    pc.controlChannel.onclose = null;
+    pc.filesChannel.onopen = null;
+    pc.filesChannel.onclose = null;
     pc.close();
   }
 }

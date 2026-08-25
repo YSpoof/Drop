@@ -1,86 +1,59 @@
-import { appState } from "#lib/stores/appState.svelte.js";
+import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { logger } from "#lib/utils/logger.js";
-import type { SignalingClient } from "#lib/utils/signaling/client.js";
-import type { PeerInfo } from "#lib/utils/signaling/types.js";
-import { handleConnectionRequest } from "#lib/utils/webrtc/connectionRequest.js";
+import type { ServerMessage } from "#lib/utils/signaling/types.js";
+import type { CodeJoinController } from "#lib/utils/webrtc/codeJoin.js";
 import type { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
-import type { RoomJoinController } from "#lib/utils/webrtc/roomJoin.js";
 
 export type SignalingHandlerDeps = {
-  signaling: SignalingClient;
   peerSession: PeerSessionCoordinator;
-  roomJoin: RoomJoinController;
-  findPeer: (peerId: string) => PeerInfo | undefined;
-  getRoomCode: () => string | undefined;
+  codeJoin: CodeJoinController;
   joinSignaling: () => Promise<void>;
-  clearPendingRequest: () => void;
-  getSignalingDisconnectNotified: () => boolean;
-  setSignalingDisconnectNotified: (value: boolean) => void;
+  onCodeAssigned: (code: string) => void;
 };
 
 export function createSignalingHandlers(deps: SignalingHandlerDeps) {
+  let disconnectNotified = false;
+
   return {
     onOpen: () => {
-      deps.setSignalingDisconnectNotified(false);
+      disconnectNotified = false;
       void deps.joinSignaling();
     },
-    onPeerList: (message: { peers: PeerInfo[] }) => {
-      appState.peers = message.peers;
-
-      if (
-        appState.pendingRequest &&
-        !message.peers.some((peer) => peer.peerId === appState.pendingRequest!.peerId)
-      ) {
-        const requesterName = appState.pendingRequest.displayName;
-        deps.clearPendingRequest();
-        toastStore.showToast(`${requesterName} desconectou`, "warning");
-      }
-
-      deps.roomJoin.onPeerListUpdated();
+    onCodeAssigned: (message: Extract<ServerMessage, { type: "code-assigned" }>) => {
+      deps.onCodeAssigned(message.code);
     },
-    onConnectRequest: (message: { requester: PeerInfo; roomCode?: string }) => {
-      handleConnectionRequest(message.requester, message.roomCode, {
-        sendConnectResponse: (targetPeerId, accepted, reason) =>
-          deps.peerSession.sendConnectResponse(targetPeerId, accepted, reason),
-        beginAsAnswerer: (requesterPeerId) => deps.peerSession.beginAsAnswerer(requesterPeerId),
-        handleMutualConnect: (requesterPeerId) =>
-          deps.peerSession.handleMutualConnect(requesterPeerId),
-        findPeer: (peerId) => deps.findPeer(peerId),
-        getHostRoomCode: () => deps.getRoomCode(),
-      });
-    },
-    onConnectResponse: async (message: { accepted: boolean; targetPeerId: string }) => {
-      logger.log(
-        `(Room) connect-response ← ${message.targetPeerId} ${message.accepted ? "accepted" : "rejected"}`,
-      );
-      if (!message.accepted) {
-        if (appState.connectingPeerId === message.targetPeerId) {
-          deps.roomJoin.onConnectResponseRejected(message.targetPeerId);
-        }
-        return;
-      }
+    onPeerJoining: (message: Extract<ServerMessage, { type: "peer-joining" }>) => {
+      const requesterId = message.requester.peerId;
+      logger.log(`(Share) peer-joining ← ${requesterId}`);
 
-      if (appState.connectingPeerId !== message.targetPeerId) return;
-      if (deps.peerSession.shouldSkipConnectResponse(message.targetPeerId)) return;
+      if (peerStore.connectedPeerId || peerStore.connectingPeerId) return;
 
-      await deps.peerSession.beginAsOfferer(message.targetPeerId);
+      peerStore.connectedPeerInfo = message.requester;
+      deps.peerSession.setIceLan(!!message.lan);
+      deps.peerSession.beginAsAnswerer(requesterId);
     },
-    onSdpOffer: async (message: { fromPeerId: string; sdp: RTCSessionDescriptionInit }) => {
-      await deps.peerSession.handleSdpOffer(message.fromPeerId, message.sdp);
+    onJoinAccepted: (message: Extract<ServerMessage, { type: "join-accepted" }>) => {
+      logger.log(`(Share) join-accepted ← ${message.host.peerId}`);
+      peerStore.connectedPeerInfo = message.host;
+      deps.codeJoin.onJoinAccepted(message.host.peerId, !!message.lan);
     },
-    onSdpAnswer: async (message: { sdp: RTCSessionDescriptionInit }) => {
+    onJoinRejected: () => {
+      deps.codeJoin.onJoinRejected();
+    },
+    onSdpOffer: async (message: Extract<ServerMessage, { type: "sdp-offer" }>) => {
+      await deps.peerSession.handleSdpOffer(message.fromPeerId, message.sdp, message.iceMode);
+    },
+    onSdpAnswer: async (message: Extract<ServerMessage, { type: "sdp-answer" }>) => {
       await deps.peerSession.handleSdpAnswer(message.sdp);
     },
-    onIceCandidate: async (message: { fromPeerId: string; candidate: RTCIceCandidateInit }) => {
+    onIceCandidate: async (message: Extract<ServerMessage, { type: "ice-candidate" }>) => {
       await deps.peerSession.handleIceCandidate(message.fromPeerId, message.candidate);
     },
     onClose: (intentional: boolean) => {
-      if (intentional || appState.connectedPeerId) return;
-      if (!deps.getSignalingDisconnectNotified()) {
-        deps.setSignalingDisconnectNotified(true);
-        toastStore.showToast("Desconectado do servidor de emparelhamento", "warning");
-      }
+      if (intentional || peerStore.connectedPeerId || disconnectNotified) return;
+      disconnectNotified = true;
+      toastStore.showToast("Desconectado do servidor de emparelhamento", "warning");
     },
   };
 }

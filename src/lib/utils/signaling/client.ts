@@ -3,9 +3,10 @@ import { logger } from "#lib/utils/logger.js";
 import type { ClientMessage, ServerMessage } from "./types";
 
 export type SignalingHandlers = {
-  onPeerList?: (message: Extract<ServerMessage, { type: "peer-list" }>) => void;
-  onConnectRequest?: (message: Extract<ServerMessage, { type: "connect-request" }>) => void;
-  onConnectResponse?: (message: Extract<ServerMessage, { type: "connect-response" }>) => void;
+  onCodeAssigned?: (message: Extract<ServerMessage, { type: "code-assigned" }>) => void;
+  onPeerJoining?: (message: Extract<ServerMessage, { type: "peer-joining" }>) => void;
+  onJoinAccepted?: (message: Extract<ServerMessage, { type: "join-accepted" }>) => void;
+  onJoinRejected?: () => void;
   onSdpOffer?: (message: Extract<ServerMessage, { type: "sdp-offer" }>) => void;
   onSdpAnswer?: (message: Extract<ServerMessage, { type: "sdp-answer" }>) => void;
   onIceCandidate?: (message: Extract<ServerMessage, { type: "ice-candidate" }>) => void;
@@ -48,25 +49,25 @@ export class SignalingClient {
     this.reconnectTimer = null;
   }
 
+  private clearHeartbeatTimeout() {
+    if (!this.heartbeatTimeout) return;
+    clearTimeout(this.heartbeatTimeout);
+    this.heartbeatTimeout = null;
+  }
+
   private clearHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
-    if (this.heartbeatTimeout) {
-      clearTimeout(this.heartbeatTimeout);
-      this.heartbeatTimeout = null;
-    }
+    this.clearHeartbeatTimeout();
   }
 
   private startHeartbeat() {
     this.clearHeartbeat();
     this.heartbeatTimer = setInterval(() => {
       if (this.ws?.readyState !== WebSocket.OPEN) return;
-      if (this.heartbeatTimeout) {
-        clearTimeout(this.heartbeatTimeout);
-        this.heartbeatTimeout = null;
-      }
+      this.clearHeartbeatTimeout();
       this.send({ type: "ping" });
       this.heartbeatTimeout = setTimeout(() => {
         logger.log("(WS) heartbeat miss");
@@ -128,19 +129,19 @@ export class SignalingClient {
 
       switch (message.type) {
         case "pong":
-          if (this.heartbeatTimeout) {
-            clearTimeout(this.heartbeatTimeout);
-            this.heartbeatTimeout = null;
-          }
+          this.clearHeartbeatTimeout();
           break;
-        case "peer-list":
-          this.handlers.onPeerList?.(message);
+        case "code-assigned":
+          this.handlers.onCodeAssigned?.(message);
           break;
-        case "connect-request":
-          this.handlers.onConnectRequest?.(message);
+        case "peer-joining":
+          this.handlers.onPeerJoining?.(message);
           break;
-        case "connect-response":
-          this.handlers.onConnectResponse?.(message);
+        case "join-accepted":
+          this.handlers.onJoinAccepted?.(message);
+          break;
+        case "join-rejected":
+          this.handlers.onJoinRejected?.();
           break;
         case "sdp-offer":
           this.handlers.onSdpOffer?.(message);
@@ -161,39 +162,41 @@ export class SignalingClient {
     }
   }
 
-  announce(payload: Extract<ClientMessage, { type: "announce" }>) {
-    this.send(payload);
-  }
-
   isConnected() {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
   suspend() {
-    this.suspended = true;
-    this.clearReconnectTimer();
-    this.clearHeartbeat();
-    logger.log("(WS) suspend");
-    if (!this.ws) return;
-    this.intentionalClose = true;
-    this.ws.close();
-    this.ws = null;
-  }
-
-  resume() {
-    this.suspended = false;
-    this.reconnectAttempt = 0;
-    this.clearReconnectTimer();
-    logger.log("(WS) resume");
-    if (this.ws) return;
-    this.openSocket();
+    this.close("suspend");
   }
 
   disconnect() {
+    this.close("disconnect");
+  }
+
+  resume(delayMs = 0) {
+    this.suspended = false;
+    this.reconnectAttempt = 0;
+    this.clearReconnectTimer();
+    logger.log(`(WS) resume delay=${delayMs}ms`);
+    if (this.ws) return;
+
+    if (delayMs > 0) {
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
+        if (!this.suspended && !this.ws) this.openSocket();
+      }, delayMs);
+      return;
+    }
+
+    this.openSocket();
+  }
+
+  private close(reason: "suspend" | "disconnect") {
     this.suspended = true;
     this.clearReconnectTimer();
     this.clearHeartbeat();
-    logger.log("(WS) disconnect");
+    logger.log(`(WS) ${reason}`);
     if (!this.ws) return;
     this.intentionalClose = true;
     this.ws.close();

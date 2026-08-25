@@ -1,17 +1,18 @@
 <script lang="ts">
-  import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { siteData } from "#lib/siteData.js";
-  import { appState } from "#lib/stores/appState.svelte.js";
-  import { localForage } from "#lib/utils/localForage.js";
-  import { feedback } from "#lib/utils/feedback.js";
   import type { Component } from "svelte";
   import { Tween } from "svelte/motion";
   import AccountEditIcon from "~icons/mdi/account-edit";
   import CogIcon from "~icons/mdi/cog";
   import DownloadIcon from "~icons/mdi/download";
   import FolderMultipleIcon from "~icons/mdi/folder-multiple";
-  import LinkIcon from "~icons/mdi/link";
+  import NumericIcon from "~icons/mdi/numeric";
   import WaterSyncIcon from "~icons/mdi/water-sync";
+
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
+  import { feedback } from "#lib/utils/feedback.js";
+  import { localForage } from "#lib/utils/localForage.js";
 
   type IntroStep = {
     title: string;
@@ -27,12 +28,12 @@
     },
     {
       title: "Botão flutuante",
-      body: "Toque no botão de engrenagem no canto da tela para acessar configurações, estatísticas, tutorial, informações e compartilhamento de link.",
+      body: "Toque no botão de engrenagem no canto da tela para acessar configurações, estatísticas, tutorial e informações.",
       Icon: CogIcon,
     },
     {
       title: "Identifique seu dispositivo",
-      body: "Altere o seu nome no menu de Configurações para que outras pessoas reconheçam você na lista.",
+      body: "Altere o seu nome no menu de Configurações para que outras pessoas reconheçam você.",
       Icon: AccountEditIcon,
     },
     {
@@ -46,9 +47,9 @@
       Icon: FolderMultipleIcon,
     },
     {
-      title: "Conexão por link",
-      body: "Gere um link de sala para se conectar com pessoas que não estão na mesma rede que você.",
-      Icon: LinkIcon,
+      title: "Código de compartilhamento",
+      body: "Toque em Gerar um código para criar uma sessão e copiar o link, ou Possuo um código para entrar com o PIN de 6 dígitos.",
+      Icon: NumericIcon,
     },
   ];
 
@@ -61,7 +62,7 @@
 
   function handleClose() {
     feedback.light();
-    appState.tutorialModalOpen = false;
+    uiStore.tutorialModalOpen = false;
     localForage.setItem("tutorialViewed", true);
     setTimeout(() => {
       currentStep = 0;
@@ -94,7 +95,7 @@
 </script>
 
 <GenericModal
-  open={appState.tutorialModalOpen}
+  open={uiStore.tutorialModalOpen}
   modalClass="max-w-lg"
   title="Tutorial"
   onClose={handleClose}>

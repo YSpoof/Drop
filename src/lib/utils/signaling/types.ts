@@ -1,14 +1,9 @@
+export type IceMode = "local" | "all";
+
 export interface PeerInfo {
   peerId: string;
   displayName: string;
   deviceHint: string;
-  room?: string;
-  nearby: boolean;
-}
-
-export interface PeerListMessage {
-  type: "peer-list";
-  peers: PeerInfo[];
 }
 
 export type ClientMessage =
@@ -17,15 +12,16 @@ export type ClientMessage =
       peerId: string;
       displayName: string;
       deviceHint: string;
-      room?: string;
-      localIps: string[];
+      host?: boolean;
+      code?: string;
+      publicIpv4?: string;
     }
-  | { type: "connect-request"; targetPeerId: string; roomCode?: string }
-  | { type: "connect-response"; targetPeerId: string; accepted: boolean }
+  | { type: "join-code"; code: string }
   | {
       type: "sdp-offer";
       targetPeerId: string;
       sdp: RTCSessionDescriptionInit;
+      iceMode?: IceMode;
     }
   | {
       type: "sdp-answer";
@@ -40,17 +36,15 @@ export type ClientMessage =
   | { type: "ping" };
 
 export type ServerMessage =
-  | PeerListMessage
-  | { type: "connect-request"; requester: PeerInfo; roomCode?: string }
-  | {
-      type: "connect-response";
-      accepted: boolean;
-      targetPeerId: string;
-    }
+  | { type: "code-assigned"; code: string }
+  | { type: "peer-joining"; requester: PeerInfo; lan?: boolean }
+  | { type: "join-accepted"; host: PeerInfo; lan?: boolean }
+  | { type: "join-rejected" }
   | {
       type: "sdp-offer";
       fromPeerId: string;
       sdp: RTCSessionDescriptionInit;
+      iceMode?: IceMode;
     }
   | {
       type: "sdp-answer";

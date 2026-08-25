@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-import { gotoApp } from "./helpers/app";
+import { gotoShare } from "./helpers/app";
 import { simulateDragOver, simulateFileDrop } from "./helpers/files";
 
 test.describe("drag and drop", () => {
   test.beforeEach(async ({ page }) => {
-    await gotoApp(page);
+    await gotoShare(page);
   });
 
   test("shows drop overlay on dragover", async ({ page }) => {

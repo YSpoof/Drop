@@ -1,10 +1,10 @@
 <script lang="ts">
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { appState } from "#lib/stores/appState.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
 </script>
 
 <GenericModal
-  open={appState.unsupportedBrowserModalOpen}
+  open={uiStore.unsupportedBrowserModalOpen}
   cantClose={true}
   title="Navegador não suportado">
   <p class="text-base-content/80 text-sm">

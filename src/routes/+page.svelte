@@ -1,147 +1,107 @@
 <script lang="ts">
-  import { page } from "$app/state";
-  import DeviceList from "#lib/components/device/DeviceList.svelte";
-  import Files from "#lib/components/transfer/Files.svelte";
-  import TransferProgress from "#lib/components/transfer/TransferProgress.svelte";
-  import { appState } from "#lib/stores/appState.svelte.js";
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import LightningBoltIcon from "~icons/mdi/lightning-bolt";
+  import NumericIcon from "~icons/mdi/numeric";
+
+  import PossessCodeModal from "#lib/components/modals/PossessCodeModal.svelte";
+  import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { ensureNotificationPermission } from "#lib/utils/device/backgroundNotify.js";
-  import {
-    applyShareParams,
-    initSessionPage,
-    leaveRoom,
-    setupSessionEffects,
-    teardownSessionPage,
-  } from "#lib/utils/sessionSetup.svelte.js";
-  import {
-    SessionManager,
-    registerSession,
-    unregisterSession,
-  } from "#lib/utils/webrtc/SessionManager.js";
-  import { onDestroy, onMount } from "svelte";
+  import { feedback } from "#lib/utils/feedback.js";
+  import { hasSharedRecords } from "#lib/utils/files/webShare.js";
 
-  const room = $derived(page.url.searchParams.get("room") ?? undefined);
-  const autoParam = $derived(page.url.searchParams.get("auto") ?? undefined);
-  const isHost = $derived(page.url.searchParams.get("host") === appState.identity.peerId);
-  const inRoom = $derived(!!room);
-  const shareMode = $derived<"manual" | "auto" | null>(autoParam ? "auto" : room ? "manual" : null);
-  const shareLink = $derived(inRoom ? page.url.href : null);
+  let possessOpen = $state(false);
 
-  const session = new SessionManager({
-    getRoom: () => page.url.searchParams.get("room") ?? undefined,
-    getRoomCode: () => page.url.searchParams.get("auto") ?? undefined,
-  });
-  registerSession(session);
+  function gotoHostShare() {
+    goto("/share/?hostid=" + deviceStore.identity.peerId);
+  }
 
-  let visibilityState = $state(document.visibilityState);
+  function openGenerateGate() {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      gotoHostShare();
+      return;
+    }
+
+    uiStore.shareNotifyDenied =
+      typeof Notification === "undefined" || Notification.permission === "denied";
+    lazyLoad.mark("shareNotify");
+    uiStore.shareNotifyModalOpen = true;
+  }
+
+  function handleGenerateClick() {
+    feedback.light();
+    openGenerateGate();
+  }
+
+  function handlePossessClick() {
+    feedback.light();
+    possessOpen = true;
+  }
 
   async function handleShareNotifyContinue() {
     const granted = await ensureNotificationPermission();
     if (granted) {
-      appState.shareNotifyModalOpen = false;
-      appState.shareModalOpen = true;
+      uiStore.shareNotifyModalOpen = false;
+      gotoHostShare();
       return;
     }
-    appState.shareNotifyDenied = true;
+    uiStore.shareNotifyDenied = true;
   }
 
-  setupSessionEffects(session, {
-    getRoom: () => room,
-    getIsHost: () => isHost,
-    getVisibilityState: () => visibilityState,
-  });
-
-  onMount(() => initSessionPage(session));
-
-  onDestroy(() => {
-    teardownSessionPage();
-    session.destroy();
-    unregisterSession(session);
+  onMount(async () => {
+    if (await hasSharedRecords()) openGenerateGate();
   });
 </script>
 
-<div class="flex flex-col gap-6 py-6">
-  <DeviceList
-    peers={appState.displayPeers}
-    {inRoom}
-    pollingStopped={appState.roomJoinPhase === "failed"}
-    connectingPeerId={appState.connectingPeerId}
-    connectedPeerId={appState.connectedPeerId}
-    connected={appState.connected}
-    onConnect={(id) => session.handleConnect(id)}
-    onDisconnect={() => session.disconnectPeer()} />
+<div class="flex min-h-[60vh] items-center justify-center py-6">
+  <div class="flex w-full max-w-2xl flex-col gap-3 sm:flex-row">
+    <button
+      type="button"
+      class="card bg-base-100 dark:bg-base-300 hover:border-primary flex-1 border-2 border-transparent text-left shadow-sm transition-colors"
+      onclick={handleGenerateClick}>
+      <div class="card-body gap-2 p-6">
+        <div class="flex items-center gap-2">
+          <LightningBoltIcon class="text-primary text-2xl" />
+          <h2 class="text-lg font-semibold">Gerar um código</h2>
+        </div>
+        <p class="text-base-content/70 text-sm">
+          Crie uma sessão, copie o link e envie para outra pessoa.
+        </p>
+      </div>
+    </button>
 
-  <div class="flex flex-col gap-6">
-    <TransferProgress
-      transfers={appState.transfers}
-      queue={appState.visibleQueue} />
-
-    <Files
-      autoDownload={appState.autoDownload}
-      history={appState.transfers}
-      queue={appState.visibleQueue}
-      onadd={(files) => session.addFiles(files)}
-      onremoveQueue={(id) => appState.removeFile(id)}
-      onclearQueue={() => session.clearQueue()}
-      onPull={(id) => session.handlePull(id)}
-      onPullBatch={(ids, name) => session.handlePullBatch(ids, name)}
-      onDeleteHistory={(id) => session.handleDeleteTransfer(id)} />
+    <button
+      type="button"
+      class="card bg-base-100 dark:bg-base-300 hover:border-primary flex-1 border-2 border-transparent text-left shadow-sm transition-colors"
+      onclick={handlePossessClick}>
+      <div class="card-body gap-2 p-6">
+        <div class="flex items-center gap-2">
+          <NumericIcon class="text-primary text-2xl" />
+          <h2 class="text-lg font-semibold">Possuo um código</h2>
+        </div>
+        <p class="text-base-content/70 text-sm">Entre com o PIN de 6 dígitos para se conectar.</p>
+      </div>
+    </button>
   </div>
 </div>
 
-{#if lazyLoad.has("connectionRequest")}
-  {const ConnectionRequest = (await import("#lib/components/device/ConnectionRequest.svelte"))
-    .default}
-  <ConnectionRequest
-    open={appState.connectionModalOpen}
-    requester={appState.pendingRequest}
-    onaccept={() => session.acceptPendingRequest()}
-    ondeny={() => session.denyPendingRequest()} />
-{/if}
-
-{#if lazyLoad.has("unsupportedBrowser")}
-  {const UnsupportedBrowserModal = (
-    await import("#lib/components/modals/UnsupportedBrowserModal.svelte")
-  ).default}
-  <UnsupportedBrowserModal />
-{/if}
+<PossessCodeModal
+  open={possessOpen}
+  onClose={() => (possessOpen = false)}
+  onFound={(code: string) => {
+    possessOpen = false;
+    goto("/share/?code=" + code);
+  }} />
 
 {#if lazyLoad.has("shareNotify")}
   {const ShareNotifyPermissionModal = (
     await import("#lib/components/modals/ShareNotifyPermissionModal.svelte")
   ).default}
   <ShareNotifyPermissionModal
-    open={appState.shareNotifyModalOpen}
-    denied={appState.shareNotifyDenied}
-    onClose={() => (appState.shareNotifyModalOpen = false)}
+    open={uiStore.shareNotifyModalOpen}
+    denied={uiStore.shareNotifyDenied}
+    onClose={() => (uiStore.shareNotifyModalOpen = false)}
     onContinue={handleShareNotifyContinue} />
 {/if}
-
-{#if lazyLoad.has("shareLink")}
-  {const ShareLinkModal = (await import("#lib/components/modals/ShareLinkModal.svelte")).default}
-  <ShareLinkModal
-    open={appState.shareModalOpen}
-    {inRoom}
-    mode={shareMode}
-    link={shareLink}
-    onSelectManual={() => applyShareParams(session, "manual", room)}
-    onSelectAuto={() => applyShareParams(session, "auto", room)}
-    onLeaveRoom={() => leaveRoom(session, room)}
-    onClose={() => (appState.shareModalOpen = false)} />
-{/if}
-
-{#if lazyLoad.has("roomJoin")}
-  {const RoomJoinModal = (await import("#lib/components/modals/RoomJoinModal.svelte")).default}
-  <RoomJoinModal
-    open={appState.roomJoinOpen}
-    phase={appState.roomJoinPhase}
-    peerName={appState.connectedPeerInfo?.displayName}
-    onClose={() => session.cancelRoomJoin()} />
-{/if}
-
-<svelte:window ononline={() => session.wakeSignaling("online")} />
-<svelte:document
-  bind:visibilityState
-  onvisibilitychange={() => {
-    if (document.visibilityState === "visible") session.wakeSignaling("visibility");
-  }} />

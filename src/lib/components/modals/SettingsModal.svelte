@@ -1,17 +1,20 @@
 <script lang="ts">
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { appState } from "#lib/stores/appState.svelte.js";
+  import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
+  import { peerStore } from "#lib/stores/peerStore.svelte.js";
+  import { transferStore } from "#lib/stores/transferStore.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { saveAutoDownload } from "#lib/utils/files/prefs.js";
 
   $effect(() => {
-    saveAutoDownload(appState.autoDownload);
+    saveAutoDownload(transferStore.autoDownload);
   });
 </script>
 
 <GenericModal
-  open={appState.settingsModalOpen}
+  open={uiStore.settingsModalOpen}
   title="Configurações"
-  onClose={() => (appState.settingsModalOpen = false)}
+  onClose={() => (uiStore.settingsModalOpen = false)}
   modalClass="w-full md:max-w-sm">
   <div class="flex flex-col gap-4">
     <label class="floating-label">
@@ -19,8 +22,8 @@
         type="text"
         placeholder="Nome de exibição"
         class="input w-full"
-        bind:value={appState.displayName}
-        onblur={() => appState.handleDisplayNameBlur()} />
+        bind:value={deviceStore.displayName}
+        onblur={() => deviceStore.handleDisplayNameBlur()} />
       <span>Nome de exibição</span>
     </label>
 
@@ -29,15 +32,15 @@
       <input
         type="checkbox"
         class="toggle toggle-primary"
-        bind:checked={appState.autoDownload}
-        disabled={appState.connected} />
+        bind:checked={transferStore.autoDownload}
+        disabled={peerStore.connected} />
     </div>
   </div>
 
   {#snippet modalActions()}
     <button
       class="btn btn-primary"
-      onclick={() => (appState.settingsModalOpen = false)}>
+      onclick={() => (uiStore.settingsModalOpen = false)}>
       Fechar
     </button>
   {/snippet}

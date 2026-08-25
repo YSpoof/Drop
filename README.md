@@ -37,16 +37,18 @@ Ideal para compartilhar projetos, coleções de fotos, documentos e backups.
 
 ---
 
-### 👥 Salas e links de conexão
+### 🔗 Códigos e links de conexão
 
-Na rede local, os dispositivos são descobertos automaticamente. Para conectar com alguém remoto, crie uma **sala** e compartilhe o link.
+A tela inicial oferece dois caminhos: **Gerar um código** e **Possuo um código**.
 
-Ao criar a sala, escolha o modo de conexão:
+Ao gerar, uma sessão é criada e o servidor sorteia um **PIN de 6 dígitos**. Quem gerou recebe um link pronto para compartilhar e o próprio código, ambos copiáveis, e fica aguardando o outro dispositivo.
 
-- **Manual** — quem abrir o link solicita conexão e você aprova;
-- **Automática** — um código fica embutido no link; quem abrir conecta na hora, sem aprovação.
+Do outro lado, é possível:
 
-Enquanto estiver na sala, é possível copiar o link, trocar entre os modos ou sair da sala. Quem recebe o link vê o progresso da conexão (aguardando, conectando, conectado) até a transferência começar. Se a conexão automática falhar, um aviso é exibido com opção de reconectar; a busca por dispositivos é pausada até então.
+- abrir o link recebido; ou
+- tocar em **Possuo um código** e digitar o PIN de 6 dígitos.
+
+E pronto, a conexão será estabelecida e você poderá transferir arquivos de forma bidirecional.
 
 ---
 
@@ -123,7 +125,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 ## 🚀 Como usar
 
 1. Abra o Drop em ambos os dispositivos.
-2. Na rede local, aguarde a descoberta automática. Se estiverem remotos, crie uma sala, escolha conexão manual ou automática e envie o link.
+2. Em um deles, toque em **Gerar um código** e compartilhe o link ou o código de 6 dígitos. No outro, abra o link recebido ou toque em **Possuo um código** e digite o PIN.
 3. Arraste arquivos ou pastas para a janela.
 4. Caso prefira, adicione os arquivos à fila antes mesmo da conexão.
 5. O destinatário poderá aceitar tudo ou selecionar apenas os arquivos desejados.
@@ -134,16 +136,27 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 ## 📈 Ideias / Melhorias futuras
 
 - Compartilhamento em grupo
+
 > Atuamente o WS fica aberto até apenas uma conexão ser feita
+
 - Modal de reminder para doação
+
 > É sempre bom né?
+
 - Servidor atuar como intermediario
+
 > Seria legal se desse para o servidor guardar os arquivos temporáriamente mediante uma configuração no .env para habilitar essa feature com uma senha de acesso
+
 - App nativo Windows/Mac/Linux ou usar FSAPI
+
 > Daria para suportar configurar pastas de envio/recebimento para que o sistema fique automático, e.g adicionamos os arquivos na pasta de envio e eles automáticamente entram na queue
+
 - Transferências que resumem caso a internet caia
+
 > De alguma forma precisamos conseguir re-conectar e transferir apenas os bytes faltantes, para não sobrecarregar o WS, poderiamos ter um cooldown de 30s antes de forçar o reset de tudo
+
 - Documentar/Refatorar algumas partes do código
+
 > Algumas coisas estão bem complexas, se desse para simplificar seria o ideal.
 
 ---

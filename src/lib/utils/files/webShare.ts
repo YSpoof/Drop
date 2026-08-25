@@ -20,6 +20,11 @@ export async function pushSharedRecord(record: SharedRecord): Promise<void> {
   await localForage.setItem(WEB_SHARE_KEY, existing);
 }
 
+export async function hasSharedRecords(): Promise<boolean> {
+  const existing = (await localForage.getItem<SharedRecord[]>(WEB_SHARE_KEY)) ?? [];
+  return existing.length > 0;
+}
+
 export async function consumeSharedRecords(): Promise<SharedRecord[]> {
   const existing = (await localForage.getItem<SharedRecord[]>(WEB_SHARE_KEY)) ?? [];
   if (existing.length) {

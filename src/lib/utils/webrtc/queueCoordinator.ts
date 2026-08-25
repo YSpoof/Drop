@@ -1,4 +1,5 @@
-import { appState } from "#lib/stores/appState.svelte.js";
+import { peerStore } from "#lib/stores/peerStore.svelte.js";
+import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 import { logger } from "#lib/utils/logger.js";
 import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
@@ -9,7 +10,7 @@ export class QueueCoordinator {
   constructor(private readonly getTransferManager: () => TransferManager | null) {}
 
   addFiles(files: FileList | File[] | { file: File; path: string }[]) {
-    const newItems = appState.createAndQueue(files);
+    const newItems = transferStore.createAndQueue(files);
     if (newItems.length === 1) {
       const item = newItems[0]!;
       logger.log(`(Queue) +1 file: ${item.path} (${item.file.size}b)`);
@@ -18,8 +19,8 @@ export class QueueCoordinator {
       logger.log(`(Queue) +${newItems.length} files${newItems[0]?.zip ? " zip" : ""}: ${root}/...`);
     }
 
-    if (appState.connected) {
-      appState.promoteToHistory(newItems);
+    if (peerStore.connected) {
+      transferStore.promoteToHistory(newItems);
     }
 
     if (this.notifyDelayTimeout) {
@@ -33,7 +34,7 @@ export class QueueCoordinator {
   }
 
   appendQueuedFiles(items: QueuedFile[]) {
-    appState.appendQueue(items);
+    transferStore.appendQueue(items);
   }
 
   notifyQueueChanged() {
@@ -41,8 +42,8 @@ export class QueueCoordinator {
   }
 
   clearQueue() {
-    for (const item of appState.queue) {
-      const transfer = appState.transfers.find((entry) => entry.id === item.id);
+    for (const item of transferStore.queue) {
+      const transfer = transferStore.transfers.find((entry) => entry.id === item.id);
       if (
         transfer &&
         transfer.direction === "sent" &&
@@ -51,7 +52,7 @@ export class QueueCoordinator {
         this.getTransferManager()?.cancelFile(item.id);
       }
     }
-    appState.queue = [];
+    transferStore.queue = [];
     if (this.notifyDelayTimeout) {
       clearTimeout(this.notifyDelayTimeout);
       this.notifyDelayTimeout = null;
@@ -63,14 +64,14 @@ export class QueueCoordinator {
     const transferManager = this.getTransferManager();
 
     for (const id of ids) {
-      const item = appState.transfers.find((entry) => entry.id === id);
+      const item = transferStore.transfers.find((entry) => entry.id === id);
       if (!item || item.status === "completed" || item.status === "failed") continue;
 
       if (item.direction === "received") {
         if (transferManager) {
           transferManager.dismissReceivedFile(id);
         } else {
-          appState.removeTransfer(id);
+          transferStore.removeTransfer(id);
         }
         continue;
       }
@@ -78,13 +79,13 @@ export class QueueCoordinator {
       if (transferManager) {
         transferManager.cancelFile(id);
       } else {
-        appState.removeFile(id);
+        transferStore.removeFile(id);
       }
     }
   }
 
   handlePull(fileId: string) {
-    const item = appState.transfers.find((entry) => entry.id === fileId);
+    const item = transferStore.transfers.find((entry) => entry.id === fileId);
     if (!item || item.status !== "pending") return;
 
     this.markTransfersInProgress([fileId]);
@@ -92,7 +93,7 @@ export class QueueCoordinator {
   }
 
   handlePullBatch(fileIds: string[], zipFilename?: string) {
-    const pendingIds = appState.pendingReceivedIds(fileIds);
+    const pendingIds = transferStore.pendingReceivedIds(fileIds);
     if (!pendingIds.length) return;
 
     this.markTransfersInProgress(pendingIds);
@@ -108,9 +109,9 @@ export class QueueCoordinator {
 
   private markTransfersInProgress(ids: string[]) {
     for (const id of ids) {
-      const item = appState.transfers.find((entry) => entry.id === id);
+      const item = transferStore.transfers.find((entry) => entry.id === id);
       if (!item) continue;
-      appState.upsertTransfer({ ...item, status: "in-progress", bytesTransferred: 0 });
+      transferStore.upsertTransfer({ ...item, status: "in-progress", bytesTransferred: 0 });
     }
   }
 }

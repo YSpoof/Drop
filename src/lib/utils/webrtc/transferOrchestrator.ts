@@ -1,5 +1,5 @@
-import { appState } from "#lib/stores/appState.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
+import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 import type { BatchDoneInfo, HistoryEntry } from "#lib/utils/files/transferTypes.js";
 import { resolveChunkSize } from "#lib/utils/webrtc/chunkSize.js";
@@ -76,7 +76,7 @@ export class TransferOrchestrator {
     const status =
       progress.status ??
       (progress.bytesTransferred >= progress.fileSize ? "completed" : "in-progress");
-    appState.upsertTransfer({
+    transferStore.upsertTransfer({
       id: progress.fileId,
       name: progress.fileName,
       size: progress.fileSize,
@@ -87,7 +87,7 @@ export class TransferOrchestrator {
   }
 
   private upsertFromHistory(entry: HistoryEntry) {
-    appState.upsertTransfer({
+    transferStore.upsertTransfer({
       id: entry.id,
       name: entry.name,
       size: entry.size,
@@ -97,7 +97,7 @@ export class TransferOrchestrator {
     });
 
     if (entry.status !== "failed") {
-      appState.recordTransferFile(entry.direction);
+      transferStore.recordTransferFile(entry.direction);
     }
 
     this.handleHistoryToast(entry);
@@ -113,13 +113,13 @@ export class TransferOrchestrator {
       getSendQueue: options.getSendQueue,
       onBye: options.onBye,
       onChunkBytes: (direction, bytes) => {
-        appState.recordTransferStats(direction === "send" ? "sent" : "received", bytes);
+        transferStore.recordTransferStats(direction === "send" ? "sent" : "received", bytes);
       },
       onProgress: (progress) => this.upsertFromProgress(progress),
       onHistory: (entry) => this.upsertFromHistory(entry),
       onBatchDone: (info) => this.handleBatchDoneToast(info),
-      onFileCancelled: (fileId) => appState.removeFile(fileId),
-      onFileDismissed: (fileId) => appState.removeTransfer(fileId),
+      onFileCancelled: (fileId) => transferStore.removeFile(fileId),
+      onFileDismissed: (fileId) => transferStore.removeTransfer(fileId),
       onDownloadError: (message) => {
         toastStore.showToast(message, "error");
       },
@@ -151,15 +151,15 @@ export class TransferOrchestrator {
       chunkSize,
       this.createTransferCallbacks({
         isOfferer: offerer,
-        getSendQueue: () => appState.queue,
+        getSendQueue: () => transferStore.queue,
         onBye,
       }),
     );
 
-    transferManager.setManualDownload(!appState.autoDownload);
+    transferManager.setManualDownload(!transferStore.autoDownload);
     transferManager.start();
-    if (appState.queue.length) {
-      appState.promoteToHistory(appState.queue);
+    if (transferStore.queue.length) {
+      transferStore.promoteToHistory(transferStore.queue);
     }
     transferManager.notifyQueueChanged();
     return transferManager;

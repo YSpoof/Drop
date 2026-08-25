@@ -1,12 +1,13 @@
 <script lang="ts">
-  import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { siteData } from "#lib/siteData.js";
-  import { appState } from "#lib/stores/appState.svelte.js";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
   import EmailAlertIcon from "~icons/mdi/email-alert-outline";
   import HandCoinIcon from "~icons/mdi/hand-coin-outline";
   import WaterSyncIcon from "~icons/mdi/water-sync";
+
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { siteData } from "#lib/siteData.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
 
   let copied = $state(false);
 
@@ -24,9 +25,9 @@
 </script>
 
 <GenericModal
-  open={appState.infoModalOpen}
+  open={uiStore.infoModalOpen}
   title="Sobre o App"
-  onClose={() => (appState.infoModalOpen = false)}
+  onClose={() => (uiStore.infoModalOpen = false)}
   modalClass="w-full md:max-w-xl">
   <div class="flex flex-col gap-5 py-1">
     <div class="flex flex-col items-center gap-3 text-center">
@@ -90,6 +91,6 @@
   {#snippet modalActions()}
     <button
       class="btn btn-primary"
-      onclick={() => (appState.infoModalOpen = false)}>Fechar</button>
+      onclick={() => (uiStore.infoModalOpen = false)}>Fechar</button>
   {/snippet}
 </GenericModal>

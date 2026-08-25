@@ -1,8 +1,12 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { appState } from "#lib/stores/appState.svelte.js";
+
+import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
+import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
+import { transferStore } from "#lib/stores/transferStore.svelte.js";
+import { uiStore } from "#lib/stores/uiStore.svelte.js";
 import {
   closeHostBackgroundNotify,
   notifyHostBackground,
@@ -13,55 +17,26 @@ import { createQueuedFile } from "#lib/utils/files/queue.js";
 import { ensureServiceWorkerReady } from "#lib/utils/files/swDownload.js";
 import { consumeSharedRecords } from "#lib/utils/files/webShare.js";
 import type { SessionManager } from "#lib/utils/webrtc/SessionManager.js";
-import { tick } from "svelte";
 
-export function generateRoomId() {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-}
+export async function applyAssignedCode(code: string) {
+  const url = new URL("/share/", page.url.origin);
+  url.searchParams.set("hostid", deviceStore.identity.peerId);
+  url.searchParams.set("code", code);
+  await goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 
-export async function applyShareParams(
-  session: SessionManager,
-  mode: "manual" | "auto",
-  room?: string,
-) {
-  feedback.light();
-
-  const roomId = room ?? generateRoomId();
-  const url = new URL(page.url.href);
-  url.searchParams.set("room", roomId);
-  url.searchParams.set("host", appState.identity.peerId);
-
-  if (mode === "auto") {
-    url.searchParams.set("auto", session.generateRoomCode());
-  } else {
-    url.searchParams.delete("auto");
+  try {
+    await navigator.clipboard.writeText(url.href);
+    toastStore.showToast("Link copiado", "success");
+  } catch {
+    // ignore clipboard errors
   }
-
-  await goto(`${url.pathname}${url.search}`, { reset: true });
-  await tick();
-  session.announce();
 }
 
-export async function leaveRoom(session: SessionManager, room: string | undefined) {
+export async function leaveShare(session: SessionManager) {
   feedback.light();
-  if (!room) return;
-
-  appState.shareModalOpen = false;
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 300);
-  await promise;
-
-  if (appState.connectedPeerId) session.disconnectPeer();
-
-  const url = new URL(page.url.href);
-  url.searchParams.delete("room");
-  url.searchParams.delete("host");
-  url.searchParams.delete("auto");
-  const target = url.search ? `${url.pathname}${url.search}` : url.pathname;
-  await goto(target, { reset: true });
-  await tick();
-  session.announce();
-  toastStore.showToast("Saiu da sala", "info");
+  if (peerStore.connectedPeerId) session.peerSession.disconnectPeer();
+  await goto("/", { reset: true });
+  toastStore.showToast("Saiu", "info");
 }
 
 export async function recoverSharedFiles(session: SessionManager) {
@@ -81,13 +56,13 @@ export async function recoverSharedFiles(session: SessionManager) {
       }
       if (queued.length) {
         hasFiles = true;
-        session.appendQueuedFiles(queued);
+        session.queue.appendQueuedFiles(queued);
       }
     }
 
     if (hasFiles) {
       toastStore.showToast("Arquivo(s) adicionado(s) na fila", "success");
-      session.notifyQueueChanged();
+      session.queue.notifyQueueChanged();
     }
   } catch (e) {
     toastStore.showToast("Falha ao recuperar arquivos compartilhados", "error");
@@ -95,29 +70,27 @@ export async function recoverSharedFiles(session: SessionManager) {
   }
 }
 
-export async function initSessionPage(session: SessionManager) {
+export async function initSessionPage(session: SessionManager): Promise<string | null> {
   void requestWakeLock();
 
   const swAvailable = await ensureServiceWorkerReady();
   if (!swAvailable) {
-    appState.unsupportedBrowserModalOpen = true;
+    uiStore.unsupportedBrowserModalOpen = true;
   }
 
   session.connect();
   await recoverSharedFiles(session);
 
-  const roomId = page.url.searchParams.get("room");
-  const hostId = page.url.searchParams.get("host");
-  const auto = page.url.searchParams.get("auto") ?? undefined;
-  if (roomId && hostId !== appState.identity.peerId) {
-    session.startRoomJoin(auto ? "auto" : "ask", auto);
-  }
+  const isHost = page.url.searchParams.get("hostid") === deviceStore.identity.peerId;
+  const code = page.url.searchParams.get("code");
+  if (code && !isHost) return session.codeJoin.join(code);
+  return null;
 }
 
 export function setupSessionEffects(
   session: SessionManager,
   options: {
-    getRoom: () => string | undefined;
+    getCode: () => string | undefined;
     getIsHost: () => boolean;
     getVisibilityState: () => DocumentVisibilityState;
   },
@@ -129,33 +102,31 @@ export function setupSessionEffects(
     } else if (
       options.getVisibilityState() === "hidden" &&
       options.getIsHost() &&
-      options.getRoom()
+      options.getCode()
     ) {
       notifyHostBackground();
     }
   });
 
   $effect(() => {
-    options.getRoom();
+    options.getCode();
+    options.getIsHost();
     session.announce();
   });
 
   $effect(() => {
-    session.setManualDownload(!appState.autoDownload);
+    session.peerSession.setManualDownload(!transferStore.autoDownload);
   });
 
   $effect(() => {
-    if (appState.roomJoinOpen && appState.connectedPeerId) {
-      session.finishRoomJoinSuccess();
+    if (uiStore.codeJoinOpen && peerStore.connectedPeerId) {
+      session.codeJoin.finishSuccess();
     }
   });
 
   $effect.pre(() => {
-    if (appState.connectionModalOpen) lazyLoad.mark("connectionRequest");
-    if (appState.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
-    if (appState.shareModalOpen) lazyLoad.mark("shareLink");
-    if (appState.shareNotifyModalOpen) lazyLoad.mark("shareNotify");
-    if (appState.roomJoinOpen) lazyLoad.mark("roomJoin");
+    if (uiStore.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
+    if (uiStore.codeJoinOpen) lazyLoad.mark("codeJoin");
   });
 }
 

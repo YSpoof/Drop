@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 import { grantNotificationAccess } from "./context";
 
@@ -6,6 +6,16 @@ export async function gotoApp(page: Page) {
   await grantNotificationAccess(page.context());
   await page.goto("/");
   await dismissTutorial(page);
+}
+
+export async function generateCode(page: Page) {
+  await page.getByRole("button", { name: "Gerar um código" }).click();
+  await page.waitForURL(/\/share\/\?.*\bcode=\d{6}/);
+}
+
+export async function gotoShare(page: Page) {
+  await gotoApp(page);
+  await generateCode(page);
 }
 
 export async function dismissTutorial(page: Page) {
@@ -18,12 +28,12 @@ export async function dismissTutorial(page: Page) {
     return;
   }
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     if (!(await tutorial.isVisible())) break;
-    await next.click();
+    await next.click({ timeout: 5_000 }).catch(() => undefined);
   }
 
-  await tutorial.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+  await tutorial.waitFor({ state: "hidden", timeout: 5_000 });
 }
 
 export async function closeFabMenu(page: Page) {
@@ -34,30 +44,18 @@ export async function closeFabMenu(page: Page) {
 }
 
 export async function openFabMenu(page: Page) {
-  await closeFabMenu(page);
-  await page.locator(".fab > div[role='button']").click();
-}
+  const trigger = page.locator(".fab > div[role='button']");
+  const firstAction = page.locator(".fab button.btn-circle").first();
 
-export async function openRemoteShare(page: Page) {
-  await openFabMenu(page);
-  await page
-    .locator(".fab")
-    .locator("button.btn-circle")
-    .filter({ has: page.locator("svg") })
-    .first()
-    .click();
-
-  const notifyModal = page.getByRole("heading", { name: "Notificações necessárias", level: 1 });
-  if (await notifyModal.isVisible().catch(() => false)) {
-    await page.getByRole("button", { name: "Continuar" }).click();
-  }
-
-  await page.getByRole("heading", { name: "Conectar remotamente", level: 1 }).waitFor();
+  await expect(async () => {
+    await trigger.click();
+    await firstAction.waitFor({ state: "visible", timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 export async function enableAutoDownload(page: Page) {
   await openFabMenu(page);
-  await page.locator(".fab button.btn-circle").nth(2).click();
+  await page.locator(".fab button.btn-circle").nth(1).click();
   const toggle = page.getByRole("checkbox");
   if (!(await toggle.isChecked())) {
     await toggle.check();

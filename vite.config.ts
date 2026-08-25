@@ -31,10 +31,13 @@ export default defineConfig({
       version: {
         pollInterval: 1000 * 30, // 30 seconds
       },
+      csrf: {
+        trustedOrigins: ["*"],
+      },
     }),
     Icons({ compiler: "svelte" }),
     svelteKitWebSocket({
-      handlerPath:  "./src/lib/server/signaling/handler.ts",
+      handlerPath: "./src/lib/server/signaling/handler.ts",
       exportName: "handleSignalingConnection",
     }),
   ],

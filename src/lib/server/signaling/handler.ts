@@ -1,58 +1,29 @@
+import { randomInt } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 
-import type { ClientMessage, PeerInfo, ServerMessage } from "#lib/utils/signaling/types.js";
 import type { WebSocket } from "ws";
 
-import { isPrivateOctet } from "../../utils/net/privateIp.ts";
+import type { ClientMessage, PeerInfo, ServerMessage } from "#lib/utils/signaling/types.js";
+
+import { isPublicIpv4 } from "../../utils/net/privateIp.ts";
 
 interface StoredPeer {
   ws: WebSocket;
   peerId: string;
   displayName: string;
   deviceHint: string;
-  room?: string;
-  localIps: string[];
-  subnets: string[];
-  publicIp: string;
+  code?: string;
+  publicIpv4?: string;
 }
 
 const peers = new Map<string, StoredPeer>();
+const codes = new Map<string, string>();
 
-function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0]?.trim() ?? "";
-  }
-  const remote = req.socket.remoteAddress ?? "";
-  return remote.replace(/^::ffff:/, "");
-}
-
-function ipToSubnet24(ip: string): string | null {
-  const parts = ip.split(".");
-  if (parts.length !== 4) return null;
-  const nums = parts.map((p) => Number(p));
-  if (nums.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return null;
-  const [a, b, c] = nums;
-  if (!isPrivateOctet(a, b)) return null;
-  return `${a}.${b}.${c}.0/24`;
-}
-
-function extractSubnets(localIps: string[]): string[] {
-  const subnets = new Set<string>();
-  for (const ip of localIps) {
-    const subnet = ipToSubnet24(ip);
-    if (subnet) subnets.add(subnet);
-  }
-  return [...subnets];
-}
-
-function toPeerInfo(peer: StoredPeer, nearby: boolean): PeerInfo {
+function toPeerInfo(peer: StoredPeer): PeerInfo {
   return {
     peerId: peer.peerId,
     displayName: peer.displayName,
     deviceHint: peer.deviceHint,
-    room: peer.room,
-    nearby,
   };
 }
 
@@ -62,159 +33,146 @@ function send(ws: WebSocket, message: ServerMessage) {
   }
 }
 
-function getPeer(peerId: string): StoredPeer | undefined {
-  return peers.get(peerId);
+function samePublicIp(a: StoredPeer, b: StoredPeer): boolean {
+  return !!(a.publicIpv4 && b.publicIpv4 && a.publicIpv4 === b.publicIpv4);
 }
 
-function areNearby(a: StoredPeer, b: StoredPeer): boolean {
-  if (a.publicIp && b.publicIp && a.publicIp === b.publicIp) return true;
-  return a.subnets.some((subnet) => b.subnets.includes(subnet));
+function normalizeCode(code: unknown): string | undefined {
+  if (typeof code !== "string") return undefined;
+  const trimmed = code.trim();
+  return /^\d{6}$/.test(trimmed) ? trimmed : undefined;
 }
 
-/**
- * Broadcasts the updated list of peers to everyone connected.
- * Peers are grouped by room matching and local network (IP/subnet) proximity.
- */
-function broadcastPeerLists() {
-  for (const peer of peers.values()) {
-    const seen = new Set<string>();
-    const peerList: PeerInfo[] = [];
+function generateUniqueCode(): string {
+  for (let i = 0; i < 50; i++) {
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    if (!codes.has(code)) return code;
+  }
+  throw new Error("Failed to allocate share code");
+}
 
-    for (const other of peers.values()) {
-      if (other.peerId === peer.peerId || seen.has(other.peerId)) continue;
-
-      const inRoom = peer.room && other.room === peer.room;
-      const nearby = areNearby(peer, other);
-
-      if (inRoom || nearby) {
-        seen.add(other.peerId);
-        peerList.push(toPeerInfo(other, nearby));
-      }
-    }
-
-    send(peer.ws, { type: "peer-list", peers: peerList });
+function freeOwnedCode(peerId: string, code: string | undefined) {
+  if (code && codes.get(code) === peerId) {
+    codes.delete(code);
   }
 }
 
 function removePeer(peerId: string) {
+  const peer = peers.get(peerId);
+  if (peer) freeOwnedCode(peerId, peer.code);
   peers.delete(peerId);
-  broadcastPeerLists();
 }
 
-function handleMessage(ws: WebSocket, raw: string, connectionPublicIp: string) {
-  let message: ClientMessage;
-  try {
-    message = JSON.parse(raw) as ClientMessage;
-  } catch {
-    return;
-  }
+function relay(
+  sender: StoredPeer | undefined,
+  targetPeerId: string,
+  build: (from: StoredPeer, target: StoredPeer) => ServerMessage,
+) {
+  const target = peers.get(targetPeerId);
+  if (!sender || !target) return;
+  send(target.ws, build(sender, target));
+}
 
-  const sender = [...peers.values()].find((p) => p.ws === ws);
+function handleMessage(ws: WebSocket, message: ClientMessage, senderId: string | null) {
+  const sender = senderId ? peers.get(senderId) : undefined;
 
   switch (message.type) {
     case "announce": {
-      const localIps = Array.isArray(message.localIps) ? message.localIps : [];
-      const subnets = extractSubnets(localIps);
-      const existing = peers.get(message.peerId);
-      const publicIp = existing?.publicIp || connectionPublicIp;
+      const previous = peers.get(message.peerId)?.code;
+      const requested = normalizeCode(message.code);
+      const reusable = previous && codes.get(previous) === message.peerId ? previous : undefined;
+      const code = message.host ? (requested ?? reusable ?? generateUniqueCode()) : undefined;
+
+      if (previous !== code) freeOwnedCode(message.peerId, previous);
+      if (code && (codes.get(code) ?? message.peerId) === message.peerId) {
+        codes.set(code, message.peerId);
+      }
+
+      const publicIpv4 =
+        typeof message.publicIpv4 === "string" && isPublicIpv4(message.publicIpv4)
+          ? message.publicIpv4
+          : undefined;
 
       peers.set(message.peerId, {
         ws,
         peerId: message.peerId,
         displayName: message.displayName,
         deviceHint: message.deviceHint,
-        room: message.room,
-        localIps,
-        subnets,
-        publicIp,
+        code,
+        publicIpv4,
       });
-      broadcastPeerLists();
+
+      if (code && !requested && !reusable) {
+        send(ws, { type: "code-assigned", code });
+      }
       break;
     }
-    case "connect-request": {
-      const target = getPeer(message.targetPeerId);
-      if (!target || !sender) return;
-      send(target.ws, {
-        type: "connect-request",
-        requester: toPeerInfo(sender, areNearby(sender, target)),
-        roomCode: message.roomCode,
+    case "join-code": {
+      const code = normalizeCode(message.code);
+      const owner = code ? peers.get(codes.get(code) ?? "") : undefined;
+
+      if (!sender || !owner || owner.peerId === sender.peerId) {
+        send(ws, { type: "join-rejected" });
+        break;
+      }
+
+      const lan = samePublicIp(sender, owner);
+      send(owner.ws, {
+        type: "peer-joining",
+        requester: toPeerInfo(sender),
+        ...(lan ? { lan: true } : {}),
+      });
+      send(ws, {
+        type: "join-accepted",
+        host: toPeerInfo(owner),
+        ...(lan ? { lan: true } : {}),
       });
       break;
     }
-    case "connect-response": {
-      const target = getPeer(message.targetPeerId);
-      if (!target || !sender) return;
-      send(target.ws, {
-        type: "connect-response",
-        accepted: message.accepted,
-        targetPeerId: sender.peerId,
-      });
-      break;
-    }
-    case "sdp-offer": {
-      const target = getPeer(message.targetPeerId);
-      if (!target || !sender) return;
-      send(target.ws, {
+    case "sdp-offer":
+      relay(sender, message.targetPeerId, (from) => ({
         type: "sdp-offer",
-        fromPeerId: sender.peerId,
+        fromPeerId: from.peerId,
         sdp: message.sdp,
-      });
+        iceMode: message.iceMode,
+      }));
       break;
-    }
-    case "sdp-answer": {
-      const target = getPeer(message.targetPeerId);
-      if (!target || !sender) return;
-      send(target.ws, {
+    case "sdp-answer":
+      relay(sender, message.targetPeerId, (from) => ({
         type: "sdp-answer",
-        fromPeerId: sender.peerId,
+        fromPeerId: from.peerId,
         sdp: message.sdp,
-      });
+      }));
       break;
-    }
-    case "ice-candidate": {
-      const target = getPeer(message.targetPeerId);
-      if (!target || !sender) return;
-      send(target.ws, {
+    case "ice-candidate":
+      relay(sender, message.targetPeerId, (from) => ({
         type: "ice-candidate",
-        fromPeerId: sender.peerId,
+        fromPeerId: from.peerId,
         candidate: message.candidate,
-      });
+      }));
       break;
-    }
-    case "ping": {
+    case "ping":
       send(ws, { type: "pong" });
       break;
-    }
   }
 }
 
-export function handleSignalingConnection(ws: WebSocket, req: IncomingMessage) {
-  const publicIp = getClientIp(req);
+export function handleSignalingConnection(ws: WebSocket, _req: IncomingMessage) {
   let registeredPeerId: string | null = null;
 
   ws.on("message", (data) => {
-    const raw = typeof data === "string" ? data : data.toString();
-    handleMessage(ws, raw, publicIp);
-
+    let message: ClientMessage;
     try {
-      const parsed = JSON.parse(raw) as ClientMessage;
-      if (parsed.type === "announce") {
-        registeredPeerId = parsed.peerId;
-      }
+      message = JSON.parse(typeof data === "string" ? data : data.toString()) as ClientMessage;
     } catch {
-      // ignore
+      return;
     }
+
+    if (message.type === "announce") registeredPeerId = message.peerId;
+    handleMessage(ws, message, registeredPeerId);
   });
 
   ws.on("close", () => {
     if (registeredPeerId) removePeer(registeredPeerId);
-    else {
-      for (const [peerId, peer] of peers) {
-        if (peer.ws === ws) {
-          removePeer(peerId);
-          break;
-        }
-      }
-    }
   });
 }

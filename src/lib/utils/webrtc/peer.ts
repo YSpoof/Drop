@@ -1,3 +1,6 @@
+import type { IceMode } from "#lib/utils/signaling/types.js";
+import { shouldSendOrAcceptCandidate } from "#lib/utils/webrtc/ice.js";
+
 export const STUN_SERVER = "stun:stun.l.google.com:19302";
 export const ICE_SERVERS: RTCIceServer[] = [{ urls: STUN_SERVER }];
 
@@ -11,16 +14,20 @@ export class PeerConnection {
   readonly pc: RTCPeerConnection;
   readonly controlChannel: RTCDataChannel;
   readonly filesChannel: RTCDataChannel;
+  readonly iceMode: IceMode;
   onIceCandidate: IceCandidateHandler | null = null;
   onConnectionStateChange: ConnectionStateHandler | null = null;
 
-  constructor() {
-    this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  constructor(iceMode: IceMode = "all") {
+    this.iceMode = iceMode;
+    this.pc = new RTCPeerConnection({
+      iceServers: iceMode === "local" ? [] : ICE_SERVERS,
+    });
 
     this.pc.onicecandidate = (event) => {
-      if (event.candidate && this.onIceCandidate) {
-        this.onIceCandidate(event.candidate);
-      }
+      if (!event.candidate || !this.onIceCandidate) return;
+      if (!shouldSendOrAcceptCandidate(this.iceMode, event.candidate)) return;
+      this.onIceCandidate(event.candidate);
     };
 
     this.pc.onconnectionstatechange = () => {
@@ -29,7 +36,6 @@ export class PeerConnection {
 
     this.controlChannel = this.pc.createDataChannel("ctrl", {
       negotiated: true,
-
       id: CONTROL_CHANNEL_ID,
       ordered: true,
     });
@@ -59,7 +65,12 @@ export class PeerConnection {
 
   async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
     if (!candidate.candidate) return;
-    await this.pc.addIceCandidate(candidate);
+    if (!shouldSendOrAcceptCandidate(this.iceMode, candidate)) return;
+    try {
+      await this.pc.addIceCandidate(candidate);
+    } catch {
+      // stale candidate from a previous ICE attempt
+    }
   }
 
   close() {

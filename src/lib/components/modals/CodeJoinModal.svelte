@@ -1,13 +1,13 @@
 <script lang="ts">
-  import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import AlertCircleIcon from "~icons/mdi/alert-circle";
   import CheckCircleIcon from "~icons/mdi/check-circle";
 
-  type RoomJoinPhase = "waiting" | "connecting" | "connected" | "failed";
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
+
+  type CodeJoinPhase = "waiting" | "connecting" | "connected";
 
   interface Props {
     open: boolean;
-    phase: RoomJoinPhase;
+    phase: CodeJoinPhase;
     peerName?: string | null;
     onClose: () => void;
   }
@@ -20,16 +20,10 @@
         return "Conectado";
       case "connecting":
         return "Conectando";
-      case "failed":
-        return "Falha na conexão";
       case "waiting":
         return "Aguardando";
     }
   });
-
-  function handleReconnect() {
-    globalThis.location.reload();
-  }
 </script>
 
 <GenericModal
@@ -49,15 +43,6 @@
       <span class="loading loading-ring loading-lg text-primary"></span>
       <p class="text-base-content/80 text-center text-sm text-balance">Conectando…</p>
     </div>
-  {:else if phase === "failed"}
-    <div
-      role="alert"
-      class="alert alert-soft alert-error alert-vertical sm:alert-horizontal">
-      <AlertCircleIcon class="text-2xl" />
-      <p class="text-pretty">
-        A conexão automática falhou, verifique se a outra pessoa está no mesmo link que você.
-      </p>
-    </div>
   {:else}
     <div
       role="alert"
@@ -72,12 +57,4 @@
       </p>
     </div>
   {/if}
-
-  {#snippet modalActions()}
-    {#if phase === "failed"}
-      <button
-        class="btn btn-primary"
-        onclick={handleReconnect}>Reconectar</button>
-    {/if}
-  {/snippet}
 </GenericModal>
