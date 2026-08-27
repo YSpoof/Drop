@@ -1,4 +1,5 @@
-import { createDownloadWritableStream } from "./swDownload";
+import type { DownloadService } from "#lib/services/downloadService.js";
+
 import { DownloadError } from "./transferTypes";
 
 function uniqueName(name: string, used: Set<string>): string {
@@ -35,6 +36,7 @@ export class ZipDownloadSession {
   private readonly filename: string;
 
   constructor(
+    private readonly downloads: DownloadService,
     filename = `drop-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.zip`,
     private readonly opts: { onAbort?: () => void } = {},
   ) {
@@ -49,7 +51,7 @@ export class ZipDownloadSession {
     if (this.started || typeof window === "undefined") return;
     this.started = true;
 
-    const fileStream = await createDownloadWritableStream(this.filename, {
+    const fileStream = await this.downloads.createWritableStream(this.filename, {
       mime: "application/zip",
       onAbort: this.opts.onAbort,
     });

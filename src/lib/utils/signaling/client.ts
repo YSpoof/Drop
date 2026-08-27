@@ -15,7 +15,7 @@ export type SignalingHandlers = {
 };
 
 const BASE_RECONNECT_DELAY_MS = 500;
-const MAX_RECONNECT_DELAY_MS = 5_000;
+const MAX_RECONNECT_DELAY_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const HEARTBEAT_TIMEOUT_MS = 8_000;
 

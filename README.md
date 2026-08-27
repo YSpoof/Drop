@@ -149,11 +149,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 
 - App nativo Windows/Mac/Linux ou usar FSAPI
 
-> Daria para suportar configurar pastas de envio/recebimento para que o sistema fique automático, e.g adicionamos os arquivos na pasta de envio e eles automáticamente entram na queue
-
-- Transferências que resumem caso a internet caia
-
-> De alguma forma precisamos conseguir re-conectar e transferir apenas os bytes faltantes, para não sobrecarregar o WS, poderiamos ter um cooldown de 30s antes de forçar o reset de tudo
+> O port nativo está em fase experimental, e já monitora pastas na fila de envio e grava recebimentos direto no disco.
 
 - Documentar/Refatorar algumas partes do código
 

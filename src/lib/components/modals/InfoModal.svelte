@@ -6,6 +6,7 @@
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { clipboard } from "#lib/runtime.js";
   import { siteData } from "#lib/siteData.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
 
@@ -13,7 +14,7 @@
 
   async function copyPixKey() {
     try {
-      await navigator.clipboard.writeText(siteData.donationPixKey);
+      await clipboard.writeText(siteData.donationPixKey);
       copied = true;
       setTimeout(() => {
         copied = false;

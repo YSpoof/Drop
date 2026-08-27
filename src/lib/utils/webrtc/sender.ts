@@ -1,5 +1,6 @@
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 
+import { fileIdentity } from "./protocol";
 import type { TransferSession } from "./session";
 
 export class TransferSender {
@@ -30,24 +31,32 @@ export class TransferSender {
     await this.sendFileBinary(fileId);
   }
 
-  private async beginSend(
-    queued: QueuedFile,
-    options: { sendStart?: boolean; retryOnIncomplete?: boolean } = {},
-  ) {
+  private async beginSend(queued: QueuedFile) {
     const { session } = this;
     const sender = session.sender;
     sender.downloadAbortedSendIds.delete(queued.id);
     sender.sending = true;
     sender.currentSendFile = queued;
 
-    if (options.sendStart) {
-      await session.io.sendControl({ type: "start", fileId: queued.id });
+    await session.io.sendControl({
+      type: "start",
+      fileId: queued.id,
+      chunkSize: session.chunkSize,
+    });
+
+    const offset = await sender.resumeSlot(queued.id).promise;
+    if (session.shouldStopSend(queued.id) || sender.currentSendFile?.id !== queued.id) {
+      sender.clearSending();
+      void this.trySendNext();
+      void this.processNextPull();
+      return;
     }
 
-    session.emitQueuedProgress(queued, "in-progress");
-    const completed = await this.sendFileChunks(queued);
-    if (!completed && options.retryOnIncomplete) {
+    session.emitQueuedProgress(queued, "in-progress", offset);
+    const completed = await this.sendFileChunks(queued, offset);
+    if (!completed) {
       void this.trySendNext();
+      void this.processNextPull();
     }
   }
 
@@ -70,7 +79,6 @@ export class TransferSender {
   announcePendingFiles() {
     const { session } = this;
     const sender = session.sender;
-    if (sender.sending) return;
 
     const queue = session.callbacks
       .getSendQueue()
@@ -116,7 +124,7 @@ export class TransferSender {
     const queued = sender.announcedFiles.get(fileId);
     if (!queued) return;
 
-    await this.beginSend(queued, { sendStart: true, retryOnIncomplete: true });
+    await this.beginSend(queued);
   }
 
   private hasUnservedAnnounced(): boolean {
@@ -231,20 +239,28 @@ export class TransferSender {
   }
 
   /** Shared chunk loop used by pull-send and auto-send. */
-  async sendFileChunks(queued: QueuedFile): Promise<boolean> {
+  async sendFileChunks(queued: QueuedFile, startOffset = 0): Promise<boolean> {
     const { session } = this;
     const sender = session.sender;
     const totalChunks = Math.ceil(queued.file.size / session.chunkSize);
-    let bytesSent = 0;
+    const startIndex = Math.floor(startOffset / session.chunkSize);
+    let bytesSent = startIndex * session.chunkSize;
 
-    for (let index = 0; index < totalChunks; index += 1) {
+    for (let index = startIndex; index < totalChunks; index += 1) {
       if (session.shouldStopSend(queued.id)) {
         sender.clearSending();
         return false;
       }
       const offset = index * session.chunkSize;
-      const slice = queued.file.slice(offset, offset + session.chunkSize);
-      const buffer = await slice.arrayBuffer();
+
+      let buffer: ArrayBuffer | undefined;
+      if (session.callbacks.readFileChunk) {
+        buffer = await session.callbacks.readFileChunk(queued, offset, session.chunkSize);
+      }
+      if (!buffer) {
+        const slice = queued.file.slice(offset, offset + session.chunkSize);
+        buffer = await slice.arrayBuffer();
+      }
       if (session.shouldStopSend(queued.id)) {
         sender.clearSending();
         return false;
@@ -278,5 +294,12 @@ export class TransferSender {
       }),
     );
     return true;
+  }
+
+  onResume(fileId: string, hash: string, bytesOffset: number) {
+    const queued = this.resolveQueuedFile(fileId);
+    const match =
+      queued && hash === fileIdentity(queued.path, queued.file.size, queued.file.lastModified);
+    this.session.sender.resumeSlot(fileId).resolve(match ? bytesOffset : 0);
   }
 }

@@ -13,22 +13,24 @@ export class DataChannelIo {
   ) {}
 
   async sendBuffer(data: ArrayBuffer): Promise<void> {
-    await this.sendOnChannel(this.files, data);
+    await this.sendOnChannel(this.files, data, true);
   }
 
   sendControl(message: ControlMessage): Promise<void> {
     logger.log(`(Ctrl) → ${describeControlMessage(message)}`);
-    if (this.control.readyState === "open") {
-      return this.sendOnChannel(this.control, encodeControlMessage(message));
-    }
-    return Promise.resolve();
+    if (this.control.readyState !== "open") return Promise.resolve();
+    return this.sendOnChannel(this.control, encodeControlMessage(message), false);
   }
 
-  private async waitUntilCanSend(channel: RTCDataChannel, bytes: number): Promise<void> {
+  private async waitUntilCanSend(
+    channel: RTCDataChannel,
+    bytes: number,
+    stopOnAbort: boolean,
+  ): Promise<void> {
     if (channel.readyState !== "open") return;
 
     while (channel.bufferedAmount + bytes > this.bufferHighWater) {
-      if (this.isAborted()) return;
+      if (stopOnAbort && this.isAborted()) return;
 
       const { promise, resolve } = Promise.withResolvers<void>();
       let poll: ReturnType<typeof setInterval> | undefined;
@@ -52,18 +54,22 @@ export class DataChannelIo {
         channel.addEventListener("bufferedamountlow", onDrain);
         poll = setInterval(onDrain, 25);
         await promise;
-        if (this.isAborted()) return;
+        if (stopOnAbort && this.isAborted()) return;
       }
     }
   }
 
-  private async sendOnChannel(channel: RTCDataChannel, data: ArrayBuffer | string): Promise<void> {
+  private async sendOnChannel(
+    channel: RTCDataChannel,
+    data: ArrayBuffer | string,
+    stopOnAbort: boolean,
+  ): Promise<void> {
     const bytes =
       typeof data === "string" ? new TextEncoder().encode(data).byteLength : data.byteLength;
 
-    while (channel.readyState === "open" && !this.isAborted()) {
-      await this.waitUntilCanSend(channel, bytes);
-      if (channel.readyState !== "open" || this.isAborted()) return;
+    while (channel.readyState === "open" && !(stopOnAbort && this.isAborted())) {
+      await this.waitUntilCanSend(channel, bytes, stopOnAbort);
+      if (channel.readyState !== "open" || (stopOnAbort && this.isAborted())) return;
       try {
         if (typeof data === "string") channel.send(data);
         else channel.send(data);

@@ -3,6 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "native/out/main.js",
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*",
+    "#native": "./native/api.js",
+    "#native/*": "./native/*"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -15,9 +22,14 @@
     "start": "node build/server.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "native:compile": "tsc -p tsconfig.electron.json",
+    "native:dev": "node scripts/native-dev.ts",
+    "native:build": "pnpm native:compile && electron-builder --linux --win",
+    "native:preview": "./release/Drop-*.AppImage;"
   },
   "dependencies": {
+    "chokidar": "^5.0.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -27,15 +39,17 @@
     "@sveltejs/kit": "next",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.3.0",
     "@types/ws": "^8.18.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "client-zip": "^2.5.0",
-    "daisyui": "^5.7.21",
+    "daisyui": "^5.7.22",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "localforage": "^1.10.0",
-    "oxfmt": "^0.64.0",
+    "oxfmt": "^0.65.0",
     "svelte": "^5.56.10",
     "svelte-check": "^4.7.6",
     "tailwindcss": "^4.3.3",
@@ -47,9 +61,5 @@
   "lint-staged": {
     "*.{json,ts,js,svelte}": "oxfmt"
   },
-  "packageManager": "pnpm@11.20.0",
-  "imports": {
-    "#lib": "./src/lib/index.js",
-    "#lib/*": "./src/lib/*"
-  }
+  "packageManager": "pnpm@11.24.0"
 }

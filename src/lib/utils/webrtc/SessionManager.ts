@@ -1,12 +1,11 @@
+import { queueService } from "#lib/runtime.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { logger } from "#lib/utils/logger.js";
 import { fetchPublicIpv4 } from "#lib/utils/net/publicIp.js";
 import { SignalingClient } from "#lib/utils/signaling/client.js";
 import { CodeJoinController } from "#lib/utils/webrtc/codeJoin.js";
 import { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
-import { QueueCoordinator } from "#lib/utils/webrtc/queueCoordinator.js";
 import { createSignalingHandlers } from "#lib/utils/webrtc/signalingHandlers.js";
-import { TransferOrchestrator } from "#lib/utils/webrtc/transferOrchestrator.js";
 
 let activeSession: SessionManager | null = null;
 
@@ -32,10 +31,8 @@ export type SessionCodeAccessors = {
 export class SessionManager {
   readonly peerSession: PeerSessionCoordinator;
   readonly codeJoin: CodeJoinController;
-  readonly queue: QueueCoordinator;
 
   private readonly signaling = new SignalingClient();
-  private readonly transferOrchestrator = new TransferOrchestrator();
   private publicIpv4: string | undefined;
   private publicIpv4Fetched = false;
   private announced = false;
@@ -56,10 +53,9 @@ export class SessionManager {
     );
     this.peerSession = new PeerSessionCoordinator({
       signaling: this.signaling,
-      transferOrchestrator: this.transferOrchestrator,
       codeJoin: this.codeJoin,
     });
-    this.queue = new QueueCoordinator(() => this.peerSession.getTransferManager());
+    queueService.bind(() => this.peerSession.getTransferManager());
   }
 
   announce() {
@@ -113,6 +109,6 @@ export class SessionManager {
     this.signaling.disconnect();
     this.peerSession.disposePeerConnection();
     this.codeJoin.destroy();
-    this.queue.destroy();
+    queueService.reset();
   }
 }

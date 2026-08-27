@@ -16,3 +16,9 @@ tests
 .oxfmtrc.json
 drizzle.config.ts
 README.md
+bin
+
+# Native / Electron
+/dist/
+/native/out/
+/release/

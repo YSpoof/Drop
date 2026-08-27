@@ -1,15 +1,14 @@
+import { downloadService, fileLockManager, transferService } from "#lib/runtime.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
-import { abortAllDownloadStreams } from "#lib/utils/files/swDownload.js";
 import { logger } from "#lib/utils/logger.js";
 import type { SignalingClient } from "#lib/utils/signaling/client.js";
 import type { IceMode } from "#lib/utils/signaling/types.js";
 import type { CodeJoinController } from "#lib/utils/webrtc/codeJoin.js";
 import { PeerConnection } from "#lib/utils/webrtc/peer.js";
 import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
-import { TransferOrchestrator } from "#lib/utils/webrtc/transferOrchestrator.js";
 
 const LOCAL_ICE_TIMEOUT_MS = 3_000;
 const LOCAL_ICE_TRIES = 3;
@@ -17,7 +16,6 @@ const RESUME_AFTER_DISCONNECT_MS = 2_000;
 
 export type PeerSessionDeps = {
   signaling: SignalingClient;
-  transferOrchestrator: TransferOrchestrator;
   codeJoin: CodeJoinController;
 };
 
@@ -30,6 +28,7 @@ export class PeerSessionCoordinator {
   private iceMode: IceMode = "all";
   private localAttempt = 0;
   private iceRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastConnectedPeerId: string | null = null;
 
   constructor(private readonly deps: PeerSessionDeps) {}
 
@@ -86,7 +85,7 @@ export class PeerSessionCoordinator {
   }
 
   disconnectPeer() {
-    abortAllDownloadStreams();
+    downloadService.abortAll();
     this.transferManager?.sendBye();
     this.cleanupPeerConnection();
   }
@@ -160,6 +159,10 @@ export class PeerSessionCoordinator {
   }
 
   private setupPeerConnection(offerer: boolean, targetPeerId: string) {
+    this.transferManager?.abort();
+    this.transferManager = null;
+    transferStore.resetTransferState();
+
     const previous = this.peerConnection;
     this.peerConnection = null;
     this.closePeerHandle(previous);
@@ -213,15 +216,7 @@ export class PeerSessionCoordinator {
       }
       this.deps.signaling.suspend();
 
-      this.transferManager = this.deps.transferOrchestrator.startTransferManager(
-        peer,
-        offerer,
-        () => {
-          toastStore.showToast("Conexão incompatível com este navegador", "error");
-          this.cleanupPeerConnection();
-        },
-        () => this.cleanupPeerConnection(),
-      );
+      void this.startTransfers(targetPeerId, offerer);
     };
 
     for (const channel of [control, files]) {
@@ -229,6 +224,29 @@ export class PeerSessionCoordinator {
       channel.onclose = () => this.cleanupPeerConnection();
       if (channel.readyState === "open") tryStart();
     }
+  }
+
+  private async startTransfers(targetPeerId: string, offerer: boolean) {
+    const peer = this.peerConnection;
+    if (!peer) return;
+
+    if (this.lastConnectedPeerId && this.lastConnectedPeerId !== targetPeerId) {
+      await downloadService.dropIncomplete();
+    }
+    if (this.peerConnection !== peer) return;
+    this.lastConnectedPeerId = targetPeerId;
+
+    this.transferManager = transferService.startTransferManager(
+      peer,
+      offerer,
+      () => {
+        toastStore.showToast("Conexão incompatível com este navegador", "error");
+        this.cleanupPeerConnection();
+      },
+      () => this.cleanupPeerConnection(),
+      (fileId) => void fileLockManager.unlock(fileId),
+      (fileId) => void fileLockManager.unlock(fileId),
+    );
   }
 
   private cleanupPeerConnection() {
@@ -241,7 +259,7 @@ export class PeerSessionCoordinator {
     const joinConnecting = uiStore.codeJoinOpen && peerStore.codeJoinPhase === "connecting";
 
     transferStore.resetTransferState();
-    this.deps.transferOrchestrator.clearPendingBatchCompletions();
+    transferService.clearPendingBatchCompletions();
     this.transferManager?.abort();
     this.transferManager = null;
 

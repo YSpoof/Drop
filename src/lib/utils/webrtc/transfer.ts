@@ -1,3 +1,5 @@
+import type { EnvironmentPort } from "#lib/ports/environment.js";
+import type { DownloadService } from "#lib/services/downloadService.js";
 import { logger } from "#lib/utils/logger.js";
 
 import { DataChannelIo } from "./channelIo";
@@ -19,6 +21,8 @@ export class TransferManager {
     files: RTCDataChannel,
     chunkSize: number,
     callbacks: TransferCallbacks,
+    downloads: DownloadService,
+    environment: EnvironmentPort,
   ) {
     files.binaryType = "arraybuffer";
     const abortState = { shouldAbort: () => false };
@@ -37,7 +41,7 @@ export class TransferManager {
       return fileId != null && session.shouldStopSend(fileId);
     };
     this.sender = new TransferSender(this.session);
-    this.receiver = new TransferReceiver(this.session, this.sender);
+    this.receiver = new TransferReceiver(this.session, this.sender, downloads, environment);
     control.onmessage = (event) => this.handleControlEvent(event);
     files.onmessage = (event) => this.handleFilesEvent(event);
   }
@@ -78,33 +82,25 @@ export class TransferManager {
     const { session, sender } = this;
     if (session.aborted || session.cancelledFileIds.has(fileId)) return;
     session.cancelledFileIds.add(fileId);
+    this.receiver.discardReceive(fileId);
 
     session.sender.announcedFiles.delete(fileId);
     session.sender.announcedOrder = session.sender.announcedOrder.filter((id) => id !== fileId);
     session.receiver.pendingMetas.delete(fileId);
+    session.receiver.awaitingStart.delete(fileId);
     session.sender.pendingPulls = session.sender.pendingPulls.filter((id) => id !== fileId);
-
-    if (session.sender.currentSendFile?.id === fileId) {
-      session.sender.clearSending();
-    }
-
-    const recvState = session.receiver.receiving.get(fileId);
-    if (recvState) {
-      void recvState.streamWriter?.abort().catch(() => undefined);
-      session.receiver.receiving.delete(fileId);
-    }
+    session.sender.releaseFileTracking(fileId);
 
     if (notifyPeer) {
       void session.io.sendControl({ type: "cancel", fileId });
     }
 
     session.callbacks.onFileCancelled?.(fileId);
-    session.releaseFileTracking(fileId);
-    session.pruneIdleTracking();
     void sender.trySendNext();
   }
 
   abort() {
+    this.session.aborted = true;
     void this.receiver.cleanupReceives();
     this.session.resetForAbort();
     this.session.callbacks.onAbort?.();
@@ -136,7 +132,7 @@ export class TransferManager {
         this.receiver.onMeta(message);
         break;
       case "start":
-        this.receiver.onStart(message.fileId);
+        this.receiver.onStart(message.fileId, message.chunkSize);
         break;
       case "done":
         this.session.chunkWriteQueue = this.session.chunkWriteQueue.then(() =>
@@ -167,6 +163,9 @@ export class TransferManager {
         break;
       case "download-aborted":
         this.sender.stopReceiveDownload(message.fileId);
+        break;
+      case "resume":
+        this.sender.onResume(message.fileId, message.hash, message.bytesOffset);
         break;
     }
   }

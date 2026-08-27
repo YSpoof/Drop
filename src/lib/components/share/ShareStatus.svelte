@@ -5,6 +5,7 @@
   import LogoutIcon from "~icons/mdi/logout";
   import RadioTowerIcon from "~icons/mdi/radio-tower";
 
+  import { clipboard } from "#lib/runtime.js";
   import { feedback } from "#lib/utils/feedback.js";
 
   type CodeJoinPhase = "waiting" | "connecting" | "connected";
@@ -68,7 +69,7 @@
     if (!text) return;
     feedback.light();
     try {
-      await navigator.clipboard.writeText(text);
+      await clipboard.writeText(text);
       copied = kind;
       clearTimeout(copiedTimer);
       copiedTimer = setTimeout(() => {
@@ -90,7 +91,10 @@
       </div>
       <div class="min-w-0">
         <h2 class="text-base font-semibold lg:truncate">{title}</h2>
-        <p class="text-base-content/60 text-sm text-pretty lg:truncate">
+        <p
+          class="text-base-content/60 text-sm text-pretty lg:truncate"
+          class:skeleton={!connected}
+          class:skeleton-text={!connected}>
           {subtitle}
         </p>
       </div>

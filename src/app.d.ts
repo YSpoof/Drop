@@ -23,6 +23,12 @@ declare global {
   interface Window {
     dataLayer?: any[];
     gtag?: (...args: any[]) => void;
+    electronRPC?: {
+      isDesktop: boolean;
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
+      getPathForFile: (file: File) => string;
+    };
   }
   namespace App {
     // interface Error {}

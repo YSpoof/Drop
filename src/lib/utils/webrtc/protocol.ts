@@ -7,7 +7,11 @@ export interface FileMeta {
   name: string;
   size: number;
   mime: string;
-  zip?: boolean;
+  hash?: string;
+}
+
+export function fileIdentity(name: string, size: number, createdAt: number): string {
+  return `${name}|${size}|${createdAt}`;
 }
 
 interface DoneMessage {
@@ -56,6 +60,14 @@ interface DownloadAbortedMessage {
 interface StartMessage {
   type: "start";
   fileId: string;
+  chunkSize: number;
+}
+
+interface ResumeMessage {
+  type: "resume";
+  fileId: string;
+  hash: string;
+  bytesOffset: number;
 }
 
 export type ControlMessage =
@@ -69,7 +81,8 @@ export type ControlMessage =
   | PullBatchMessage
   | CancelMessage
   | DownloadAbortedMessage
-  | StartMessage;
+  | StartMessage
+  | ResumeMessage;
 
 export interface TransferProgress {
   fileId: string;
@@ -92,6 +105,11 @@ export interface TransferCallbacks {
   onDownloadError?: (message: string) => void;
   getSendQueue: () => QueuedFile[];
   isOfferer: boolean;
+  readFileChunk?: (
+    file: QueuedFile,
+    start: number,
+    length: number,
+  ) => Promise<ArrayBuffer | undefined>;
 }
 
 export interface ActiveBatch {
@@ -114,7 +132,11 @@ export function encodeControlMessage(message: ControlMessage): string {
 export function describeControlMessage(message: ControlMessage): string {
   switch (message.type) {
     case "meta":
-      return `meta name=${message.name} size=${message.size}${message.zip ? " zip" : ""}`;
+      return `meta name=${message.name} size=${message.size}${message.hash ? " hash" : ""}`;
+    case "resume":
+      return `resume fileId=${message.fileId} offset=${message.bytesOffset}`;
+    case "start":
+      return `start fileId=${message.fileId} chunkSize=${message.chunkSize}`;
     case "pull-batch":
       return `pull-batch count=${message.fileIds.length}`;
     case "batch-done":

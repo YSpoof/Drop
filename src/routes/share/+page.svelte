@@ -7,6 +7,7 @@
   import ShareStatus from "#lib/components/share/ShareStatus.svelte";
   import Files from "#lib/components/transfer/Files.svelte";
   import TransferProgress from "#lib/components/transfer/TransferProgress.svelte";
+  import { queueService } from "#lib/runtime.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
@@ -101,12 +102,12 @@
       history={transferStore.transfers}
       queue={transferStore.visibleQueue}
       onadd={(files: FileList | File[] | { file: File; path: string }[]) =>
-        session.queue.addFiles(files)}
+        queueService.addFiles(files)}
       onremoveQueue={(id: string | string[]) => transferStore.removeFile(id)}
-      onclearQueue={() => session.queue.clearQueue()}
-      onPull={(id: string) => session.queue.handlePull(id)}
-      onPullBatch={(ids: string[], name?: string) => session.queue.handlePullBatch(ids, name)}
-      onDeleteHistory={(id: string | string[]) => session.queue.handleDeleteTransfer(id)} />
+      onclearQueue={() => queueService.clearQueue()}
+      onPull={(id: string) => queueService.handlePull(id)}
+      onPullBatch={(ids: string[], name?: string) => queueService.handlePullBatch(ids, name)}
+      onDeleteHistory={(id: string | string[]) => queueService.handleDeleteTransfer(id)} />
   </div>
 </div>
 

@@ -2,16 +2,15 @@ export interface QueuedFile {
   id: string;
   file: File;
   groupId: string;
-  zip: boolean;
   path: string;
 }
 
 export function createQueuedFile(
   file: File,
   path = file.webkitRelativePath || file.name,
-  groupId = crypto.randomUUID(),
+  groupId: string = crypto.randomUUID(),
 ): QueuedFile {
-  return { id: crypto.randomUUID(), file, groupId, zip: false, path };
+  return { id: crypto.randomUUID(), file, groupId, path };
 }
 
 export function createQueuedFiles(
@@ -25,11 +24,6 @@ export function createQueuedFiles(
     const file = item as File;
     return createQueuedFile(file, file.webkitRelativePath || file.name, groupId);
   });
-  if (items.length > 1) {
-    for (const item of items) {
-      item.zip = true;
-    }
-  }
   return items;
 }
 

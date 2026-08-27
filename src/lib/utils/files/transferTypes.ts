@@ -34,5 +34,11 @@ export interface TransferItem {
 export interface CreateDownloadStreamOptions {
   size?: number;
   mime?: string;
+  hash?: string;
+  startOffset?: number;
   onAbort?: () => void;
+}
+
+export interface DownloadHandle {
+  abort: () => void;
 }

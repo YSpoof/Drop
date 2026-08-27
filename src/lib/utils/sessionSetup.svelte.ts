@@ -1,20 +1,16 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 
+import { clipboard, downloadService, notifications, queueService } from "#lib/runtime.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
-import {
-  closeHostBackgroundNotify,
-  notifyHostBackground,
-} from "#lib/utils/device/backgroundNotify.js";
 import { releaseWakeLock, requestWakeLock } from "#lib/utils/device/wakelock.js";
 import { feedback } from "#lib/utils/feedback.js";
 import { createQueuedFile } from "#lib/utils/files/queue.js";
-import { ensureServiceWorkerReady } from "#lib/utils/files/swDownload.js";
 import { consumeSharedRecords } from "#lib/utils/files/webShare.js";
 import type { SessionManager } from "#lib/utils/webrtc/SessionManager.js";
 
@@ -25,7 +21,7 @@ export async function applyAssignedCode(code: string) {
   await goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 
   try {
-    await navigator.clipboard.writeText(url.href);
+    await clipboard.writeText(url.href);
     toastStore.showToast("Link copiado", "success");
   } catch {
     // ignore clipboard errors
@@ -39,7 +35,7 @@ export async function leaveShare(session: SessionManager) {
   toastStore.showToast("Saiu", "info");
 }
 
-export async function recoverSharedFiles(session: SessionManager) {
+export async function recoverSharedFiles() {
   try {
     let hasFiles = false;
     const records = await consumeSharedRecords();
@@ -49,20 +45,15 @@ export async function recoverSharedFiles(session: SessionManager) {
       const queued = rec.files.map((f) =>
         createQueuedFile(new File([f.blob], f.name, { type: f.type }), f.name, groupId),
       );
-      if (queued.length > 1) {
-        for (const item of queued) {
-          item.zip = true;
-        }
-      }
       if (queued.length) {
         hasFiles = true;
-        session.queue.appendQueuedFiles(queued);
+        queueService.appendQueuedFiles(queued);
       }
     }
 
     if (hasFiles) {
       toastStore.showToast("Arquivo(s) adicionado(s) na fila", "success");
-      session.queue.notifyQueueChanged();
+      queueService.notifyQueueChanged();
     }
   } catch (e) {
     toastStore.showToast("Falha ao recuperar arquivos compartilhados", "error");
@@ -73,13 +64,13 @@ export async function recoverSharedFiles(session: SessionManager) {
 export async function initSessionPage(session: SessionManager): Promise<string | null> {
   void requestWakeLock();
 
-  const swAvailable = await ensureServiceWorkerReady();
-  if (!swAvailable) {
+  const ready = await downloadService.ensureReady();
+  if (!ready) {
     uiStore.unsupportedBrowserModalOpen = true;
   }
 
   session.connect();
-  await recoverSharedFiles(session);
+  await recoverSharedFiles();
 
   const isHost = page.url.searchParams.get("hostid") === deviceStore.identity.peerId;
   const code = page.url.searchParams.get("code");
@@ -98,13 +89,13 @@ export function setupSessionEffects(
   $effect(() => {
     if (options.getVisibilityState() === "visible") {
       void requestWakeLock();
-      closeHostBackgroundNotify();
+      notifications.closeHostBackground();
     } else if (
       options.getVisibilityState() === "hidden" &&
       options.getIsHost() &&
       options.getCode()
     ) {
-      notifyHostBackground();
+      notifications.notifyHostBackground();
     }
   });
 

@@ -1,4 +1,4 @@
-import { loadAutoDownload } from "#lib/utils/files/prefs.js";
+import { loadAutoDownload, loadReceiveFolderPath } from "#lib/utils/files/prefs.js";
 import { createQueuedFiles, type QueuedFile } from "#lib/utils/files/queue.js";
 import {
   flushTransferStats,
@@ -10,12 +10,14 @@ import {
 import type { TransferItem } from "#lib/utils/files/transferTypes.js";
 
 const autoDownload = await loadAutoDownload();
+const initialReceiveFolderPath = await loadReceiveFolderPath();
 const initialTransferStats = await loadTransferStats();
 
 class TransferStore {
   queue = $state<QueuedFile[]>([]);
   transfers = $state<TransferItem[]>([]);
   autoDownload = $state(autoDownload);
+  receiveFolderPath = $state(initialReceiveFolderPath);
   transferStats = $state<TransferStats>(initialTransferStats);
 
   visibleQueue = $derived(

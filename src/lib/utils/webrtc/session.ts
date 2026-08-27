@@ -8,6 +8,7 @@ import {
   type FileMeta,
   type TransferCallbacks,
   type TransferProgress,
+  fileIdentity,
 } from "./protocol";
 
 export interface ReceiveState {
@@ -17,6 +18,7 @@ export interface ReceiveState {
   sessionOpen: boolean;
   useZip: boolean;
   senderDone: boolean;
+  finishing?: boolean;
   streamWriter?: WritableStreamDefaultWriter<Uint8Array>;
 }
 
@@ -25,28 +27,26 @@ export class SenderState {
   sending = false;
   expectingBinary = false;
   currentSendFile: QueuedFile | null = null;
-  zipSession: ZipDownloadSession | null = null;
-  batchUsesZip = false;
   announcedFiles = new Map<string, QueuedFile>();
   pendingPulls: string[] = [];
-  activePullBatch: string[] | null = null;
-  activePullBatchFilename?: string;
-  pullBatchReceivedCount = 0;
   activeSendBatch: ActiveBatch | null = null;
   announcedOrder: string[] = [];
   downloadAbortedSendIds = new Set<string>();
   servedFileIds = new Set<string>();
+  resumes = new Map<string, PromiseWithResolvers<number>>();
+
+  resumeSlot(fileId: string) {
+    let slot = this.resumes.get(fileId);
+    if (!slot) {
+      slot = Promise.withResolvers<number>();
+      this.resumes.set(fileId, slot);
+    }
+    return slot;
+  }
 
   clearSending() {
     this.sending = false;
     this.currentSendFile = null;
-  }
-
-  clearPullBatch() {
-    this.activePullBatch = null;
-    this.activePullBatchFilename = undefined;
-    this.pullBatchReceivedCount = 0;
-    this.batchUsesZip = false;
   }
 
   reset() {
@@ -55,15 +55,17 @@ export class SenderState {
     this.announcedFiles.clear();
     this.announcedOrder = [];
     this.pendingPulls = [];
-    this.clearPullBatch();
-    this.zipSession = null;
     this.activeSendBatch = null;
     this.downloadAbortedSendIds.clear();
     this.servedFileIds.clear();
+    for (const slot of this.resumes.values()) slot.resolve(0);
+    this.resumes.clear();
   }
 
   releaseFileTracking(fileId: string) {
     this.downloadAbortedSendIds.delete(fileId);
+    this.resumes.get(fileId)?.resolve(0);
+    this.resumes.delete(fileId);
   }
 }
 
@@ -71,14 +73,28 @@ export class SenderState {
 export class ReceiverState {
   receiving = new Map<string, ReceiveState>();
   pendingMetas = new Map<string, FileMeta>();
+  awaitingStart = new Map<string, FileMeta>();
   preReceiveChunks: ArrayBuffer[] = [];
   activeReceiveBatch: ActiveBatch | null = null;
+  zipSession: ZipDownloadSession | null = null;
+  activePullBatch: string[] | null = null;
+  activePullBatchFilename?: string;
+  pullBatchReceivedCount = 0;
+
+  clearPullBatch() {
+    this.activePullBatch = null;
+    this.activePullBatchFilename = undefined;
+    this.pullBatchReceivedCount = 0;
+  }
 
   reset() {
     this.receiving.clear();
     this.pendingMetas.clear();
+    this.awaitingStart.clear();
     this.preReceiveChunks = [];
     this.activeReceiveBatch = null;
+    this.clearPullBatch();
+    this.zipSession = null;
   }
 }
 
@@ -129,7 +145,8 @@ export class TransferSession {
       this.sender.pendingPulls.length > 0 ||
       this.sender.sending ||
       this.receiver.receiving.size > 0 ||
-      this.receiver.pendingMetas.size > 0
+      this.receiver.pendingMetas.size > 0 ||
+      this.receiver.awaitingStart.size > 0
     ) {
       return;
     }
@@ -139,12 +156,14 @@ export class TransferSession {
   }
 
   emitProgress(progress: TransferProgress) {
+    if (this.aborted) return;
     if (this.cancelledFileIds.has(progress.fileId)) return;
     if (this.dismissedReceivedIds.has(progress.fileId)) return;
     this.callbacks.onProgress?.(progress);
   }
 
   emitHistory(entry: HistoryEntry) {
+    if (this.aborted) return;
     if (this.cancelledFileIds.has(entry.id)) return;
     if (this.dismissedReceivedIds.has(entry.id)) return;
     this.callbacks.onHistory?.(entry);
@@ -241,8 +260,8 @@ export class TransferSession {
       name: queued.path,
       size: queued.file.size,
       mime: queued.file.type || "application/octet-stream",
+      hash: fileIdentity(queued.path, queued.file.size, queued.file.lastModified),
     };
-    if (queued.zip) meta.zip = true;
     return meta;
   }
 

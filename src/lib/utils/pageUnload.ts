@@ -1,4 +1,4 @@
-import { abortAllDownloadStreams } from "#lib/utils/files/swDownload.js";
+import { downloadService } from "#lib/runtime.js";
 import { flushTransferStats } from "#lib/utils/files/transferStats.js";
 import { abortActiveSession } from "#lib/utils/webrtc/SessionManager.js";
 
@@ -8,6 +8,6 @@ export function flushStatsOnHide(): void {
 
 export function abortOnPageClose(): void {
   abortActiveSession();
-  abortAllDownloadStreams();
+  downloadService.abortAll();
   void flushTransferStats();
 }

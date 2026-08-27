@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "esnext",
+    "strict": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "rewriteRelativeImportExtensions": true,
+    "outDir": "native/out",
+    "rootDir": "native",
+    "types": ["node"]
+  },
+  "include": ["native/**/*.ts", "native/**/*.mts", "native/**/*.d.ts"]
+}

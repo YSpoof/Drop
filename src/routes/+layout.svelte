@@ -2,6 +2,8 @@
   import "./layout.css";
   import { dev } from "$app/env";
   import { updated } from "$app/state";
+  import { onMount } from "svelte";
+
   import Fab from "#lib/components/layout/Fab.svelte";
   import NavBar from "#lib/components/layout/NavBar.svelte";
   import ToastRenderer from "#lib/components/ui/ToastRenderer.svelte";
@@ -10,7 +12,6 @@
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { layoutModals } from "#lib/utils/layoutModals.js";
   import { abortOnPageClose, flushStatsOnHide } from "#lib/utils/pageUnload.js";
-  import { onMount } from "svelte";
 
   let { children } = $props();
 

@@ -1,3 +1,6 @@
+import type { EnvironmentPort } from "#lib/ports/environment.js";
+import type { FileReaderPort } from "#lib/ports/fileReader.js";
+import type { DownloadService } from "#lib/services/downloadService.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
@@ -16,8 +19,14 @@ type PendingBatchCompletion = {
   fileCountInBatch: number;
 };
 
-export class TransferOrchestrator {
+export class TransferService {
   private pendingBatchCompletions = new Map<string, PendingBatchCompletion>();
+
+  constructor(
+    private readonly fileReader: FileReaderPort,
+    private readonly downloads: DownloadService,
+    private readonly environment: EnvironmentPort,
+  ) {}
 
   clearPendingBatchCompletions() {
     this.pendingBatchCompletions.clear();
@@ -107,6 +116,8 @@ export class TransferOrchestrator {
     isOfferer: boolean;
     getSendQueue: () => QueuedFile[];
     onBye: () => void;
+    onFileSent?: (fileId: string) => void;
+    onFileCancelled?: (fileId: string) => void;
   }): TransferCallbacks {
     return {
       isOfferer: options.isOfferer,
@@ -116,13 +127,22 @@ export class TransferOrchestrator {
         transferStore.recordTransferStats(direction === "send" ? "sent" : "received", bytes);
       },
       onProgress: (progress) => this.upsertFromProgress(progress),
-      onHistory: (entry) => this.upsertFromHistory(entry),
+      onHistory: (entry) => {
+        this.upsertFromHistory(entry);
+        if (entry.direction === "sent" && entry.status !== "failed") {
+          options.onFileSent?.(entry.id);
+        }
+      },
       onBatchDone: (info) => this.handleBatchDoneToast(info),
-      onFileCancelled: (fileId) => transferStore.removeFile(fileId),
+      onFileCancelled: (fileId) => {
+        transferStore.removeFile(fileId);
+        options.onFileCancelled?.(fileId);
+      },
       onFileDismissed: (fileId) => transferStore.removeTransfer(fileId),
       onDownloadError: (message) => {
         toastStore.showToast(message, "error");
       },
+      readFileChunk: (file, start, length) => this.fileReader.readChunk(file.file, start, length),
     };
   }
 
@@ -134,6 +154,8 @@ export class TransferOrchestrator {
     offerer: boolean,
     onIncompatible: () => void,
     onBye: () => void,
+    onFileSent?: (fileId: string) => void,
+    onFileCancelled?: (fileId: string) => void,
   ): TransferManager | null {
     const { controlChannel: control, filesChannel: files } = peer;
 
@@ -153,7 +175,11 @@ export class TransferOrchestrator {
         isOfferer: offerer,
         getSendQueue: () => transferStore.queue,
         onBye,
+        onFileSent,
+        onFileCancelled,
       }),
+      this.downloads,
+      this.environment,
     );
 
     transferManager.setManualDownload(!transferStore.autoDownload);

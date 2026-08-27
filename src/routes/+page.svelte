@@ -5,13 +5,12 @@
   import NumericIcon from "~icons/mdi/numeric";
 
   import PossessCodeModal from "#lib/components/modals/PossessCodeModal.svelte";
+  import { notifications } from "#lib/runtime.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
-  import { ensureNotificationPermission } from "#lib/utils/device/backgroundNotify.js";
   import { feedback } from "#lib/utils/feedback.js";
   import { hasSharedRecords } from "#lib/utils/files/webShare.js";
-
   let possessOpen = $state(false);
 
   function gotoHostShare() {
@@ -19,6 +18,11 @@
   }
 
   function openGenerateGate() {
+    if (!notifications.needsPermissionForHostShare) {
+      gotoHostShare();
+      return;
+    }
+
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       gotoHostShare();
       return;
@@ -41,7 +45,7 @@
   }
 
   async function handleShareNotifyContinue() {
-    const granted = await ensureNotificationPermission();
+    const granted = await notifications.ensurePermission();
     if (granted) {
       uiStore.shareNotifyModalOpen = false;
       gotoHostShare();
