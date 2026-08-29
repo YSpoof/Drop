@@ -19,7 +19,7 @@ export async function gotoShare(page: Page) {
 }
 
 export async function dismissTutorial(page: Page) {
-  const tutorial = page.getByRole("heading", { name: "Tutorial", level: 1 });
+  const tutorial = page.getByRole("heading", { name: "Configuração inicial", level: 1 });
   const next = page.getByRole("button", { name: /Próximo|Começar/ });
 
   try {

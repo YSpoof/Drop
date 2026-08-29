@@ -1,12 +1,12 @@
 import { localForage } from "#lib/utils/localForage.js";
 
-const tutorialViewed = await localForage.getItem<boolean>("tutorialViewed");
+const setupWizardViewed = await localForage.getItem<boolean>("setupWizardViewed");
 const initialDevMode = (await localForage.getItem<boolean>("devMode")) ?? false;
 
 class UiStore {
   unsupportedBrowserModalOpen = $state(false);
   codeJoinOpen = $state(false);
-  tutorialModalOpen = $state(!tutorialViewed);
+  setupWizardOpen = $state(!setupWizardViewed);
   infoModalOpen = $state(false);
   statsModalOpen = $state(false);
   settingsModalOpen = $state(false);

@@ -2,7 +2,7 @@
   import ChartBarIcon from "~icons/mdi/chart-bar";
   import CogIcon from "~icons/mdi/cog";
   import InfoIcon from "~icons/mdi/information-outline";
-  import SchoolIcon from "~icons/mdi/school-outline";
+  import WizardIcon from "~icons/mdi/wizard-hat";
 
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
 
@@ -40,11 +40,11 @@
     </button>
   </div>
   <div>
-    <span class={labelClass}>Rever tutorial</span>
+    <span class={labelClass}>Abrir setup</span>
     <button
       class="btn btn-lg btn-circle btn-info"
-      onclick={() => (uiStore.tutorialModalOpen = true)}>
-      <SchoolIcon class="text-xl" />
+      onclick={() => (uiStore.setupWizardOpen = true)}>
+      <WizardIcon class="text-xl" />
     </button>
   </div>
   <div>
