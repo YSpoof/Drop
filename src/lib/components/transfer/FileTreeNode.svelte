@@ -1,5 +1,9 @@
 <script lang="ts">
-  import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+  import CloseIcon from "~icons/mdi/close";
+  import FileIcon from "~icons/mdi/file";
+  import FileDownloadIcon from "~icons/mdi/file-download";
+  import FolderIcon from "~icons/mdi/folder";
+  import FolderDownloadIcon from "~icons/mdi/folder-download";
   import {
     canShowFileDownload,
     unifiedFileSubtitle,
@@ -7,13 +11,6 @@
   } from "#lib/utils/files/fileTreeDisplay.js";
   import { filePercent, folderProgress, type UnifiedItem } from "#lib/utils/files/tree.js";
   import type { TreeNode } from "#lib/utils/files/tree.js";
-  import CloseIcon from "~icons/mdi/close";
-  import FileIcon from "~icons/mdi/file";
-  import FileDownloadIcon from "~icons/mdi/file-download";
-  import FolderIcon from "~icons/mdi/folder";
-  import FolderDownloadIcon from "~icons/mdi/folder-download";
-
-  import type { FileTreeAction } from "./FileTreeActionsModal.svelte";
 
   interface Props {
     node: TreeNode<UnifiedItem>;

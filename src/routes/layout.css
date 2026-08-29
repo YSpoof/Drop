@@ -111,7 +111,7 @@
 }
 
 html {
-  @apply scrollbar-thumb-base-content scrollbar-track-base-100 dark:scrollbar-track-base-300 scrollbar-thin scroll-smooth overflow-x-clip;
+  @apply scrollbar-thumb-base-content scrollbar-track-base-100 dark:scrollbar-track-base-300 scrollbar-thin overflow-x-clip scroll-smooth;
   font-family: "Open Sans", sans-serif;
 }
 

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import ProgressDownloadIcon from "~icons/mdi/progress-download";
+  import ProgressUploadIcon from "~icons/mdi/progress-upload";
+
   import { formatBytes, formatSpeed } from "#lib/utils/files/format.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
   import type { TransferItem } from "#lib/utils/files/transferTypes.js";
-  import ProgressDownloadIcon from "~icons/mdi/progress-download";
-  import ProgressUploadIcon from "~icons/mdi/progress-upload";
 
   interface Props {
     transfers: TransferItem[];
@@ -72,8 +73,6 @@
       prevSnapshot = { uploadBytes, downloadBytes, time: now };
     }
   });
-
-
 </script>
 
 <section class="card bg-base-100 dark:bg-base-300 min-w-0 flex-1 overflow-hidden shadow-sm">

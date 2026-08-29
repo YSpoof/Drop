@@ -26,15 +26,13 @@
 <GenericModal
   {open}
   cantClose
-  title="Nova versão disponível"
->
+  title="Nova versão disponível">
   <p>O Drop foi atualizado, por favor, recarregue a página!</p>
   {#snippet modalActions()}
     <button
       class="btn btn-primary"
       onclick={handleReload}
-      disabled={isReloading}
-    >
+      disabled={isReloading}>
       {#if isReloading}
         <span class="loading loading-spinner loading-sm"></span>
         Recarregando...

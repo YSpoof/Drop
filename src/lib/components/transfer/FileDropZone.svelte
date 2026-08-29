@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { createDropHandlers } from "#lib/utils/files/dropHandlers.svelte.js";
   import FolderOpenIcon from "~icons/mdi/folder-open";
+
+  import { createDropHandlers } from "#lib/utils/files/dropHandlers.svelte.js";
 
   interface Props {
     onDrop: (files: FileList | File[] | { file: File; path: string }[]) => void;

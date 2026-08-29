@@ -1,8 +1,9 @@
 <script lang="ts">
-  import GenericModal from "#lib/components/ui/GenericModal.svelte";
   import CloseIcon from "~icons/mdi/close";
   import FileDownloadIcon from "~icons/mdi/file-download";
   import FolderDownloadIcon from "~icons/mdi/folder-download";
+
+  import GenericModal from "#lib/components/ui/GenericModal.svelte";
 
   export type FileTreeAction = {
     id: "download" | "download-folder" | "remove";
