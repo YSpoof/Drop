@@ -42,6 +42,7 @@ app.whenReady().then(() => {
     minWidth: 400,
     minHeight: 600,
     center: true,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(dirname, "preload.mjs"),
       contextIsolation: true,
