@@ -219,7 +219,7 @@ self.addEventListener("fetch", (event) => {
     }
   }
 
-  if (request.method === "POST" && url.pathname === "/web-share-catcher") {
+  if (request.method === "POST" && url.pathname.includes("/web-share-catcher/")) {
     event.respondWith(handleWebShareEvent(event));
     return;
   }
