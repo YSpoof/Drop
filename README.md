@@ -66,15 +66,24 @@ Quando essa opção está desabilitada, o destinatário pode:
 
 ---
 
+### 💻 Versão desktop (Windows e Linux)
+
+No Windows e no Linux, o botão **Instalar Aplicativo** na barra oferece duas opções: a versão desktop ou a PWA.
+
+A versão desktop traz recursos extras:
+
+- transferências retomáveis;
+- pasta de download personalizada;
+- detecção automática de itens novos nas pastas;
+- transferências mais estáveis.
+
+O instalador fica no [Google Drive](https://drive.google.com/drive/folders/1DGvPP-_jfiFzJb_F9aVtwaI317sW4ztT) (AppImage no Linux, portable no Windows). O port ainda é experimental.
+
+---
+
 ### 📱 Progressive Web App (PWA)
 
-O Drop pode ser instalado como um aplicativo.
-
-Entre as vantagens:
-
-- funcionamento em tela cheia;
-- acesso rápido pelo menu do dispositivo;
-- experiência semelhante a um aplicativo nativo.
+Em qualquer dispositivo, o Drop também pode ser instalado como PWA, garantindo acesso mais fácil e funcionamento em tela cheia e os mesmos recursos da versão WEB.
 
 ---
 
@@ -117,6 +126,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 - [WebRTC](https://developer.mozilla.org/en-US/docs/Glossary/WebRTC)
 - [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
 - [Progressive Web App (PWA)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
+- [Electron](https://www.electronjs.org/)
 - [Streaming de arquivos](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API)
 - [SvelteKit](https://svelte.dev/docs/kit/introduction)
 
@@ -146,10 +156,6 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 - Servidor atuar como intermediario
 
 > Seria legal se desse para o servidor guardar os arquivos temporáriamente mediante uma configuração no .env para habilitar essa feature com uma senha de acesso
-
-- App nativo Windows/Mac/Linux ou usar FSAPI
-
-> O port nativo está em fase experimental, e já monitora pastas na fila de envio e grava recebimentos direto no disco.
 
 - Documentar/Refatorar algumas partes do código
 

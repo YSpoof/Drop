@@ -3,7 +3,6 @@ export type IceMode = "local" | "all";
 export interface PeerInfo {
   peerId: string;
   displayName: string;
-  deviceHint: string;
 }
 
 export type ClientMessage =
@@ -11,7 +10,6 @@ export type ClientMessage =
       type: "announce";
       peerId: string;
       displayName: string;
-      deviceHint: string;
       host?: boolean;
       code?: string;
       publicIpv4?: string;

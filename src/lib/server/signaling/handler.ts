@@ -11,7 +11,6 @@ interface StoredPeer {
   ws: WebSocket;
   peerId: string;
   displayName: string;
-  deviceHint: string;
   code?: string;
   publicIpv4?: string;
 }
@@ -23,7 +22,6 @@ function toPeerInfo(peer: StoredPeer): PeerInfo {
   return {
     peerId: peer.peerId,
     displayName: peer.displayName,
-    deviceHint: peer.deviceHint,
   };
 }
 
@@ -97,7 +95,6 @@ function handleMessage(ws: WebSocket, message: ClientMessage, senderId: string |
         ws,
         peerId: message.peerId,
         displayName: message.displayName,
-        deviceHint: message.deviceHint,
         code,
         publicIpv4,
       });

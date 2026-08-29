@@ -67,7 +67,6 @@ export class SessionManager {
       type: "announce",
       peerId: deviceStore.identity.peerId,
       displayName: deviceStore.displayName,
-      deviceHint: deviceStore.identity.deviceHint,
       host,
       code,
       publicIpv4: this.publicIpv4,

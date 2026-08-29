@@ -22,15 +22,6 @@
     if (updated.current) lazyLoad.mark("updateModal");
   });
 
-  const handleBeforeInstallPrompt = (e: Event) => {
-    e.preventDefault();
-    uiStore.setInstallPrompt(e as BeforeInstallPromptEvent);
-  };
-
-  const handleAppInstalled = () => {
-    uiStore.clearInstallPrompt();
-  };
-
   $effect(() => {
     if (updated.current) {
       console.log("New version available.");
@@ -60,9 +51,7 @@
 
 <svelte:window
   onpagehide={flushStatsOnHide}
-  onbeforeunload={abortOnPageClose}
-  onbeforeinstallprompt={handleBeforeInstallPrompt}
-  onappinstalled={handleAppInstalled} />
+  onbeforeunload={abortOnPageClose} />
 
 <div class="bg-base-200 min-h-screen">
   <NavBar />

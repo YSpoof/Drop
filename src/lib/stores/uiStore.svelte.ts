@@ -13,19 +13,10 @@ class UiStore {
   shareNotifyModalOpen = $state(false);
   shareNotifyDenied = $state(false);
   devMode = $state(initialDevMode);
-  installPrompt = $state<BeforeInstallPromptEvent | null>(null);
 
   setDevMode(value: boolean) {
     this.devMode = value;
     localForage.setItem("devMode", value);
-  }
-
-  setInstallPrompt(prompt: BeforeInstallPromptEvent) {
-    this.installPrompt = prompt;
-  }
-
-  clearInstallPrompt() {
-    this.installPrompt = null;
   }
 }
 

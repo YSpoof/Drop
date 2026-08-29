@@ -30,7 +30,7 @@
     <meta
       name="twitter:description"
       content="Compartilhe arquivos de forma simples, rapida e eficiênte usando uma conexão direta, seja na sua rede local ou na internet." />
-      <meta
+    <meta
       property="twitter:url"
       content="https://drop.lzart.com.br" />
     <meta
@@ -71,6 +71,12 @@
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="tap">
+    <script>
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__dropInstallPrompt = e;
+      });
+    </script>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>
