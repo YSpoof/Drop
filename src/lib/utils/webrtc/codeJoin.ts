@@ -57,8 +57,7 @@ export class CodeJoinController {
 
     peerStore.codeJoinPhase = "connecting";
     peerStore.connectingPeerId = hostId;
-    this.peerSession().setIceLan(lan);
-    void this.peerSession().beginAsOfferer(hostId);
+    this.peerSession().connectPeer(hostId, lan);
     this.armPairingTimeout();
   }
 

@@ -1,55 +1,58 @@
+import type { Channel } from "fastrtc";
+
 import type { EnvironmentPort } from "#lib/ports/environment.js";
 import type { DownloadService } from "#lib/services/downloadService.js";
 import { logger } from "#lib/utils/logger.js";
 
-import { DataChannelIo } from "./channelIo";
-import { resolveBufferHighWater, resolveBufferLowWater } from "./chunkSize";
 import { describeControlMessage, parseControlMessage, type TransferCallbacks } from "./protocol";
 import { TransferReceiver } from "./receiver";
 import { TransferSender } from "./sender";
 import { TransferSession } from "./session";
 
-export { type TransferCallbacks, type TransferProgress } from "./protocol";
-
 export class TransferManager {
   private readonly session: TransferSession;
   private readonly sender: TransferSender;
   private readonly receiver: TransferReceiver;
+  private readonly stopListeners: () => void;
 
   constructor(
-    control: RTCDataChannel,
-    files: RTCDataChannel,
-    chunkSize: number,
+    control: Channel,
+    files: Channel,
     callbacks: TransferCallbacks,
     downloads: DownloadService,
     environment: EnvironmentPort,
   ) {
-    files.binaryType = "arraybuffer";
-    const abortState = { shouldAbort: () => false };
-    const io = new DataChannelIo(
-      control,
-      files,
-      () => abortState.shouldAbort(),
-      resolveBufferHighWater(chunkSize),
-      resolveBufferLowWater(chunkSize),
-    );
-    this.session = new TransferSession(control, files, callbacks, io, chunkSize);
-    abortState.shouldAbort = () => {
-      const { session } = this;
-      if (session.aborted) return true;
-      const fileId = session.sender.currentSendFile?.id;
-      return fileId != null && session.shouldStopSend(fileId);
-    };
+    this.session = new TransferSession(control, files, callbacks);
     this.sender = new TransferSender(this.session);
     this.receiver = new TransferReceiver(this.session, this.sender, downloads, environment);
-    control.onmessage = (event) => this.handleControlEvent(event);
-    files.onmessage = (event) => this.handleFilesEvent(event);
+
+    const listeners = new AbortController();
+    control.addEventListener(
+      "message",
+      ({ data }) => {
+        if (typeof data !== "string") return;
+        this.handleControlMessage(data);
+      },
+      { signal: listeners.signal },
+    );
+    files.addEventListener(
+      "message",
+      ({ data }) => {
+        if (!(data instanceof ArrayBuffer)) return;
+        const { session } = this;
+        if (session.receiver.receiving.size > 0 || session.sender.expectingBinary) {
+          this.receiver.handleBinaryChunk(data);
+        } else {
+          session.receiver.preReceiveChunks.push(data);
+        }
+      },
+      { signal: listeners.signal },
+    );
+    this.stopListeners = () => listeners.abort();
   }
 
   start() {
-    if (this.session.callbacks.isOfferer) {
-      void this.sender.trySendNext();
-    }
+    void this.sender.trySendNext();
   }
 
   notifyQueueChanged() {
@@ -57,13 +60,13 @@ export class TransferManager {
   }
 
   sendBye() {
-    void this.session.io.sendControl({ type: "bye" });
+    this.session.sendControl({ type: "bye" });
   }
 
   setManualDownload(manual: boolean) {
     if (this.session.manualDownload === manual) return;
     this.session.manualDownload = manual;
-    void this.session.io.sendControl({ type: "download-mode", manual });
+    this.session.sendControl({ type: "download-mode", manual });
   }
 
   requestPull(fileId: string) {
@@ -89,10 +92,15 @@ export class TransferManager {
     session.receiver.pendingMetas.delete(fileId);
     session.receiver.awaitingStart.delete(fileId);
     session.sender.pendingPulls = session.sender.pendingPulls.filter((id) => id !== fileId);
+
+    if (session.sender.currentSendFile?.id === fileId) {
+      session.sender.clearSending();
+    }
+
     session.sender.releaseFileTracking(fileId);
 
     if (notifyPeer) {
-      void session.io.sendControl({ type: "cancel", fileId });
+      session.sendControl({ type: "cancel", fileId });
     }
 
     session.callbacks.onFileCancelled?.(fileId);
@@ -101,25 +109,11 @@ export class TransferManager {
 
   abort() {
     this.session.aborted = true;
+    this.session.sender.sendAbort?.abort();
     void this.receiver.cleanupReceives();
+    this.stopListeners();
     this.session.resetForAbort();
     this.session.callbacks.onAbort?.();
-  }
-
-  private handleControlEvent(event: MessageEvent) {
-    if (typeof event.data !== "string") return;
-    this.handleControlMessage(event.data);
-  }
-
-  private handleFilesEvent(event: MessageEvent) {
-    if (!(event.data instanceof ArrayBuffer)) return;
-
-    const { session } = this;
-    if (session.receiver.receiving.size > 0 || session.sender.expectingBinary) {
-      this.receiver.handleBinaryChunk(event.data);
-    } else {
-      session.receiver.preReceiveChunks.push(event.data);
-    }
   }
 
   private handleControlMessage(raw: string) {

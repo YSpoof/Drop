@@ -21,10 +21,10 @@ export default {
     oneClick: false,
     // installerIcon: "static/images/pwa/512.png",
     // uninstallerIcon: "static/images/pwa/512.png",
-    uninstallDisplayName: "Desinstalar Drop",
+    uninstallDisplayName: "Drop",
     license: "LICENSE",
     language: "1046",
     warningsAsErrors: false,
     allowToChangeInstallationDirectory: true,
-  }
+  },
 } satisfies Configuration;

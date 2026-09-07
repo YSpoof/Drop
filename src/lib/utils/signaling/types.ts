@@ -1,4 +1,4 @@
-export type IceMode = "local" | "all";
+import type { SignalPayload } from "fastrtc";
 
 export interface PeerInfo {
   peerId: string;
@@ -16,20 +16,9 @@ export type ClientMessage =
     }
   | { type: "join-code"; code: string }
   | {
-      type: "sdp-offer";
+      type: "signal";
       targetPeerId: string;
-      sdp: RTCSessionDescriptionInit;
-      iceMode?: IceMode;
-    }
-  | {
-      type: "sdp-answer";
-      targetPeerId: string;
-      sdp: RTCSessionDescriptionInit;
-    }
-  | {
-      type: "ice-candidate";
-      targetPeerId: string;
-      candidate: RTCIceCandidateInit;
+      payload: SignalPayload;
     }
   | { type: "ping" };
 
@@ -39,19 +28,8 @@ export type ServerMessage =
   | { type: "join-accepted"; host: PeerInfo; lan?: boolean }
   | { type: "join-rejected" }
   | {
-      type: "sdp-offer";
+      type: "signal";
       fromPeerId: string;
-      sdp: RTCSessionDescriptionInit;
-      iceMode?: IceMode;
-    }
-  | {
-      type: "sdp-answer";
-      fromPeerId: string;
-      sdp: RTCSessionDescriptionInit;
-    }
-  | {
-      type: "ice-candidate";
-      fromPeerId: string;
-      candidate: RTCIceCandidateInit;
+      payload: SignalPayload;
     }
   | { type: "pong" };

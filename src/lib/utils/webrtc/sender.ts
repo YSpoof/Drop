@@ -37,11 +37,13 @@ export class TransferSender {
     sender.downloadAbortedSendIds.delete(queued.id);
     sender.sending = true;
     sender.currentSendFile = queued;
+    const abort = new AbortController();
+    sender.sendAbort = abort;
 
-    await session.io.sendControl({
+    session.sendControl({
       type: "start",
       fileId: queued.id,
-      chunkSize: session.chunkSize,
+      chunkSize: session.files.maxMessageSize,
     });
 
     const offset = await sender.resumeSlot(queued.id).promise;
@@ -53,7 +55,7 @@ export class TransferSender {
     }
 
     session.emitQueuedProgress(queued, "in-progress", offset);
-    const completed = await this.sendFileChunks(queued, offset);
+    const completed = await this.sendFileChunks(queued, offset, abort.signal);
     if (!completed) {
       void this.trySendNext();
       void this.processNextPull();
@@ -100,7 +102,7 @@ export class TransferSender {
 
       const meta = session.buildFileMeta(queued);
 
-      void session.io.sendControl(meta);
+      session.sendControl(meta);
       sender.announcedFiles.set(queued.id, queued);
       sender.announcedOrder.push(queued.id);
       session.emitQueuedProgress(queued, "pending");
@@ -154,7 +156,7 @@ export class TransferSender {
     }
 
     session.completeSendBatch();
-    void session.io.sendControl({ type: "batch-done" });
+    session.sendControl({ type: "batch-done" });
   }
 
   async trySendNext() {
@@ -183,6 +185,7 @@ export class TransferSender {
       return;
     }
     sender.sending = false;
+    sender.sendAbort = null;
     sender.servedFileIds.add(fileId);
     if (sender.currentSendFile?.id === fileId) {
       sender.announcedFiles.delete(fileId);
@@ -238,34 +241,43 @@ export class TransferSender {
     this.enqueuePullIds(fileIds);
   }
 
-  /** Shared chunk loop used by pull-send and auto-send. */
-  async sendFileChunks(queued: QueuedFile, startOffset = 0): Promise<boolean> {
+  async sendFileChunks(
+    queued: QueuedFile,
+    startOffset: number,
+    signal: AbortSignal,
+  ): Promise<boolean> {
     const { session } = this;
     const sender = session.sender;
-    const totalChunks = Math.ceil(queued.file.size / session.chunkSize);
-    const startIndex = Math.floor(startOffset / session.chunkSize);
-    let bytesSent = startIndex * session.chunkSize;
+    const chunkSize = session.files.maxMessageSize;
+    const totalChunks = Math.ceil(queued.file.size / chunkSize);
+    const startIndex = Math.floor(startOffset / chunkSize);
+    let bytesSent = startIndex * chunkSize;
 
     for (let index = startIndex; index < totalChunks; index += 1) {
-      if (session.shouldStopSend(queued.id)) {
+      if (session.shouldStopSend(queued.id) || signal.aborted) {
         sender.clearSending();
         return false;
       }
-      const offset = index * session.chunkSize;
+      const offset = index * chunkSize;
 
       let buffer: ArrayBuffer | undefined;
       if (session.callbacks.readFileChunk) {
-        buffer = await session.callbacks.readFileChunk(queued, offset, session.chunkSize);
+        buffer = await session.callbacks.readFileChunk(queued, offset, chunkSize);
       }
       if (!buffer) {
-        const slice = queued.file.slice(offset, offset + session.chunkSize);
+        const slice = queued.file.slice(offset, offset + chunkSize);
         buffer = await slice.arrayBuffer();
       }
-      if (session.shouldStopSend(queued.id)) {
+      if (session.shouldStopSend(queued.id) || signal.aborted) {
         sender.clearSending();
         return false;
       }
-      await session.io.sendBuffer(buffer);
+      try {
+        await session.files.send(buffer, { signal });
+      } catch {
+        sender.clearSending();
+        return false;
+      }
       if (session.shouldStopSend(queued.id)) {
         sender.clearSending();
         return false;
@@ -275,12 +287,12 @@ export class TransferSender {
       session.emitQueuedProgress(queued, "in-progress", bytesSent);
     }
 
-    if (session.shouldStopSend(queued.id)) {
+    if (session.shouldStopSend(queued.id) || signal.aborted) {
       sender.clearSending();
       return false;
     }
 
-    await session.io.sendControl({ type: "done", fileId: queued.id });
+    session.sendControl({ type: "done", fileId: queued.id });
 
     sender.servedFileIds.add(queued.id);
     session.emitHistory(

@@ -89,7 +89,7 @@
             </span>
           </div>
           <progress
-            class="progress progress-primary w-full"
+            class="progress {totalPercent >= 100 ? 'progress-success' : 'progress-primary'} w-full"
             value={totalPercent}
             max="100"></progress>
         </div>

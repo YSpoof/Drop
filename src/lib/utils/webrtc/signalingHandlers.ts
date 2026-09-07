@@ -30,8 +30,7 @@ export function createSignalingHandlers(deps: SignalingHandlerDeps) {
       if (peerStore.connectedPeerId || peerStore.connectingPeerId) return;
 
       peerStore.connectedPeerInfo = message.requester;
-      deps.peerSession.setIceLan(!!message.lan);
-      deps.peerSession.beginAsAnswerer(requesterId);
+      deps.peerSession.connectPeer(requesterId, !!message.lan);
     },
     onJoinAccepted: (message: Extract<ServerMessage, { type: "join-accepted" }>) => {
       logger.log(`(Share) join-accepted ← ${message.host.peerId}`);
@@ -41,14 +40,8 @@ export function createSignalingHandlers(deps: SignalingHandlerDeps) {
     onJoinRejected: () => {
       deps.codeJoin.onJoinRejected();
     },
-    onSdpOffer: async (message: Extract<ServerMessage, { type: "sdp-offer" }>) => {
-      await deps.peerSession.handleSdpOffer(message.fromPeerId, message.sdp, message.iceMode);
-    },
-    onSdpAnswer: async (message: Extract<ServerMessage, { type: "sdp-answer" }>) => {
-      await deps.peerSession.handleSdpAnswer(message.sdp);
-    },
-    onIceCandidate: async (message: Extract<ServerMessage, { type: "ice-candidate" }>) => {
-      await deps.peerSession.handleIceCandidate(message.fromPeerId, message.candidate);
+    onSignal: (message: Extract<ServerMessage, { type: "signal" }>) => {
+      deps.peerSession.handleSignal(message.fromPeerId, message.payload);
     },
     onClose: (intentional: boolean) => {
       if (intentional || peerStore.connectedPeerId || disconnectNotified) return;

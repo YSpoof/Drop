@@ -1,3 +1,5 @@
+import type { Channel } from "fastrtc";
+
 import type { EnvironmentPort } from "#lib/ports/environment.js";
 import type { FileReaderPort } from "#lib/ports/fileReader.js";
 import type { DownloadService } from "#lib/services/downloadService.js";
@@ -5,13 +7,8 @@ import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 import type { BatchDoneInfo, HistoryEntry } from "#lib/utils/files/transferTypes.js";
-import { resolveChunkSize } from "#lib/utils/webrtc/chunkSize.js";
-import { PeerConnection } from "#lib/utils/webrtc/peer.js";
-import {
-  TransferManager,
-  type TransferCallbacks,
-  type TransferProgress as TransferProgressState,
-} from "#lib/utils/webrtc/transfer.js";
+import type { TransferCallbacks, TransferProgress } from "#lib/utils/webrtc/protocol.js";
+import { TransferManager } from "#lib/utils/webrtc/transfer.js";
 
 type PendingBatchCompletion = {
   direction: HistoryEntry["direction"];
@@ -81,7 +78,7 @@ export class TransferService {
     this.pendingBatchCompletions.delete(info.batchId);
   }
 
-  private upsertFromProgress(progress: TransferProgressState) {
+  private upsertFromProgress(progress: TransferProgress) {
     const status =
       progress.status ??
       (progress.bytesTransferred >= progress.fileSize ? "completed" : "in-progress");
@@ -113,14 +110,12 @@ export class TransferService {
   }
 
   createTransferCallbacks(options: {
-    isOfferer: boolean;
     getSendQueue: () => QueuedFile[];
     onBye: () => void;
     onFileSent?: (fileId: string) => void;
     onFileCancelled?: (fileId: string) => void;
   }): TransferCallbacks {
     return {
-      isOfferer: options.isOfferer,
       getSendQueue: options.getSendQueue,
       onBye: options.onBye,
       onChunkBytes: (direction, bytes) => {
@@ -142,37 +137,26 @@ export class TransferService {
       onDownloadError: (message) => {
         toastStore.showToast(message, "error");
       },
-      readFileChunk: (file, start, length) => this.fileReader.readChunk(file.file, start, length),
+      readFileChunk: this.environment.hasNativeFs
+        ? (file, start, length) => this.fileReader.readChunk(file.file, start, length)
+        : undefined,
     };
   }
 
   /**
-   * Wires up transfer channels after WebRTC connect: resolve chunk size, create manager, start.
+   * Wires up transfer channels after WebRTC connect: create manager, start.
    */
   startTransferManager(
-    peer: PeerConnection,
-    offerer: boolean,
-    onIncompatible: () => void,
+    control: Channel,
+    files: Channel,
     onBye: () => void,
     onFileSent?: (fileId: string) => void,
     onFileCancelled?: (fileId: string) => void,
-  ): TransferManager | null {
-    const { controlChannel: control, filesChannel: files } = peer;
-
-    let chunkSize: number;
-    try {
-      chunkSize = resolveChunkSize(peer.pc.sctp ?? null);
-    } catch {
-      onIncompatible();
-      return null;
-    }
-
+  ): TransferManager {
     const transferManager = new TransferManager(
       control,
       files,
-      chunkSize,
       this.createTransferCallbacks({
-        isOfferer: offerer,
         getSendQueue: () => transferStore.queue,
         onBye,
         onFileSent,

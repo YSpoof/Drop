@@ -163,7 +163,7 @@ export class TransferReceiver {
         }
         state.sessionOpen = true;
 
-        await session.io.sendControl({
+        session.sendControl({
           type: "resume",
           fileId: meta.fileId,
           hash: meta.hash ?? "",
@@ -208,7 +208,7 @@ export class TransferReceiver {
       return;
     }
     sender.expectingBinary = false;
-    void session.io.sendControl({ type: "cancel", fileId });
+    session.sendControl({ type: "cancel", fileId });
     session.callbacks.onDownloadError?.(message);
     this.abortStream(state);
     session.receiver.receiving.delete(fileId);
@@ -218,7 +218,6 @@ export class TransferReceiver {
 
   async finishReceive(fileId: string) {
     const { session } = this;
-    const sender = session.sender;
     const receiver = session.receiver;
     const state = receiver.receiving.get(fileId);
     if (!state || state.finishing) return;
@@ -271,7 +270,7 @@ export class TransferReceiver {
     receiver.receiving.delete(fileId);
     session.emitReceiveProgress(state.meta, "completed", state.meta.size);
 
-    void session.io.sendControl({ type: "ack", fileId });
+    session.sendControl({ type: "ack", fileId });
     void this.sender.trySendNext();
   }
 
@@ -287,7 +286,6 @@ export class TransferReceiver {
 
   private onZipDownloadAborted() {
     const { session } = this;
-    const sender = session.sender;
     const receiver = session.receiver;
     for (const fileId of [...receiver.receiving.keys()]) {
       this.abortBrowserDownload(fileId);
@@ -314,7 +312,7 @@ export class TransferReceiver {
       session.emitReceiveProgress(state.meta, "pending");
     }
 
-    void session.io.sendControl({ type: "download-aborted", fileId });
+    session.sendControl({ type: "download-aborted", fileId });
   }
 
   discardReceive(fileId: string) {
@@ -348,7 +346,7 @@ export class TransferReceiver {
         sender.expectingBinary = false;
       }
 
-      void session.io.sendControl({ type: "download-aborted", fileId });
+      session.sendControl({ type: "download-aborted", fileId });
     }
 
     session.callbacks.onFileDismissed?.(fileId);
@@ -366,7 +364,6 @@ export class TransferReceiver {
 
   async cleanupReceives() {
     const { session } = this;
-    const sender = session.sender;
     const receiver = session.receiver;
     const receiving = [...receiver.receiving.values()];
     await session.chunkWriteQueue.catch(() => undefined);
@@ -394,7 +391,7 @@ export class TransferReceiver {
     receiver.clearPullBatch();
     receiver.activeReceiveBatch = { id: crypto.randomUUID(), fileCount: 1 };
 
-    void session.io.sendControl({ type: "pull", fileId });
+    session.sendControl({ type: "pull", fileId });
   }
 
   requestPullBatch(fileIds: string[], zipFilename?: string) {
@@ -416,7 +413,7 @@ export class TransferReceiver {
     }
 
     sender.expectingBinary = true;
-    void session.io.sendControl({ type: "pull-batch", fileIds: validIds });
+    session.sendControl({ type: "pull-batch", fileIds: validIds });
   }
 
   onMeta(message: FileMeta) {

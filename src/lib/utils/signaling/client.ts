@@ -7,9 +7,7 @@ export type SignalingHandlers = {
   onPeerJoining?: (message: Extract<ServerMessage, { type: "peer-joining" }>) => void;
   onJoinAccepted?: (message: Extract<ServerMessage, { type: "join-accepted" }>) => void;
   onJoinRejected?: () => void;
-  onSdpOffer?: (message: Extract<ServerMessage, { type: "sdp-offer" }>) => void;
-  onSdpAnswer?: (message: Extract<ServerMessage, { type: "sdp-answer" }>) => void;
-  onIceCandidate?: (message: Extract<ServerMessage, { type: "ice-candidate" }>) => void;
+  onSignal?: (message: Extract<ServerMessage, { type: "signal" }>) => void;
   onClose?: (intentional: boolean) => void;
   onOpen?: () => void;
 };
@@ -143,14 +141,8 @@ export class SignalingClient {
         case "join-rejected":
           this.handlers.onJoinRejected?.();
           break;
-        case "sdp-offer":
-          this.handlers.onSdpOffer?.(message);
-          break;
-        case "sdp-answer":
-          this.handlers.onSdpAnswer?.(message);
-          break;
-        case "ice-candidate":
-          this.handlers.onIceCandidate?.(message);
+        case "signal":
+          this.handlers.onSignal?.(message);
           break;
       }
     };

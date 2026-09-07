@@ -126,26 +126,11 @@ function handleMessage(ws: WebSocket, message: ClientMessage, senderId: string |
       });
       break;
     }
-    case "sdp-offer":
+    case "signal":
       relay(sender, message.targetPeerId, (from) => ({
-        type: "sdp-offer",
+        type: "signal",
         fromPeerId: from.peerId,
-        sdp: message.sdp,
-        iceMode: message.iceMode,
-      }));
-      break;
-    case "sdp-answer":
-      relay(sender, message.targetPeerId, (from) => ({
-        type: "sdp-answer",
-        fromPeerId: from.peerId,
-        sdp: message.sdp,
-      }));
-      break;
-    case "ice-candidate":
-      relay(sender, message.targetPeerId, (from) => ({
-        type: "ice-candidate",
-        fromPeerId: from.peerId,
-        candidate: message.candidate,
+        payload: message.payload,
       }));
       break;
     case "ping":

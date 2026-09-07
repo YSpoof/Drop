@@ -1,13 +1,18 @@
+import type { Channel } from "fastrtc";
+
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 import type { HistoryEntry } from "#lib/utils/files/transferTypes.js";
 import { ZipDownloadSession } from "#lib/utils/files/zipDownload.js";
+import { logger } from "#lib/utils/logger.js";
 
-import type { DataChannelIo } from "./channelIo";
 import {
   type ActiveBatch,
+  type ControlMessage,
   type FileMeta,
   type TransferCallbacks,
   type TransferProgress,
+  encodeControlMessage,
+  describeControlMessage,
   fileIdentity,
 } from "./protocol";
 
@@ -34,6 +39,7 @@ export class SenderState {
   downloadAbortedSendIds = new Set<string>();
   servedFileIds = new Set<string>();
   resumes = new Map<string, PromiseWithResolvers<number>>();
+  sendAbort: AbortController | null = null;
 
   resumeSlot(fileId: string) {
     let slot = this.resumes.get(fileId);
@@ -45,6 +51,8 @@ export class SenderState {
   }
 
   clearSending() {
+    this.sendAbort?.abort();
+    this.sendAbort = null;
     this.sending = false;
     this.currentSendFile = null;
   }
@@ -110,15 +118,19 @@ export class TransferSession {
   dismissedReceivedIds = new Set<string>();
 
   constructor(
-    readonly controlChannel: RTCDataChannel,
-    readonly filesChannel: RTCDataChannel,
+    readonly ctrl: Channel,
+    readonly files: Channel,
     readonly callbacks: TransferCallbacks,
-    readonly io: DataChannelIo,
-    readonly chunkSize: number,
   ) {}
 
   channelsOpen(): boolean {
-    return this.controlChannel.readyState === "open" && this.filesChannel.readyState === "open";
+    return this.ctrl.readyState === "open" && this.files.readyState === "open";
+  }
+
+  sendControl(message: ControlMessage) {
+    logger.log(`(Ctrl) → ${describeControlMessage(message)}`);
+    if (this.ctrl.readyState !== "open") return;
+    void this.ctrl.send(encodeControlMessage(message));
   }
 
   resetForAbort() {
@@ -127,8 +139,6 @@ export class TransferSession {
     this.receiver.reset();
     this.cancelledFileIds.clear();
     this.dismissedReceivedIds.clear();
-    this.controlChannel.onmessage = null;
-    this.filesChannel.onmessage = null;
   }
 
   /** Drop per-file tracking once transfer lifecycle for that id is finished. */

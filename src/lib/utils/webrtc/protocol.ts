@@ -104,7 +104,6 @@ export interface TransferCallbacks {
   onAbort?: () => void;
   onDownloadError?: (message: string) => void;
   getSendQueue: () => QueuedFile[];
-  isOfferer: boolean;
   readFileChunk?: (
     file: QueuedFile,
     start: number,
