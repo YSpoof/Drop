@@ -5,7 +5,8 @@ allowBuilds:
   esbuild: true
   utf-8-validate: true
 minimumReleaseAgeExclude:
-  - fastrtc@1.0.1 || 1.1.1
+  - fastrtc@1.2.1
+  - vite-plugin-sveltekit-ws@2.1.1
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild

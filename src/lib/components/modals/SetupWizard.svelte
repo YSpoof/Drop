@@ -9,6 +9,7 @@
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { SHARE_CODE_DIGITS } from "#lib/consts.js";
   import { receiveFolder } from "#lib/runtime.js";
   import { siteData } from "#lib/siteData.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
@@ -56,7 +57,7 @@
     },
     {
       title: "Código de compartilhamento",
-      body: "Toque em Gerar um código para criar uma sessão e copiar o link, ou Possuo um código para entrar com o PIN de 6 dígitos.",
+      body: `Toque em Gerar um código para criar uma sessão e copiar o link, ou Possuo um código para entrar com o PIN de ${SHARE_CODE_DIGITS} dígitos.`,
       Icon: NumericIcon,
     },
   ];

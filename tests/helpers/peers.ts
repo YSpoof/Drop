@@ -1,5 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 
+import { SHARE_CODE_DIGITS } from "../../src/lib/consts.ts";
 import { enableAutoDownload, generateCode, gotoApp } from "./app";
 
 function shareStatusSection(page: Page) {
@@ -37,7 +38,7 @@ export async function hostShare(page: Page): Promise<{ code: string; url: string
 
 export async function joinWithCode(page: Page, code: string) {
   await page.getByRole("button", { name: "Possuo um código" }).click();
-  await page.getByLabel("Código de 6 dígitos").fill(code);
+  await page.getByLabel(`Código de ${SHARE_CODE_DIGITS} dígitos`).fill(code);
   await page.waitForURL(/\/share\/\?.*\bcode=/);
 }
 

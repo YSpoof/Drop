@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "chokidar": "^5.0.0",
-    "fastrtc": "^1.1.1",
+    "fastrtc": "^1.2.1",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -40,24 +40,24 @@
     "@sveltejs/kit": "next",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.6.1",
     "@types/ws": "^8.18.1",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "client-zip": "^2.5.0",
-    "daisyui": "^5.7.28",
-    "electron": "^44.2.0",
+    "client-zip": "^2.5.1",
+    "daisyui": "^5.7.38",
+    "electron": "^44.4.1",
     "electron-builder": "^26.15.3",
     "husky": "^9.1.7",
-    "lint-staged": "^17.5.0",
+    "lint-staged": "^17.5.1",
     "localforage": "^1.10.0",
-    "oxfmt": "^0.66.0",
+    "oxfmt": "^0.68.0",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "unplugin-icons": "^23.0.1",
-    "vite": "^8.2.2",
-    "vite-plugin-sveltekit-ws": "^2.0.2"
+    "unplugin-icons": "^24.0.0",
+    "vite": "^8.3.0",
+    "vite-plugin-sveltekit-ws": "^2.1.1"
   },
   "lint-staged": {
     "*.{json,ts,js,svelte}": "oxfmt"

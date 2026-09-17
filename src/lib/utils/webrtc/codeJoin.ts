@@ -1,20 +1,16 @@
+import { CODE_JOIN_RETRY_MS, CODE_JOIN_WAIT_MS } from "#lib/consts.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
 import { logger } from "#lib/utils/logger.js";
 import type { SignalingClient } from "#lib/utils/signaling/client.js";
 import type { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
-
-const PAIRING_TIMEOUT_MS = 15_000;
-const JOIN_TRIES = 3;
-const JOIN_RETRY_MS = 1_500;
-const CODE_JOIN_CONNECTED_CLOSE_MS = 3_000;
-const CODE_JOIN_CLOSE_MS = 300;
+import { CODE_JOIN_CLOSE_MS, CODE_JOIN_CONNECTED_CLOSE_MS, PAIRING_TIMEOUT_MS } from "#lib/consts.js";
 
 export class CodeJoinController {
   private code: string | null = null;
-  private rejections = 0;
   private joinWait: PromiseWithResolvers<string | null> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private waitTimeout: ReturnType<typeof setTimeout> | null = null;
   private pairingTimeout: ReturnType<typeof setTimeout> | null = null;
   private connectedTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -31,8 +27,8 @@ export class CodeJoinController {
     this.resolveJoin(null);
 
     this.code = code;
-    this.rejections = 0;
     this.joinWait = Promise.withResolvers<string | null>();
+    this.armJoinWait();
 
     uiStore.codeJoinOpen = true;
     peerStore.codeJoinPhase = "waiting";
@@ -52,6 +48,7 @@ export class CodeJoinController {
     if (!this.code) return;
 
     this.code = null;
+    this.clearJoinWait();
     this.clearRetry();
     this.resolveJoin(null);
 
@@ -62,20 +59,14 @@ export class CodeJoinController {
   }
 
   onJoinRejected() {
-    if (!this.code) return;
+    if (!this.code || !this.waitTimeout) return;
 
-    this.rejections += 1;
-    logger.log(`(Share) join-rejected ${this.rejections}/${JOIN_TRIES}`);
-    if (this.rejections >= JOIN_TRIES) {
-      this.fail("Código inválido");
-      return;
-    }
-
+    logger.log("(Share) join-rejected, retrying");
     this.clearRetry();
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       this.sendJoinCode();
-    }, JOIN_RETRY_MS);
+    }, CODE_JOIN_RETRY_MS);
   }
 
   onPeerConnected() {
@@ -147,6 +138,14 @@ export class CodeJoinController {
     this.joinWait = null;
   }
 
+  private armJoinWait() {
+    this.clearJoinWait();
+    this.waitTimeout = setTimeout(() => {
+      this.waitTimeout = null;
+      this.fail("Código inválido");
+    }, CODE_JOIN_WAIT_MS);
+  }
+
   private armPairingTimeout() {
     this.clearPairingTimeout();
     this.pairingTimeout = setTimeout(() => {
@@ -162,6 +161,12 @@ export class CodeJoinController {
     this.pairingTimeout = null;
   }
 
+  private clearJoinWait() {
+    if (!this.waitTimeout) return;
+    clearTimeout(this.waitTimeout);
+    this.waitTimeout = null;
+  }
+
   private clearRetry() {
     if (!this.retryTimer) return;
     clearTimeout(this.retryTimer);
@@ -175,6 +180,7 @@ export class CodeJoinController {
   }
 
   private clearTimers() {
+    this.clearJoinWait();
     this.clearRetry();
     this.clearPairingTimeout();
     this.clearConnectedTimeout();

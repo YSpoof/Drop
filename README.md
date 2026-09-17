@@ -41,12 +41,12 @@ Ideal para compartilhar projetos, coleções de fotos, documentos e backups.
 
 A tela inicial oferece dois caminhos: **Gerar um código** e **Possuo um código**.
 
-Ao gerar, uma sessão é criada e o servidor sorteia um **PIN de 6 dígitos**. Quem gerou recebe um link pronto para compartilhar e o próprio código, ambos copiáveis, e fica aguardando o outro dispositivo.
+Ao gerar, uma sessão é criada e o servidor sorteia um **PIN de 4 dígitos**. Quem gerou recebe um link pronto para compartilhar e o próprio código, ambos copiáveis, e fica aguardando o outro dispositivo.
 
 Do outro lado, é possível:
 
 - abrir o link recebido; ou
-- tocar em **Possuo um código** e digitar o PIN de 6 dígitos.
+- tocar em **Possuo um código** e digitar o PIN de 4 dígitos.
 
 E pronto, a conexão será estabelecida e você poderá transferir arquivos de forma bidirecional.
 
@@ -135,7 +135,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 ## 🚀 Como usar
 
 1. Abra o Drop em ambos os dispositivos.
-2. Em um deles, toque em **Gerar um código** e compartilhe o link ou o código de 6 dígitos. No outro, abra o link recebido ou toque em **Possuo um código** e digite o PIN.
+2. Em um deles, toque em **Gerar um código** e compartilhe o link ou o código de 4 dígitos. No outro, abra o link recebido ou toque em **Possuo um código** e digite o PIN.
 3. Arraste arquivos ou pastas para a janela.
 4. Caso prefira, adicione os arquivos à fila antes mesmo da conexão.
 5. O destinatário poderá aceitar tudo ou selecionar apenas os arquivos desejados.

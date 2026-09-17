@@ -5,6 +5,7 @@
   import NumericIcon from "~icons/mdi/numeric";
 
   import PossessCodeModal from "#lib/components/modals/PossessCodeModal.svelte";
+  import { SHARE_CODE_DIGITS } from "#lib/consts.js";
   import { notifications } from "#lib/runtime.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
@@ -85,7 +86,9 @@
           <NumericIcon class="text-primary text-2xl" />
           <h2 class="text-lg font-semibold">Possuo um código</h2>
         </div>
-        <p class="text-base-content/70 text-sm">Entre com o PIN de 6 dígitos para se conectar.</p>
+        <p class="text-base-content/70 text-sm">
+          Entre com o PIN de {SHARE_CODE_DIGITS} dígitos para se conectar.
+        </p>
       </div>
     </button>
   </div>

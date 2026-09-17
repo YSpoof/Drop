@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
+import { SHARE_CODE_DIGITS } from "../../src/lib/consts.ts";
 import { grantNotificationAccess } from "./context";
 
 export async function gotoApp(page: Page) {
@@ -10,7 +11,7 @@ export async function gotoApp(page: Page) {
 
 export async function generateCode(page: Page) {
   await page.getByRole("button", { name: "Gerar um código" }).click();
-  await page.waitForURL(/\/share\/\?.*\bcode=\d{6}/);
+  await page.waitForURL(new RegExp(`/share/\\?.*\\bcode=\\d{${SHARE_CODE_DIGITS}}`));
 }
 
 export async function gotoShare(page: Page) {

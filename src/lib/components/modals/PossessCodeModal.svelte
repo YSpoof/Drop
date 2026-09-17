@@ -1,5 +1,6 @@
 <script lang="ts">
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
+  import { SHARE_CODE_DIGITS } from "#lib/consts.js";
   import { feedback } from "#lib/utils/feedback.js";
 
   interface Props {
@@ -11,6 +12,8 @@
   }
 
   let { open, onClose, onFound, error = null, closeLabel = "Cancelar" }: Props = $props();
+
+  const otpSlots = Array.from({ length: SHARE_CODE_DIGITS }, (_, i) => i);
 
   let digits = $state("");
   let looking = $state(false);
@@ -31,14 +34,14 @@
   }
 
   function handleInput() {
-    digits = digits.replace(/\D/g, "").slice(0, 6);
+    digits = digits.replace(/\D/g, "").slice(0, SHARE_CODE_DIGITS);
     localError = null;
-    if (digits.length === 6 && !looking) void handleSubmit();
+    if (digits.length === SHARE_CODE_DIGITS && !looking) void handleSubmit();
   }
 
   async function handleSubmit(event?: Event) {
     event?.preventDefault();
-    if (digits.length !== 6 || looking) return;
+    if (digits.length !== SHARE_CODE_DIGITS || looking) return;
 
     feedback.light();
     const seq = ++submitSeq;
@@ -66,21 +69,18 @@
     <label
       class="otp otp-lg otp-joined mx-auto"
       class:otp-error={!!localError}>
-      <span></span>
-      <span></span>
-      <span></span>
-      <span></span>
-      <span></span>
-      <span></span>
+      {#each otpSlots as slot (slot)}
+        <span></span>
+      {/each}
       <!-- svelte-ignore a11y_autofocus -->
       <input
         type="text"
         autofocus
         autocomplete="one-time-code"
         inputmode="numeric"
-        maxlength="6"
-        pattern="[0-9]{6}"
-        aria-label="Código de 6 dígitos"
+        maxlength={SHARE_CODE_DIGITS}
+        pattern={`[0-9]{${SHARE_CODE_DIGITS}}`}
+        aria-label={`Código de ${SHARE_CODE_DIGITS} dígitos`}
         bind:value={digits}
         oninput={handleInput}
         disabled={looking} />

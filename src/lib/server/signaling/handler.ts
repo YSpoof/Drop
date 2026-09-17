@@ -3,6 +3,7 @@ import type { IncomingMessage } from "node:http";
 
 import type { WebSocket } from "ws";
 
+import { SHARE_CODE_DIGITS, SHARE_CODE_RANGE } from "#lib/consts.js";
 import type { ClientMessage, PeerInfo, ServerMessage } from "#lib/utils/signaling/types.js";
 
 import { isPublicIpv4 } from "../../utils/net/privateIp.ts";
@@ -35,15 +36,17 @@ function samePublicIp(a: StoredPeer, b: StoredPeer): boolean {
   return !!(a.publicIpv4 && b.publicIpv4 && a.publicIpv4 === b.publicIpv4);
 }
 
+const SHARE_CODE_RE = new RegExp(`^\\d{${SHARE_CODE_DIGITS}}$`);
+
 function normalizeCode(code: unknown): string | undefined {
   if (typeof code !== "string") return undefined;
   const trimmed = code.trim();
-  return /^\d{6}$/.test(trimmed) ? trimmed : undefined;
+  return SHARE_CODE_RE.test(trimmed) ? trimmed : undefined;
 }
 
 function generateUniqueCode(): string {
   for (let i = 0; i < 50; i++) {
-    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const code = String(randomInt(0, SHARE_CODE_RANGE)).padStart(SHARE_CODE_DIGITS, "0");
     if (!codes.has(code)) return code;
   }
   throw new Error("Failed to allocate share code");
