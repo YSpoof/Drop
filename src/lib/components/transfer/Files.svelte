@@ -4,6 +4,7 @@
   import FolderPlusIcon from "~icons/mdi/folder-plus";
   import PlusIcon from "~icons/mdi/plus";
 
+  import { picker } from "#lib/runtime.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { feedback } from "#lib/utils/feedback.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
@@ -88,6 +89,19 @@
     }
     input.value = "";
   }
+
+  async function add(kind: "files" | "folder") {
+    if (!picker.canPick) {
+      (kind === "files" ? filePicker : folderPicker).click();
+      return;
+    }
+
+    const picked = kind === "files" ? await picker.pickFiles() : await picker.pickFolder();
+    if (!picked.length) return;
+
+    feedback.light();
+    onadd(picked);
+  }
 </script>
 
 <FileDropZone onDrop={onadd} />
@@ -139,7 +153,7 @@
           <li class="mb-1">
             <button
               type="button"
-              onclick={() => filePicker.click()}>
+              onclick={() => add("files")}>
               <FilePlusIcon class="text-sm" />
               Selecionar Arquivos
             </button>
@@ -147,7 +161,7 @@
           <li>
             <button
               type="button"
-              onclick={() => folderPicker.click()}>
+              onclick={() => add("folder")}>
               <FolderPlusIcon class="text-sm" />
               Selecionar Pasta
             </button>
@@ -162,19 +176,25 @@
         <div class="flex justify-center">
           <button
             type="button"
-            onclick={() => filePicker.click()}
+            onclick={() => add("files")}
             class="btn btn-ghost btn-circle p-1">
             <FilePlusIcon class="text-3xl opacity-50" />
           </button>
           <div class="divider divider-horizontal"></div>
           <button
             type="button"
-            onclick={() => folderPicker.click()}
+            onclick={() => add("folder")}
             class="btn btn-ghost btn-circle p-1">
             <FolderPlusIcon class="text-3xl opacity-50" />
           </button>
         </div>
-        <p>Arraste arquivos e pastas para cá<br />ou clique em Adicionar</p>
+        <p>
+          {#if picker.canPick}
+            Clique em Adicionar para escolher arquivos e pastas
+          {:else}
+            Arraste arquivos e pastas para cá<br />ou clique em Adicionar
+          {/if}
+        </p>
       </div>
     {:else}
       {#if lazyLoad.has("fileTreeView")}

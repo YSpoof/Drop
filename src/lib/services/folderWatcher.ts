@@ -1,6 +1,5 @@
 import type { FileReaderPort } from "#lib/ports/fileReader.js";
 import type { WatcherEvent, WatcherPort } from "#lib/ports/watcher.js";
-import type { FileLockManager } from "#lib/services/fileLockManager.js";
 import { createQueuedFile, type QueuedFile } from "#lib/utils/files/queue.js";
 
 type Callbacks = {
@@ -20,7 +19,6 @@ export class FolderWatcher {
   private callbacks: Callbacks | null = null;
 
   constructor(
-    readonly locks: FileLockManager,
     private readonly watcher: WatcherPort,
     private readonly fileReader: FileReaderPort,
   ) {}
@@ -31,7 +29,7 @@ export class FolderWatcher {
   }
 
   /**
-   * Begin watching a folder group and lock all files already in the queue.
+   * Begin watching a folder group.
    * @param groupId    Reused as the watcherId (1-to-1)
    * @param folderPath Absolute path to the watched folder
    * @param initial    QueuedFiles already created for this group
@@ -40,23 +38,15 @@ export class FolderWatcher {
     const fileMap = new Map<string, string>();
     for (const qf of initial) {
       const absPath = this.fileReader.nativePath(qf.file);
-      if (absPath) {
-        fileMap.set(absPath, qf.id);
-        await this.locks.lock(qf.id, absPath);
-      }
+      if (absPath) fileMap.set(absPath, qf.id);
     }
     this.watched.set(groupId, { folderPath, fileMap });
     await this.watcher.watch(groupId, folderPath);
   }
 
-  /** Stop watching a group and unlock all its files. */
   async unwatchGroup(groupId: string) {
-    const entry = this.watched.get(groupId);
-    if (!entry) return;
+    if (!this.watched.has(groupId)) return;
     await this.watcher.unwatch(groupId);
-    for (const fileId of entry.fileMap.values()) {
-      await this.locks.unlock(fileId);
-    }
     this.watched.delete(groupId);
   }
 
@@ -101,7 +91,6 @@ export class FolderWatcher {
 
         entry.fileMap.set(event.filePath, qf.id);
 
-        await this.locks.lock(qf.id, event.filePath);
         cb.onAdd(event.watcherId, qf);
         break;
       }
@@ -112,7 +101,6 @@ export class FolderWatcher {
 
         entry.fileMap.delete(event.filePath);
 
-        // Lock is released by the coordinator's removeWatchedFile path
         cb.onRemove(fileId);
         break;
       }

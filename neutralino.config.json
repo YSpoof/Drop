@@ -1,0 +1,40 @@
+{
+  "applicationId": "br.com.lzart.drop",
+  "version": "1.0.0",
+  "defaultMode": "chrome",
+  "documentRoot": "/",
+  "url": "https://drop.lzart.com.br",
+  "port": 65173,
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "one-time",
+  "nativeAllowList": [
+    "app.*",
+    "events.*",
+    "filesystem.*",
+    "os.getPath",
+    "os.showOpenDialog",
+    "os.showFolderDialog"
+  ],
+  "modes": {
+    "chrome": {
+      "width": 1024,
+      "height": 768
+    }
+  },
+  "logging": {
+    "enabled": false
+  },
+  "cli": {
+    "binaryName": "Drop",
+    "resourcesPath": "/native/empty/",
+    "binaryVersion": "6.9.0",
+    "clientVersion": "6.9.0",
+    "frontendLibrary": {
+      "projectPath": ".",
+      "devUrl": "http://localhost:4321",
+      "initCommand": "pnpm install",
+      "devCommand": "pnpm run dev"
+    }
+  }
+}

@@ -1,10 +1,14 @@
 import { CODE_JOIN_RETRY_MS, CODE_JOIN_WAIT_MS } from "#lib/consts.js";
+import {
+  CODE_JOIN_CLOSE_MS,
+  CODE_JOIN_CONNECTED_CLOSE_MS,
+  PAIRING_TIMEOUT_MS,
+} from "#lib/consts.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
 import { logger } from "#lib/utils/logger.js";
 import type { SignalingClient } from "#lib/utils/signaling/client.js";
 import type { PeerSessionCoordinator } from "#lib/utils/webrtc/peerSession.js";
-import { CODE_JOIN_CLOSE_MS, CODE_JOIN_CONNECTED_CLOSE_MS, PAIRING_TIMEOUT_MS } from "#lib/consts.js";
 
 export class CodeJoinController {
   private code: string | null = null;

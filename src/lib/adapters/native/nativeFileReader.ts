@@ -1,6 +1,10 @@
-import { nativeFilePath } from "#lib/adapters/native/ipcBridge.js";
 import type { FileReaderPort } from "#lib/ports/fileReader.js";
-import type { NativeApi } from "#native";
+import type { NativeApi } from "#lib/ports/nativeApi.js";
+
+/** Absolute disk path stamped on the File by the native picker or the folder watcher. */
+function nativeFilePath(file: File): string {
+  return (file as File & { path?: string }).path ?? "";
+}
 
 export class NativeFileReader implements FileReaderPort {
   constructor(private readonly api: NativeApi) {}

@@ -1,3 +1,4 @@
+import { environment } from "#lib/runtime.js";
 import { feedback } from "#lib/utils/feedback.js";
 import { getFilesFromDataTransfer } from "#lib/utils/files/drop.js";
 
@@ -9,6 +10,8 @@ export function createDropHandlers(getOnDrop: () => FileDropHandler) {
   async function handleDrop(event: DragEvent) {
     event.preventDefault();
     dragOver = false;
+    // Dropped files carry no real disk path in the native shell, so the queue can't read them.
+    if (environment.isNative) return;
     if (event.dataTransfer?.items) {
       feedback.light();
       const files = await getFilesFromDataTransfer(event.dataTransfer.items);

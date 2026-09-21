@@ -1,6 +1,6 @@
 import { FastRTC, type Channel, type Peer, type SignalPayload } from "fastrtc";
 
-import { downloadService, fileLockManager, transferService } from "#lib/runtime.js";
+import { downloadService, transferService } from "#lib/runtime.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
@@ -197,12 +197,8 @@ export class PeerSessionCoordinator {
     if (this.ctrl !== ctrl || this.files !== files) return;
     this.lastConnectedPeerId = targetPeerId;
 
-    this.transferManager = transferService.startTransferManager(
-      ctrl,
-      files,
-      () => this.cleanupPeerConnection(),
-      (fileId) => void fileLockManager.unlock(fileId),
-      (fileId) => void fileLockManager.unlock(fileId),
+    this.transferManager = transferService.startTransferManager(ctrl, files, () =>
+      this.cleanupPeerConnection(),
     );
   }
 

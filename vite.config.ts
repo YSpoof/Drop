@@ -57,7 +57,7 @@ export default defineConfig({
         "**/playwright-report/**",
         "**/dist/**",
         "**/native/**",
-        "**/release/**",
+        "**/bin/**",
       ],
     },
   },

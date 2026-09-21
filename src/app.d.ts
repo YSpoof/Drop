@@ -24,12 +24,6 @@ declare global {
     dataLayer?: any[];
     gtag?: (...args: any[]) => void;
     __dropInstallPrompt?: BeforeInstallPromptEvent;
-    electronRPC?: {
-      isDesktop: boolean;
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-      on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
-      getPathForFile: (file: File) => string;
-    };
   }
   namespace App {
     // interface Error {}

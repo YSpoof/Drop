@@ -14,7 +14,8 @@ node_modules
 /playwright/.cache/
 /playwright/.auth/
 
-# Native / Electron
+# Native / Neutralinojs
+/bin
 /dist/
-/native/out/
-/release/
+/.tmp/
+/neutralinojs.log

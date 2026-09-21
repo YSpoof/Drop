@@ -1,5 +1,5 @@
+import type { NativeApi } from "#lib/ports/nativeApi.js";
 import type { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
-import type { NativeApi } from "#native";
 
 export class NativeReceiveFolder implements ReceiveFolderPort {
   readonly canPick = true;

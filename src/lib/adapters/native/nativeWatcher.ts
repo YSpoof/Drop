@@ -1,6 +1,6 @@
-import { onFolderWatchEvent } from "#lib/adapters/native/ipcBridge.js";
+import { onFolderWatchEvent } from "#lib/adapters/native/neutralinoWatch.js";
+import type { NativeApi } from "#lib/ports/nativeApi.js";
 import type { WatcherEvent, WatcherPort } from "#lib/ports/watcher.js";
-import type { NativeApi } from "#native";
 
 export class NativeWatcher implements WatcherPort {
   constructor(private readonly api: NativeApi) {}

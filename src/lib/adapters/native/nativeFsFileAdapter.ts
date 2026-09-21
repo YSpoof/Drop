@@ -1,10 +1,10 @@
 import type { FileAdapterPort } from "#lib/ports/fileAdapter.js";
+import type { NativeApi } from "#lib/ports/nativeApi.js";
 import {
   DownloadError,
   type CreateDownloadStreamOptions,
   type DownloadHandle,
 } from "#lib/utils/files/transferTypes.js";
-import type { NativeApi } from "#native";
 
 const DROP_SUFFIX = ".drop";
 

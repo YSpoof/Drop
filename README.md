@@ -126,7 +126,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 - [WebRTC](https://developer.mozilla.org/en-US/docs/Glossary/WebRTC)
 - [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
 - [Progressive Web App (PWA)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
-- [Electron](https://www.electronjs.org/)
+- [Neutralinojs](https://neutralino.js.org/)
 - [Streaming de arquivos](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API)
 - [SvelteKit](https://svelte.dev/docs/kit/introduction)
 

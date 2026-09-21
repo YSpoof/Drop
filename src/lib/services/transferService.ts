@@ -112,8 +112,6 @@ export class TransferService {
   createTransferCallbacks(options: {
     getSendQueue: () => QueuedFile[];
     onBye: () => void;
-    onFileSent?: (fileId: string) => void;
-    onFileCancelled?: (fileId: string) => void;
   }): TransferCallbacks {
     return {
       getSendQueue: options.getSendQueue,
@@ -122,17 +120,9 @@ export class TransferService {
         transferStore.recordTransferStats(direction === "send" ? "sent" : "received", bytes);
       },
       onProgress: (progress) => this.upsertFromProgress(progress),
-      onHistory: (entry) => {
-        this.upsertFromHistory(entry);
-        if (entry.direction === "sent" && entry.status !== "failed") {
-          options.onFileSent?.(entry.id);
-        }
-      },
+      onHistory: (entry) => this.upsertFromHistory(entry),
       onBatchDone: (info) => this.handleBatchDoneToast(info),
-      onFileCancelled: (fileId) => {
-        transferStore.removeFile(fileId);
-        options.onFileCancelled?.(fileId);
-      },
+      onFileCancelled: (fileId) => transferStore.removeFile(fileId),
       onFileDismissed: (fileId) => transferStore.removeTransfer(fileId),
       onDownloadError: (message) => {
         toastStore.showToast(message, "error");
@@ -146,21 +136,13 @@ export class TransferService {
   /**
    * Wires up transfer channels after WebRTC connect: create manager, start.
    */
-  startTransferManager(
-    control: Channel,
-    files: Channel,
-    onBye: () => void,
-    onFileSent?: (fileId: string) => void,
-    onFileCancelled?: (fileId: string) => void,
-  ): TransferManager {
+  startTransferManager(control: Channel, files: Channel, onBye: () => void): TransferManager {
     const transferManager = new TransferManager(
       control,
       files,
       this.createTransferCallbacks({
         getSendQueue: () => transferStore.queue,
         onBye,
-        onFileSent,
-        onFileCancelled,
       }),
       this.downloads,
       this.environment,
