@@ -123,10 +123,20 @@ export class SwFileAdapter implements FileAdapterPort {
       }, 5_000);
     };
 
+    let endAckResolver: (() => void) | null = null;
+    const notifyEndAck = () => {
+      if (endAckResolver) {
+        const resolve = endAckResolver;
+        endAckResolver = null;
+        resolve();
+      }
+    };
+
     const handleBrowserAbort = () => {
       if (aborted) return;
       aborted = true;
       clearPing();
+      notifyEndAck();
       opts.onAbort?.();
     };
 
@@ -138,6 +148,11 @@ export class SwFileAdapter implements FileAdapterPort {
 
     channel.port1.onmessage = (event) => {
       const data = event.data as { download?: string; error?: string } | string;
+
+      if (data === "end-ack") {
+        notifyEndAck();
+        return;
+      }
 
       if (data === "abort") {
         handleBrowserAbort();
@@ -166,6 +181,7 @@ export class SwFileAdapter implements FileAdapterPort {
           if (aborted) return;
           aborted = true;
           clearPing();
+          notifyEndAck();
           try {
             channel.port1.postMessage("abort");
           } catch {
@@ -193,17 +209,39 @@ export class SwFileAdapter implements FileAdapterPort {
           close() {
             unregister();
             clearPing();
-            if (!aborted) {
-              ensureDownloadStarted();
+            if (aborted) return;
+            ensureDownloadStarted();
+            const { promise, resolve } = Promise.withResolvers<void>();
+            const timeout = setTimeout(() => {
+              if (endAckResolver === done) {
+                endAckResolver = null;
+                resolve();
+              }
+            }, 5_000);
+            const done = () => {
+              clearTimeout(timeout);
+              resolve();
+            };
+            endAckResolver = done;
+            try {
               channel.port1.postMessage("end");
+            } catch {
+              notifyEndAck();
             }
+            return promise;
           },
+
           abort(reason) {
             unregister();
             if (aborted) return;
             aborted = true;
             clearPing();
-            channel.port1.postMessage("abort");
+            notifyEndAck();
+            try {
+              channel.port1.postMessage("abort");
+            } catch {
+              // port closed
+            }
             void reason;
           },
         }),

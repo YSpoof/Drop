@@ -40,6 +40,8 @@
   };
 
   const openDesktopDownload = () => {
+    toastStore.showToast("Em breve");
+    return;
     window.open(siteData.driveDownloadLink, "_blank", "noopener,noreferrer");
     modalOpen = false;
   };

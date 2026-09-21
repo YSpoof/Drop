@@ -184,6 +184,11 @@ export class TransferSender {
       void this.trySendNext();
       return;
     }
+    const queued =
+      sender.currentSendFile?.id === fileId
+        ? sender.currentSendFile
+        : this.resolveQueuedFile(fileId);
+
     sender.sending = false;
     sender.sendAbort = null;
     sender.servedFileIds.add(fileId);
@@ -191,6 +196,19 @@ export class TransferSender {
       sender.announcedFiles.delete(fileId);
       sender.announcedOrder = sender.announcedOrder.filter((id) => id !== fileId);
       sender.currentSendFile = null;
+    }
+    if (queued) {
+      session.emitHistory(
+        session.withBatchContext({
+          id: queued.id,
+          name: queued.path,
+          size: queued.file.size,
+          direction: "sent",
+          status: "completed",
+          timestamp: Date.now(),
+        }),
+      );
+      session.emitQueuedProgress(queued, "completed", queued.file.size);
     }
     session.releaseFileTracking(fileId);
     if (sender.pendingPulls.length) {
@@ -295,16 +313,6 @@ export class TransferSender {
     session.sendControl({ type: "done", fileId: queued.id });
 
     sender.servedFileIds.add(queued.id);
-    session.emitHistory(
-      session.withBatchContext({
-        id: queued.id,
-        name: queued.path,
-        size: queued.file.size,
-        direction: "sent",
-        status: "completed",
-        timestamp: Date.now(),
-      }),
-    );
     return true;
   }
 

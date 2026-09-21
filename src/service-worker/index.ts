@@ -58,6 +58,11 @@ function streamFromPort(port: MessagePort): ReadableStream<Uint8Array> {
     if (data === "end") {
       isClosed = true;
       pump();
+      try {
+        port.postMessage("end-ack");
+      } catch {
+        // port closed
+      }
       return;
     }
 

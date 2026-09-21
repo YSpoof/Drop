@@ -115,7 +115,7 @@ export class TransferReceiver {
     if (!state) return;
     state.senderDone = true;
     if (state.receivedBytes >= state.meta.size) {
-      void this.finishReceive(fileId);
+      return this.finishReceive(fileId);
     }
   }
 
@@ -228,10 +228,12 @@ export class TransferReceiver {
     }
 
     state.finishing = true;
+    receiver.receiving.delete(fileId);
 
     try {
       await state.streamWriter?.close();
     } catch (error) {
+      receiver.receiving.set(fileId, state);
       this.failReceive(
         fileId,
         state,
@@ -251,6 +253,7 @@ export class TransferReceiver {
         try {
           await receiver.zipSession?.finalize();
         } catch (error) {
+          receiver.receiving.set(fileId, state);
           this.failReceive(
             fileId,
             state,
@@ -267,7 +270,6 @@ export class TransferReceiver {
     }
 
     session.emitReceiveHistory(state.meta, "completed");
-    receiver.receiving.delete(fileId);
     session.emitReceiveProgress(state.meta, "completed", state.meta.size);
 
     session.sendControl({ type: "ack", fileId });
@@ -365,10 +367,11 @@ export class TransferReceiver {
   async cleanupReceives() {
     const { session } = this;
     const receiver = session.receiver;
-    const receiving = [...receiver.receiving.values()];
     await session.chunkWriteQueue.catch(() => undefined);
+    const receiving = [...receiver.receiving.values()];
 
     for (const state of receiving) {
+      if (state.finishing) continue;
       await state.streamWriter?.abort().catch(() => undefined);
     }
 
