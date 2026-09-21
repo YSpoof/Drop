@@ -1,5 +1,9 @@
 {
   "applicationId": "br.com.lzart.drop",
+  "applicationName": "Drop",
+  "author": "LZart",
+  "copyright": "LZart",
+  "description": "Compartilhe arquivos de forma simplificada",
   "version": "1.0.0",
   "defaultMode": "chrome",
   "documentRoot": "/",
@@ -17,6 +21,9 @@
     "os.showFolderDialog"
   ],
   "modes": {
+    "window": {
+      "icon": "static/images/pwa/512.png"
+    },
     "chrome": {
       "width": 1024,
       "height": 768

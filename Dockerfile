@@ -7,6 +7,19 @@ RUN npm i -g pnpm@latest
 # Copy lockfiles so installs are reproducible and match local pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
+FROM node:bookworm AS native
+WORKDIR /app
+
+RUN npm i -g pnpm@latest
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm i --frozen-lockfile --ignore-scripts
+
+COPY . .
+RUN pnpm run native:update && pnpm run native:build \
+  && mkdir -p /out \
+  && cp dist/Drop/Drop-linux_x64 dist/Drop/Drop-win_x64.exe /out/
+
 FROM base AS prod-deps
 # Use pnpm with the frozen lockfile to install only production deps
 RUN pnpm i --frozen-lockfile --prod --ignore-scripts
@@ -16,6 +29,7 @@ FROM base AS build
 COPY --from=prod-deps /app/node_modules ./node_modules
 RUN pnpm i --frozen-lockfile --ignore-scripts
 COPY . .
+COPY --from=native /out/ ./static/downloads/
 RUN pnpm run build
 
 FROM node:alpine AS prodcontainer

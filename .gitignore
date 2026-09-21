@@ -17,5 +17,6 @@ node_modules
 # Native / Neutralinojs
 /bin
 /dist/
+/static/downloads/
 /.tmp/
 /neutralinojs.log

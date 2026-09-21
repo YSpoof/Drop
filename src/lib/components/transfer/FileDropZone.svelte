@@ -22,7 +22,7 @@
 {#if dropZone.dragOver}
   {#if environment.isNative}
     <div
-      class="bg-base-100/80 border-error fixed inset-0 z-50 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
+      class="bg-base-100/80 border-error fixed inset-0 z-1000 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
       <div class="pointer-events-none text-center">
         <AlertIcon class="text-error mx-auto mb-4 text-6xl" />
         <h2 class="text-error text-3xl font-bold">DROPAR arquivos e pastas ainda não funciona no app nativo</h2>
@@ -33,7 +33,7 @@
     </div>
   {:else}
     <div
-      class="bg-base-100/80 border-primary fixed inset-0 z-50 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
+      class="bg-base-100/80 border-primary fixed inset-0 z-1000 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
       <div class="pointer-events-none text-center">
         <FolderOpenIcon class="text-primary mx-auto mb-4 text-6xl" />
         <h2 class="text-primary text-3xl font-bold">DROP seus arquivos e pastas aqui</h2>

@@ -110,7 +110,11 @@ export class QueueService {
 
     for (const id of ids) {
       const item = transferStore.transfers.find((entry) => entry.id === id);
-      if (!item || item.status === "completed" || item.status === "failed") continue;
+      if (!item) {
+        transferStore.removeFile(id);
+        continue;
+      }
+      if (item.status === "completed" || item.status === "failed") continue;
 
       if (item.direction === "received") {
         if (transferManager) {

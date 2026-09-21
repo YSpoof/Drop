@@ -19,6 +19,9 @@
   ];
   const choiceCardClass =
     "card bg-base-100 dark:bg-base-300 hover:border-primary border-2 border-transparent text-left shadow-sm transition-colors";
+  const desktopCardClass =
+    "card bg-base-100 dark:bg-base-300 border-2 border-transparent text-left shadow-sm";
+  const downloadLinkClass = "btn btn-sm btn-block btn-primary btn-soft";
 
   let modalOpen = $state(false);
   const showButton = $derived(!environment.isNative && (desktopOs || !!installPromptStore.current));
@@ -36,13 +39,6 @@
       toastStore.showToast("Instalando, confira suas notificações.");
       installPromptStore.clear();
     }
-    modalOpen = false;
-  };
-
-  const openDesktopDownload = () => {
-    toastStore.showToast("Em breve");
-    return;
-    window.open(siteData.driveDownloadLink, "_blank", "noopener,noreferrer");
     modalOpen = false;
   };
 
@@ -71,10 +67,7 @@
   onClose={() => (modalOpen = false)}
   modalClass="w-full md:max-w-sm">
   <div class="flex flex-col gap-3">
-    <button
-      type="button"
-      class={choiceCardClass}
-      onclick={openDesktopDownload}>
+    <div class={desktopCardClass}>
       <div class="card-body gap-2 p-6">
         <div class="flex items-center gap-2">
           <MonitorIcon class="text-primary text-2xl" />
@@ -85,8 +78,26 @@
             <li>{feature}</li>
           {/each}
         </ul>
+        <a
+          role="button"
+          class={downloadLinkClass}
+          href={siteData.desktopDownloads.windows}
+          download="Drop-win_x64.exe">
+          Windows
+        </a>
+        <a
+          role="button"
+          class={downloadLinkClass}
+          href={siteData.desktopDownloads.linux}
+          download="Drop-linux_x64">
+          Linux
+        </a>
+        <p class="text-base-content/60 text-xs">
+          No Linux, após baixar:
+          <code class="whitespace-nowrap">chmod +x Drop-linux_x64</code>
+        </p>
       </div>
-    </button>
+    </div>
 
     <button
       type="button"

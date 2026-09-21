@@ -6,7 +6,10 @@ interface SiteData {
   defaultImage: string;
   locale: string;
   googleAnalyticsId: string;
-  driveDownloadLink: string;
+  desktopDownloads: {
+    windows: string;
+    linux: string;
+  };
 }
 
 export const siteData: SiteData = {
@@ -18,5 +21,8 @@ export const siteData: SiteData = {
   defaultImage: "/images/og-image.png",
   locale: "pt-BR",
   googleAnalyticsId: "G-C1DYCGPZPX",
-  driveDownloadLink: "https://drive.google.com/drive/folders/1DGvPP-_jfiFzJb_F9aVtwaI317sW4ztT",
+  desktopDownloads: {
+    windows: "/downloads/Drop-win_x64.exe",
+    linux: "/downloads/Drop-linux_x64",
+  },
 };

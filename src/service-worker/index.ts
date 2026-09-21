@@ -5,7 +5,8 @@ import { self } from "$app/service-worker";
 import { pushSharedRecord } from "../lib/utils/files/webShare";
 
 const CACHE_NAME = `drop-${version}`;
-const ASSETS = [...immutable, ...assets, ...prerendered].map((asset) => `/${asset.path}`);
+const staticAssets = assets.filter((asset) => !asset.path.startsWith("downloads/"));
+const ASSETS = [...immutable, ...staticAssets, ...prerendered].map((asset) => `/${asset.path}`);
 const DOWNLOAD_PREFIX = "/__download__/";
 
 type PendingDownload = {

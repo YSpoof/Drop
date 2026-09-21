@@ -20,5 +20,6 @@ bin
 
 # Native / Electron
 /dist/
+/static/downloads/
 /native/out/
 /release/
