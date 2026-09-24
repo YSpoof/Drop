@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
+  import { lazy } from "svelte-comp-lazyloader";
   import LightningBoltIcon from "~icons/mdi/lightning-bolt";
   import NumericIcon from "~icons/mdi/numeric";
 
-  import PossessCodeModal from "#lib/components/modals/PossessCodeModal.svelte";
   import { SHARE_CODE_DIGITS } from "#lib/consts.js";
   import { notifications } from "#lib/runtime.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
@@ -12,6 +12,12 @@
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { feedback } from "#lib/utils/feedback.js";
   import { hasSharedRecords } from "#lib/utils/files/webShare.js";
+
+  const PossessCodeModal = lazy(() => import("#lib/components/modals/PossessCodeModal.svelte"));
+  const ShareNotifyPermissionModal = lazy(
+    () => import("#lib/components/modals/ShareNotifyPermissionModal.svelte"),
+  );
+
   let possessOpen = $state(false);
 
   function gotoHostShare() {
@@ -103,9 +109,6 @@
   }} />
 
 {#if lazyLoad.has("shareNotify")}
-  {const ShareNotifyPermissionModal = (
-    await import("#lib/components/modals/ShareNotifyPermissionModal.svelte")
-  ).default}
   <ShareNotifyPermissionModal
     open={uiStore.shareNotifyModalOpen}
     denied={uiStore.shareNotifyDenied}

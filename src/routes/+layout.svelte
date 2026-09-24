@@ -3,15 +3,17 @@
   import { dev } from "$app/env";
   import { updated } from "$app/state";
   import { onMount } from "svelte";
+  import { lazy } from "svelte-comp-lazyloader";
 
-  import Fab from "#lib/components/layout/Fab.svelte";
   import NavBar from "#lib/components/layout/NavBar.svelte";
-  import ToastRenderer from "#lib/components/ui/ToastRenderer.svelte";
   import { siteData } from "#lib/siteData.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
-  import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { layoutModals } from "#lib/utils/layoutModals.js";
   import { abortOnPageClose, flushStatsOnHide } from "#lib/utils/pageUnload.js";
+
+  const UpdateModal = lazy(() => import("#lib/components/modals/UpdateModal.svelte"));
+  const ToastRenderer = lazy(() => import("#lib/components/ui/ToastRenderer.svelte"));
+  const Fab = lazy(() => import("#lib/components/layout/Fab.svelte"));
 
   let { children } = $props();
 
@@ -59,18 +61,17 @@
     {@render children()}
   </main>
 </div>
-<Fab />
 
+<Fab />
 <ToastRenderer />
 
 {#each layoutModals as modal (modal.key)}
   {#if lazyLoad.has(modal.key)}
-    {const Component = (await modal.load()).default}
+    {const Component = modal.Component}
     <Component />
   {/if}
 {/each}
 
 {#if lazyLoad.has("updateModal")}
-  {const UpdateModal = (await import("#lib/components/modals/UpdateModal.svelte")).default}
   <UpdateModal open={updated.current} />
 {/if}

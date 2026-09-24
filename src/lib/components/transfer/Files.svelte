@@ -1,17 +1,19 @@
 <script lang="ts">
+  import { lazy } from "svelte-comp-lazyloader";
   import DownloadMultipleIcon from "~icons/mdi/download-multiple";
   import FilePlusIcon from "~icons/mdi/file-plus";
   import FolderPlusIcon from "~icons/mdi/folder-plus";
   import PlusIcon from "~icons/mdi/plus";
 
   import { picker } from "#lib/runtime.js";
-  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { feedback } from "#lib/utils/feedback.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
   import type { TransferItem } from "#lib/utils/files/transferTypes.js";
   import { buildTree, type UnifiedItem } from "#lib/utils/files/tree.js";
 
   import FileDropZone from "./FileDropZone.svelte";
+
+  const FileTreeView = lazy(() => import("./FileTreeView.svelte"));
 
   interface Props {
     autoDownload: boolean;
@@ -60,10 +62,6 @@
   }
 
   const currentNodes = $derived(resolveNodes(pathStack) ?? []);
-
-  $effect.pre(() => {
-    if (unifiedList.length) lazyLoad.mark("fileTreeView");
-  });
 
   $effect(() => {
     if (pathStack.length > 0 && resolveNodes(pathStack) === null) {
@@ -197,20 +195,17 @@
         </p>
       </div>
     {:else}
-      {#if lazyLoad.has("fileTreeView")}
-        {const FileTreeView = (await import("./FileTreeView.svelte")).default}
-        <FileTreeView
-          {pathStack}
-          {currentNodes}
-          {autoDownload}
-          {onPull}
-          {onPullBatch}
-          {onDeleteHistory}
-          {onremoveQueue}
-          onNavigate={(newStack) => {
-            pathStack = newStack;
-          }} />
-      {/if}
+      <FileTreeView
+        {pathStack}
+        {currentNodes}
+        {autoDownload}
+        {onPull}
+        {onPullBatch}
+        {onDeleteHistory}
+        {onremoveQueue}
+        onNavigate={(newStack) => {
+          pathStack = newStack;
+        }} />
     {/if}
   </div>
 </section>

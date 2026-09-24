@@ -30,7 +30,8 @@
     }
   },
   "logging": {
-    "enabled": false
+    "enabled": false,
+    "writeToLogFile": false
   },
   "cli": {
     "binaryName": "Drop",

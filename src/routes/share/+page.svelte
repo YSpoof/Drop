@@ -2,11 +2,8 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, onMount } from "svelte";
+  import { lazy } from "svelte-comp-lazyloader";
 
-  import PossessCodeModal from "#lib/components/modals/PossessCodeModal.svelte";
-  import ShareStatus from "#lib/components/share/ShareStatus.svelte";
-  import Files from "#lib/components/transfer/Files.svelte";
-  import TransferProgress from "#lib/components/transfer/TransferProgress.svelte";
   import { queueService } from "#lib/runtime.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
@@ -25,6 +22,15 @@
     registerSession,
     unregisterSession,
   } from "#lib/utils/webrtc/SessionManager.js";
+
+  const PossessCodeModal = lazy(() => import("#lib/components/modals/PossessCodeModal.svelte"));
+  const CodeJoinModal = lazy(() => import("#lib/components/modals/CodeJoinModal.svelte"));
+  const UnsupportedBrowserModal = lazy(
+    () => import("#lib/components/modals/UnsupportedBrowserModal.svelte"),
+  );
+  const ShareStatus = lazy(() => import("#lib/components/share/ShareStatus.svelte"));
+  const Files = lazy(() => import("#lib/components/transfer/Files.svelte"));
+  const TransferProgress = lazy(() => import("#lib/components/transfer/TransferProgress.svelte"));
 
   const hostid = $derived(page.url.searchParams.get("hostid") ?? undefined);
   const code = $derived(page.url.searchParams.get("code") ?? undefined);
@@ -90,12 +96,14 @@
     onDisconnect={() => {
       session.peerSession.disconnectPeer();
       if (!isHost) void goto("/", { reset: true });
-    }} />
+    }}
+  />
 
   <div class="flex flex-col gap-6">
     <TransferProgress
       transfers={transferStore.transfers}
-      queue={transferStore.visibleQueue} />
+      queue={transferStore.visibleQueue}
+    />
 
     <Files
       autoDownload={transferStore.autoDownload}
@@ -107,7 +115,8 @@
       onclearQueue={() => queueService.clearQueue()}
       onPull={(id: string) => queueService.handlePull(id)}
       onPullBatch={(ids: string[], name?: string) => queueService.handlePullBatch(ids, name)}
-      onDeleteHistory={(id: string | string[]) => queueService.handleDeleteTransfer(id)} />
+      onDeleteHistory={(id: string | string[]) => queueService.handleDeleteTransfer(id)}
+    />
   </div>
 </div>
 
@@ -123,21 +132,19 @@
     lookupError = err;
     retryOpen = !!err;
     return err;
-  }} />
+  }}
+/>
 
 {#if lazyLoad.has("codeJoin")}
-  {const CodeJoinModal = (await import("#lib/components/modals/CodeJoinModal.svelte")).default}
   <CodeJoinModal
     open={uiStore.codeJoinOpen}
     phase={peerStore.codeJoinPhase}
     peerName={peerStore.connectedPeerInfo?.displayName}
-    onClose={() => session.codeJoin.cancel()} />
+    onClose={() => session.codeJoin.cancel()}
+  />
 {/if}
 
 {#if lazyLoad.has("unsupportedBrowser")}
-  {const UnsupportedBrowserModal = (
-    await import("#lib/components/modals/UnsupportedBrowserModal.svelte")
-  ).default}
   <UnsupportedBrowserModal />
 {/if}
 
@@ -146,4 +153,5 @@
   bind:visibilityState
   onvisibilitychange={() => {
     if (document.visibilityState === "visible") session.wakeSignaling("visibility");
-  }} />
+  }}
+/>
