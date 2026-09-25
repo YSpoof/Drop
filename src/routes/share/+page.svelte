@@ -10,6 +10,7 @@
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
   import { transferStore } from "#lib/stores/transferStore.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
+  import { recordAppVisit } from "#lib/utils/donationReminder.js";
   import {
     applyAssignedCode,
     initSessionPage,
@@ -60,6 +61,7 @@
   });
 
   onMount(async () => {
+    void recordAppVisit();
     const err = await initSessionPage(session);
     if (err) {
       lookupError = err;
@@ -96,14 +98,12 @@
     onDisconnect={() => {
       session.peerSession.disconnectPeer();
       if (!isHost) void goto("/", { reset: true });
-    }}
-  />
+    }} />
 
   <div class="flex flex-col gap-6">
     <TransferProgress
       transfers={transferStore.transfers}
-      queue={transferStore.visibleQueue}
-    />
+      queue={transferStore.visibleQueue} />
 
     <Files
       autoDownload={transferStore.autoDownload}
@@ -115,8 +115,7 @@
       onclearQueue={() => queueService.clearQueue()}
       onPull={(id: string) => queueService.handlePull(id)}
       onPullBatch={(ids: string[], name?: string) => queueService.handlePullBatch(ids, name)}
-      onDeleteHistory={(id: string | string[]) => queueService.handleDeleteTransfer(id)}
-    />
+      onDeleteHistory={(id: string | string[]) => queueService.handleDeleteTransfer(id)} />
   </div>
 </div>
 
@@ -132,16 +131,14 @@
     lookupError = err;
     retryOpen = !!err;
     return err;
-  }}
-/>
+  }} />
 
 {#if lazyLoad.has("codeJoin")}
   <CodeJoinModal
     open={uiStore.codeJoinOpen}
     phase={peerStore.codeJoinPhase}
     peerName={peerStore.connectedPeerInfo?.displayName}
-    onClose={() => session.codeJoin.cancel()}
-  />
+    onClose={() => session.codeJoin.cancel()} />
 {/if}
 
 {#if lazyLoad.has("unsupportedBrowser")}
@@ -153,5 +150,4 @@
   bind:visibilityState
   onvisibilitychange={() => {
     if (document.visibilityState === "visible") session.wakeSignaling("visibility");
-  }}
-/>
+  }} />

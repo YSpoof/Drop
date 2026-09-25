@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { updated } from "$app/state";
   import { onMount } from "svelte";
   import { lazy } from "svelte-comp-lazyloader";
   import LightningBoltIcon from "~icons/mdi/lightning-bolt";
@@ -10,15 +11,37 @@
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
+  import {
+    dismissDonationReminder,
+    readVisitCount,
+    recordAppVisit,
+  } from "#lib/utils/donationReminder.js";
   import { feedback } from "#lib/utils/feedback.js";
   import { hasSharedRecords } from "#lib/utils/files/webShare.js";
 
+  const DonationReminderModal = lazy(
+    () => import("#lib/components/modals/DonationReminderModal.svelte"),
+  );
   const PossessCodeModal = lazy(() => import("#lib/components/modals/PossessCodeModal.svelte"));
   const ShareNotifyPermissionModal = lazy(
     () => import("#lib/components/modals/ShareNotifyPermissionModal.svelte"),
   );
 
   let possessOpen = $state(false);
+  let due = $state(false);
+  let handoffSettled = $state(false);
+
+  let reminderOpen = $derived(
+    due &&
+      handoffSettled &&
+      !possessOpen &&
+      !uiStore.setupWizardOpen &&
+      !uiStore.infoModalOpen &&
+      !uiStore.statsModalOpen &&
+      !uiStore.settingsModalOpen &&
+      !uiStore.shareNotifyModalOpen &&
+      !updated.current,
+  );
 
   function gotoHostShare() {
     goto("/share/?hostid=" + deviceStore.identity.peerId);
@@ -51,6 +74,12 @@
     possessOpen = true;
   }
 
+  function dismissReminder() {
+    if (!reminderOpen) return;
+    due = false;
+    void readVisitCount().then((visitCount) => dismissDonationReminder(visitCount));
+  }
+
   async function handleShareNotifyContinue() {
     const granted = await notifications.ensurePermission();
     if (granted) {
@@ -61,8 +90,18 @@
     uiStore.shareNotifyDenied = true;
   }
 
-  onMount(async () => {
-    if (await hasSharedRecords()) openGenerateGate();
+  onMount(() => {
+    void recordAppVisit().then((isDue) => {
+      due = isDue;
+    });
+
+    void hasSharedRecords().then((shared) => {
+      if (shared) {
+        openGenerateGate();
+        return;
+      }
+      handoffSettled = true;
+    });
   });
 </script>
 
@@ -107,6 +146,10 @@
     possessOpen = false;
     goto("/share/?code=" + code);
   }} />
+
+<DonationReminderModal
+  open={reminderOpen}
+  onDismiss={dismissReminder} />
 
 {#if lazyLoad.has("shareNotify")}
   <ShareNotifyPermissionModal

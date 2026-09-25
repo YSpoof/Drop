@@ -75,9 +75,11 @@ A versão desktop traz recursos extras:
 - transferências retomáveis;
 - pasta de download personalizada;
 - detecção automática de itens novos nas pastas;
-- transferências mais estáveis.
+- envio/recebimento mais estáveis.
 
-O instalador fica no [Google Drive](https://drive.google.com/drive/folders/1DGvPP-_jfiFzJb_F9aVtwaI317sW4ztT) (AppImage no Linux, portable no Windows). O port ainda é experimental.
+[Baixar para Windows](https://drop.lzart.com.br/downloads/Drop-win_x64.exe)
+
+[Baixar para Linux](https://drop.lzart.com.br/downloads/Drop-linux_x64)
 
 ---
 
@@ -148,10 +150,6 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 - Compartilhamento em grupo
 
 > Atuamente o WS fica aberto até apenas uma conexão ser feita
-
-- Modal de reminder para doação
-
-> É sempre bom né?
 
 - Servidor atuar como intermediario
 

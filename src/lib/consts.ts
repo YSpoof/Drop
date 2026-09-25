@@ -18,3 +18,6 @@ export const CODE_JOIN_CONNECTED_CLOSE_MS = 3_000;
 
 /** Time to wait for the host to close the connection after we've connected. */
 export const CODE_JOIN_CLOSE_MS = 300;
+
+/** Full app opens between donation reminders. */
+export const DONATION_REMINDER_INTERVAL = 25;

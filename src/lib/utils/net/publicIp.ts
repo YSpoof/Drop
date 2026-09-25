@@ -1,5 +1,6 @@
-import { isPublicIpv4 } from "./privateIp";
 import desfetch from "desfetch";
+
+import { isPublicIpv4 } from "./privateIp";
 
 const IPIFY_URL = "https://api.ipify.org";
 const IPIFY_TIMEOUT_MS = 3_000;

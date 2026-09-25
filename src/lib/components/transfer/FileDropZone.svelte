@@ -25,7 +25,9 @@
       class="bg-base-100/80 border-error fixed inset-0 z-1000 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
       <div class="pointer-events-none text-center">
         <AlertIcon class="text-error mx-auto mb-4 text-6xl" />
-        <h2 class="text-error text-3xl font-bold">DROPAR arquivos e pastas ainda não funciona no app nativo</h2>
+        <h2 class="text-error text-3xl font-bold">
+          DROPAR arquivos e pastas ainda não funciona no app nativo
+        </h2>
         <p class="text-base-content/70 mt-2">
           Use o botão Adicionar para selecionar arquivos ou pastas
         </p>

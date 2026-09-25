@@ -60,7 +60,7 @@
       return;
     }
 
-    if (!open) return;
+    if (!open || !modalRef?.isConnected) return;
     onClose?.();
   };
 </script>
