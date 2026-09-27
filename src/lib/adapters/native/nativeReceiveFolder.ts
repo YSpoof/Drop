@@ -1,10 +1,11 @@
-import type { NativeApi } from "#lib/ports/nativeApi.js";
-import type { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
+import { inject } from "quick-di";
 
-export class NativeReceiveFolder implements ReceiveFolderPort {
+import { NativeApi } from "#lib/ports/nativeApi.js";
+import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
+
+export class NativeReceiveFolder extends ReceiveFolderPort {
   readonly canPick = true;
-
-  constructor(private readonly api: NativeApi) {}
+  private readonly api = inject(NativeApi);
 
   defaultPath(): Promise<string | null> {
     return this.api.getDownloadsPath();

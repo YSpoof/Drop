@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import { lazy } from "svelte-comp-lazyloader";
   import DownloadMultipleIcon from "~icons/mdi/download-multiple";
   import FilePlusIcon from "~icons/mdi/file-plus";
   import FolderPlusIcon from "~icons/mdi/folder-plus";
   import PlusIcon from "~icons/mdi/plus";
 
-  import { picker } from "#lib/runtime.js";
+  import { PickerPort } from "#lib/ports/picker.js";
   import { feedback } from "#lib/utils/feedback.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
   import type { TransferItem } from "#lib/utils/files/transferTypes.js";
@@ -38,6 +39,8 @@
     onremoveQueue,
     onclearQueue,
   }: Props = $props();
+
+  const picker = inject(PickerPort);
 
   let pathStack = $state<string[]>([]);
 

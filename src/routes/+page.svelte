@@ -1,13 +1,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { updated } from "$app/state";
+  import { inject } from "quick-di";
   import { onMount } from "svelte";
   import { lazy } from "svelte-comp-lazyloader";
   import LightningBoltIcon from "~icons/mdi/lightning-bolt";
   import NumericIcon from "~icons/mdi/numeric";
 
   import { SHARE_CODE_DIGITS } from "#lib/consts.js";
-  import { notifications } from "#lib/runtime.js";
+  import { NotificationsPort } from "#lib/ports/notifications.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
@@ -26,6 +27,8 @@
   const ShareNotifyPermissionModal = lazy(
     () => import("#lib/components/modals/ShareNotifyPermissionModal.svelte"),
   );
+
+  const notifications = inject(NotificationsPort);
 
   let possessOpen = $state(false);
   let due = $state(false);

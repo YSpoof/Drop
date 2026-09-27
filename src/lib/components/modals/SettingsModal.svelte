@@ -1,14 +1,16 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import { onMount } from "svelte";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { receiveFolder } from "#lib/runtime.js";
+  import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
   import { transferStore } from "#lib/stores/transferStore.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { saveAutoDownload, saveReceiveFolderPath } from "#lib/utils/files/prefs.js";
 
+  const receiveFolder = inject(ReceiveFolderPort);
   let defaultReceiveFolder = $state("Downloads");
   const displayPath = $derived(transferStore.receiveFolderPath || defaultReceiveFolder);
 

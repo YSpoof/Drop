@@ -1,4 +1,6 @@
-import { queueService } from "#lib/runtime.js";
+import { inject } from "quick-di";
+
+import { QueueService } from "#lib/services/queueService.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { logger } from "#lib/utils/logger.js";
 import { fetchPublicIpv4 } from "#lib/utils/net/publicIp.js";
@@ -29,6 +31,7 @@ export type SessionCodeAccessors = {
 };
 
 export class SessionManager {
+  private readonly queueService = inject(QueueService);
   readonly peerSession: PeerSessionCoordinator;
   readonly codeJoin: CodeJoinController;
 
@@ -55,7 +58,7 @@ export class SessionManager {
       signaling: this.signaling,
       codeJoin: this.codeJoin,
     });
-    queueService.bind(() => this.peerSession.getTransferManager());
+    this.queueService.bind(() => this.peerSession.getTransferManager());
   }
 
   announce() {
@@ -108,6 +111,6 @@ export class SessionManager {
     this.signaling.disconnect();
     this.peerSession.disposePeerConnection();
     this.codeJoin.destroy();
-    queueService.reset();
+    this.queueService.reset();
   }
 }

@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import { onDestroy } from "svelte";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
   import LogoutIcon from "~icons/mdi/logout";
   import RadioTowerIcon from "~icons/mdi/radio-tower";
 
-  import { clipboard } from "#lib/runtime.js";
+  import { ClipboardPort } from "#lib/ports/clipboard.js";
   import { feedback } from "#lib/utils/feedback.js";
 
   type CodeJoinPhase = "waiting" | "connecting" | "connected";
@@ -34,6 +35,7 @@
     onDisconnect,
   }: Props = $props();
 
+  const clipboard = inject(ClipboardPort);
   let copied = $state<"link" | "code" | null>(null);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 

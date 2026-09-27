@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import AlertIcon from "~icons/mdi/alert";
   import FolderOpenIcon from "~icons/mdi/folder-open";
 
-  import { environment } from "#lib/runtime.js";
+  import { EnvironmentPort } from "#lib/ports/environment.js";
   import { createDropHandlers } from "#lib/utils/files/dropHandlers.svelte.js";
 
   interface Props {
@@ -11,6 +12,7 @@
 
   let { onDrop }: Props = $props();
 
+  const environment = inject(EnvironmentPort);
   const dropZone = createDropHandlers(() => onDrop);
 </script>
 

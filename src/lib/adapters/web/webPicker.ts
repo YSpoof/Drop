@@ -1,7 +1,7 @@
-import type { PickedFile, PickerPort } from "#lib/ports/picker.js";
+import { PickerPort, type PickedFile } from "#lib/ports/picker.js";
 
 /** No-op: the browser picks through the hidden `<input type="file">` elements. */
-export class WebPicker implements PickerPort {
+export class WebPicker extends PickerPort {
   readonly canPick = false;
 
   async pickFiles(): Promise<PickedFile[]> {

@@ -1,7 +1,7 @@
 import { os } from "@neutralinojs/lib";
 
 import { leafOf, readEntries, tryStats } from "#lib/adapters/native/neutralinoFs.js";
-import type { PickedFile, PickerPort } from "#lib/ports/picker.js";
+import { PickerPort, type PickedFile } from "#lib/ports/picker.js";
 
 /**
  * A File carrying only metadata; the bytes are read straight from `path` by the sender.
@@ -34,7 +34,7 @@ async function collect(dir: string, relativeDir: string, into: PickedFile[]): Pr
   }
 }
 
-export class NeutralinoPicker implements PickerPort {
+export class NeutralinoPicker extends PickerPort {
   readonly canPick = true;
 
   async pickFiles(): Promise<PickedFile[]> {

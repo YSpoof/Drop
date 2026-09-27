@@ -29,6 +29,7 @@
   "dependencies": {
     "desfetch": "^1.2.1",
     "fastrtc": "^1.2.1",
+    "quick-di": "^1.0.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -40,13 +41,13 @@
     "@sveltejs/kit": "next",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "@types/ws": "^8.18.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "client-zip": "^2.5.1",
-    "daisyui": "^5.7.43",
+    "daisyui": "^5.7.46",
     "husky": "^9.1.7",
-    "lint-staged": "^17.5.1",
+    "lint-staged": "^17.6.0",
     "localforage": "^1.10.0",
     "oxfmt": "^0.70.0",
     "svelte": "^5.57.1",
@@ -55,7 +56,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "unplugin-icons": "^24.0.0",
-    "vite": "^8.3.0",
+    "vite": "^8.3.1",
     "vite-plugin-sveltekit-ws": "^2.1.1"
   },
   "lint-staged": {

@@ -3,9 +3,9 @@ export type PickedFile = {
   path: string;
 };
 
-export type PickerPort = {
+export abstract class PickerPort {
   /** False in the browser, where the hidden `<input type="file">` elements are used instead. */
-  readonly canPick: boolean;
-  pickFiles(): Promise<PickedFile[]>;
-  pickFolder(): Promise<PickedFile[]>;
-};
+  abstract readonly canPick: boolean;
+  abstract pickFiles(): Promise<PickedFile[]>;
+  abstract pickFolder(): Promise<PickedFile[]>;
+}

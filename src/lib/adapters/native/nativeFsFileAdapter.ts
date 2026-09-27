@@ -1,5 +1,9 @@
-import type { FileAdapterPort } from "#lib/ports/fileAdapter.js";
-import type { NativeApi } from "#lib/ports/nativeApi.js";
+import { inject } from "quick-di";
+
+import { FileAdapterPort } from "#lib/ports/fileAdapter.js";
+import { NativeApi } from "#lib/ports/nativeApi.js";
+import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
+import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import {
   DownloadError,
   type CreateDownloadStreamOptions,
@@ -51,13 +55,12 @@ async function ensureParentDir(api: NativeApi, dir: string, relative: string) {
   if (slash > 0) await api.ensureDir(await api.joinPath(dir, relative.slice(0, slash)));
 }
 
-export class NativeFsFileAdapter implements FileAdapterPort {
+export class NativeFsFileAdapter extends FileAdapterPort {
   #active = new Set<DownloadHandle>();
-
-  constructor(
-    private readonly api: NativeApi,
-    private readonly getDir: () => Promise<string>,
-  ) {}
+  private readonly api = inject(NativeApi);
+  private readonly receiveFolder = inject(ReceiveFolderPort);
+  private readonly getDir = async (): Promise<string> =>
+    transferStore.receiveFolderPath || (await this.receiveFolder.defaultPath()) || "";
 
   async ensureReady(): Promise<boolean> {
     return true;

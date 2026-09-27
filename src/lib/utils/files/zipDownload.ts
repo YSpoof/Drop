@@ -1,4 +1,6 @@
-import type { DownloadService } from "#lib/services/downloadService.js";
+import { inject } from "quick-di";
+
+import { DownloadService } from "#lib/services/downloadService.js";
 
 import { DownloadError } from "./transferTypes";
 
@@ -26,6 +28,7 @@ interface QueuedEntry {
 }
 
 export class ZipDownloadSession {
+  private readonly downloads = inject(DownloadService);
   private queue: QueuedEntry[] = [];
   private usedNames = new Set<string>();
   private wake: (() => void) | null = null;
@@ -36,7 +39,6 @@ export class ZipDownloadSession {
   private readonly filename: string;
 
   constructor(
-    private readonly downloads: DownloadService,
     filename = `drop-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.zip`,
     private readonly opts: { onAbort?: () => void } = {},
   ) {

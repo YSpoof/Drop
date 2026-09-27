@@ -19,6 +19,8 @@ import {
 export interface ReceiveState {
   meta: FileMeta;
   receivedBytes: number;
+  /** Absolute offset last reported to the sender. Starts at the resume prefix. */
+  lastCredited: number;
   pendingChunks: ArrayBuffer[];
   sessionOpen: boolean;
   useZip: boolean;
@@ -40,6 +42,9 @@ export class SenderState {
   servedFileIds = new Set<string>();
   resumes = new Map<string, PromiseWithResolvers<number>>();
   sendAbort: AbortController | null = null;
+  /** Absolute file offset the receiver has accepted for the current send. */
+  bytesConfirmed = 0;
+  creditWait: PromiseWithResolvers<void> | null = null;
 
   resumeSlot(fileId: string) {
     let slot = this.resumes.get(fileId);
@@ -55,10 +60,13 @@ export class SenderState {
     this.sendAbort = null;
     this.sending = false;
     this.currentSendFile = null;
+    this.creditWait?.resolve();
+    this.creditWait = null;
   }
 
   reset() {
     this.clearSending();
+    this.bytesConfirmed = 0;
     this.expectingBinary = false;
     this.announcedFiles.clear();
     this.announcedOrder = [];

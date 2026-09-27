@@ -1,6 +1,6 @@
-export type NotificationsPort = {
-  readonly needsPermissionForHostShare: boolean;
-  ensurePermission(): Promise<boolean>;
-  notifyHostBackground(): void;
-  closeHostBackground(): void;
-};
+export abstract class NotificationsPort {
+  abstract readonly needsPermissionForHostShare: boolean;
+  abstract ensurePermission(): Promise<boolean>;
+  abstract notifyHostBackground(): void;
+  abstract closeHostBackground(): void;
+}

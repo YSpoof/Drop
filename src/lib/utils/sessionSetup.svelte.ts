@@ -1,7 +1,11 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
+import { inject } from "quick-di";
 
-import { clipboard, downloadService, notifications, queueService } from "#lib/runtime.js";
+import { ClipboardPort } from "#lib/ports/clipboard.js";
+import { NotificationsPort } from "#lib/ports/notifications.js";
+import { DownloadService } from "#lib/services/downloadService.js";
+import { QueueService } from "#lib/services/queueService.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
@@ -21,7 +25,7 @@ export async function applyAssignedCode(code: string) {
   await goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 
   try {
-    await clipboard.writeText(url.href);
+    await inject(ClipboardPort).writeText(url.href);
     toastStore.showToast("Link copiado", "success");
   } catch {
     // ignore clipboard errors
@@ -47,13 +51,13 @@ export async function recoverSharedFiles() {
       );
       if (queued.length) {
         hasFiles = true;
-        queueService.appendQueuedFiles(queued);
+        inject(QueueService).appendQueuedFiles(queued);
       }
     }
 
     if (hasFiles) {
       toastStore.showToast("Arquivo(s) adicionado(s) na fila", "success");
-      queueService.notifyQueueChanged();
+      inject(QueueService).notifyQueueChanged();
     }
   } catch (e) {
     toastStore.showToast("Falha ao recuperar arquivos compartilhados", "error");
@@ -64,7 +68,7 @@ export async function recoverSharedFiles() {
 export async function initSessionPage(session: SessionManager): Promise<string | null> {
   void requestWakeLock();
 
-  const ready = await downloadService.ensureReady();
+  const ready = await inject(DownloadService).ensureReady();
   if (!ready) {
     uiStore.unsupportedBrowserModalOpen = true;
   }
@@ -86,6 +90,8 @@ export function setupSessionEffects(
     getVisibilityState: () => DocumentVisibilityState;
   },
 ) {
+  const notifications = inject(NotificationsPort);
+
   $effect(() => {
     if (options.getVisibilityState() === "visible") {
       void requestWakeLock();

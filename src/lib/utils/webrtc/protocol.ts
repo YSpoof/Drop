@@ -70,6 +70,12 @@ interface ResumeMessage {
   bytesOffset: number;
 }
 
+interface CreditMessage {
+  type: "credit";
+  fileId: string;
+  bytesWritten: number;
+}
+
 export type ControlMessage =
   | FileMeta
   | DoneMessage
@@ -82,7 +88,8 @@ export type ControlMessage =
   | CancelMessage
   | DownloadAbortedMessage
   | StartMessage
-  | ResumeMessage;
+  | ResumeMessage
+  | CreditMessage;
 
 export interface TransferProgress {
   fileId: string;
@@ -136,6 +143,8 @@ export function describeControlMessage(message: ControlMessage): string {
       return `resume fileId=${message.fileId} offset=${message.bytesOffset}`;
     case "start":
       return `start fileId=${message.fileId} chunkSize=${message.chunkSize}`;
+    case "credit":
+      return `credit fileId=${message.fileId} offset=${message.bytesWritten}`;
     case "pull-batch":
       return `pull-batch count=${message.fileIds.length}`;
     case "batch-done":

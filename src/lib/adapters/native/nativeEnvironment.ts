@@ -1,6 +1,6 @@
-import type { EnvironmentPort } from "#lib/ports/environment.js";
+import { EnvironmentPort } from "#lib/ports/environment.js";
 
-export class NativeEnvironment implements EnvironmentPort {
+export class NativeEnvironment extends EnvironmentPort {
   readonly isNative = true;
   readonly hasNativeFs = true;
 }

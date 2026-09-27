@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import { onMount, type Component } from "svelte";
   import { Tween } from "svelte/motion";
   import AccountEditIcon from "~icons/mdi/account-edit";
@@ -10,7 +11,7 @@
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
   import { SHARE_CODE_DIGITS } from "#lib/consts.js";
-  import { receiveFolder } from "#lib/runtime.js";
+  import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
   import { siteData } from "#lib/siteData.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
@@ -19,6 +20,8 @@
   import { feedback } from "#lib/utils/feedback.js";
   import { saveAutoDownload, saveReceiveFolderPath } from "#lib/utils/files/prefs.js";
   import { localForage } from "#lib/utils/localForage.js";
+
+  const receiveFolder = inject(ReceiveFolderPort);
 
   type IntroStep = {
     title: string;

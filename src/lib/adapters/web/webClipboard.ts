@@ -1,6 +1,6 @@
-import type { ClipboardPort } from "#lib/ports/clipboard.js";
+import { ClipboardPort } from "#lib/ports/clipboard.js";
 
-export class WebClipboard implements ClipboardPort {
+export class WebClipboard extends ClipboardPort {
   async writeText(text: string): Promise<void> {
     await navigator.clipboard.writeText(text);
   }

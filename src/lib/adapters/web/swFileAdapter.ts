@@ -1,4 +1,4 @@
-import type { FileAdapterPort } from "#lib/ports/fileAdapter.js";
+import { FileAdapterPort } from "#lib/ports/fileAdapter.js";
 import {
   DownloadError,
   type CreateDownloadStreamOptions,
@@ -57,7 +57,7 @@ function triggerBrowserDownload(url: string) {
   setTimeout(() => iframe.remove(), 60_000);
 }
 
-export class SwFileAdapter implements FileAdapterPort {
+export class SwFileAdapter extends FileAdapterPort {
   #active = new Set<DownloadHandle>();
 
   abortAll(): void {

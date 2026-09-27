@@ -3,6 +3,9 @@ import type { QueuedFile } from "#lib/utils/files/queue.js";
 import { fileIdentity } from "./protocol";
 import type { TransferSession } from "./session";
 
+/** Unconfirmed bytes the sender may keep in flight. Twice the native 4 MiB flush. */
+const SEND_WINDOW = 8 * 1024 * 1024;
+
 export class TransferSender {
   constructor(private readonly session: TransferSession) {}
 
@@ -54,6 +57,7 @@ export class TransferSender {
       return;
     }
 
+    sender.bytesConfirmed = offset;
     session.emitQueuedProgress(queued, "in-progress", offset);
     const completed = await this.sendFileChunks(queued, offset, abort.signal);
     if (!completed) {
@@ -259,6 +263,48 @@ export class TransferSender {
     this.enqueuePullIds(fileIds);
   }
 
+  onCredit(fileId: string, bytesWritten: number) {
+    const { session } = this;
+    const sender = session.sender;
+    const queued = sender.currentSendFile;
+    if (!queued || queued.id !== fileId) return;
+    if (bytesWritten < sender.bytesConfirmed) return;
+
+    sender.bytesConfirmed = bytesWritten;
+    if (bytesWritten < queued.file.size && !session.shouldStopSend(fileId)) {
+      session.emitQueuedProgress(queued, "in-progress", bytesWritten);
+    }
+    sender.creditWait?.resolve();
+    sender.creditWait = null;
+  }
+
+  private async waitForSendWindow(
+    fileId: string,
+    bytesSent: number,
+    chunkSize: number,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    const { session } = this;
+    const sender = session.sender;
+
+    while (bytesSent - sender.bytesConfirmed + chunkSize > SEND_WINDOW) {
+      if (session.shouldStopSend(fileId) || signal.aborted) return false;
+
+      const wait = Promise.withResolvers<void>();
+      sender.creditWait = wait;
+      const stop = () => {
+        wait.resolve();
+      };
+      signal.addEventListener("abort", stop, { once: true });
+      await wait.promise;
+      signal.removeEventListener("abort", stop);
+      if (sender.creditWait === wait) sender.creditWait = null;
+      if (session.shouldStopSend(fileId) || signal.aborted) return false;
+    }
+
+    return true;
+  }
+
   async sendFileChunks(
     queued: QueuedFile,
     startOffset: number,
@@ -273,6 +319,11 @@ export class TransferSender {
 
     for (let index = startIndex; index < totalChunks; index += 1) {
       if (session.shouldStopSend(queued.id) || signal.aborted) {
+        sender.clearSending();
+        return false;
+      }
+      const room = await this.waitForSendWindow(queued.id, bytesSent, chunkSize, signal);
+      if (!room) {
         sender.clearSending();
         return false;
       }
@@ -302,7 +353,6 @@ export class TransferSender {
       }
       session.callbacks.onChunkBytes?.("send", buffer.byteLength);
       bytesSent += buffer.byteLength;
-      session.emitQueuedProgress(queued, "in-progress", bytesSent);
     }
 
     if (session.shouldStopSend(queued.id) || signal.aborted) {

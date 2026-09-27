@@ -1,5 +1,7 @@
-import type { FileReaderPort } from "#lib/ports/fileReader.js";
-import type { WatcherEvent, WatcherPort } from "#lib/ports/watcher.js";
+import { inject } from "quick-di";
+
+import { FileReaderPort } from "#lib/ports/fileReader.js";
+import { WatcherPort, type WatcherEvent } from "#lib/ports/watcher.js";
 import { createQueuedFile, type QueuedFile } from "#lib/utils/files/queue.js";
 
 type Callbacks = {
@@ -14,14 +16,11 @@ type WatchedGroupEntry = {
 };
 
 export class FolderWatcher {
+  private readonly watcher = inject(WatcherPort);
+  private readonly fileReader = inject(FileReaderPort);
   private watched = new Map<string, WatchedGroupEntry>();
   private unsub: (() => void) | null = null;
   private callbacks: Callbacks | null = null;
-
-  constructor(
-    private readonly watcher: WatcherPort,
-    private readonly fileReader: FileReaderPort,
-  ) {}
 
   init(onAdd: Callbacks["onAdd"], onRemove: Callbacks["onRemove"]) {
     this.callbacks = { onAdd, onRemove };

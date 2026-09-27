@@ -1,5 +1,7 @@
-import type { FileReaderPort } from "#lib/ports/fileReader.js";
-import type { FolderWatcher } from "#lib/services/folderWatcher.js";
+import { inject } from "quick-di";
+
+import { FileReaderPort } from "#lib/ports/fileReader.js";
+import { FolderWatcher } from "#lib/services/folderWatcher.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
@@ -7,15 +9,14 @@ import { logger } from "#lib/utils/logger.js";
 import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
 
 export class QueueService {
+  private readonly fileReader = inject(FileReaderPort);
+  private readonly folderWatcher = inject(FolderWatcher);
   private notifyDelayTimeout: ReturnType<typeof setTimeout> | null = null;
   private getTransferManager: () => TransferManager | null = () => null;
   /** groupIds that are folder-watched */
   private watchedGroupIds = new Set<string>();
 
-  constructor(
-    private readonly fileReader: FileReaderPort,
-    private readonly folderWatcher: FolderWatcher,
-  ) {
+  constructor() {
     this.folderWatcher.init(
       (groupId, file) => this.addWatchedFile(groupId, file),
       (fileId) => this.removeWatchedFile(fileId),

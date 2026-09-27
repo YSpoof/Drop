@@ -1,8 +1,8 @@
-import type { NotificationsPort } from "#lib/ports/notifications.js";
+import { NotificationsPort } from "#lib/ports/notifications.js";
 
 const HOST_NOTIFY_TAG = "drop-host-background";
 
-export class WebNotifications implements NotificationsPort {
+export class WebNotifications extends NotificationsPort {
   readonly needsPermissionForHostShare = true;
   #lastNotification: Notification | null = null;
 

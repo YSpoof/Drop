@@ -1,8 +1,9 @@
 import type { Channel } from "fastrtc";
+import { inject } from "quick-di";
 
-import type { EnvironmentPort } from "#lib/ports/environment.js";
-import type { FileReaderPort } from "#lib/ports/fileReader.js";
-import type { DownloadService } from "#lib/services/downloadService.js";
+import { EnvironmentPort } from "#lib/ports/environment.js";
+import { FileReaderPort } from "#lib/ports/fileReader.js";
+import { DownloadService } from "#lib/services/downloadService.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
@@ -17,13 +18,10 @@ type PendingBatchCompletion = {
 };
 
 export class TransferService {
+  private readonly fileReader = inject(FileReaderPort);
+  private readonly downloads = inject(DownloadService);
+  private readonly environment = inject(EnvironmentPort);
   private pendingBatchCompletions = new Map<string, PendingBatchCompletion>();
-
-  constructor(
-    private readonly fileReader: FileReaderPort,
-    private readonly downloads: DownloadService,
-    private readonly environment: EnvironmentPort,
-  ) {}
 
   clearPendingBatchCompletions() {
     this.pendingBatchCompletions.clear();
@@ -144,8 +142,6 @@ export class TransferService {
         getSendQueue: () => transferStore.queue,
         onBye,
       }),
-      this.downloads,
-      this.environment,
     );
 
     transferManager.setManualDownload(!transferStore.autoDownload);

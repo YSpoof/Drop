@@ -1,7 +1,8 @@
 import type { Channel } from "fastrtc";
+import { inject } from "quick-di";
 
-import type { EnvironmentPort } from "#lib/ports/environment.js";
-import type { DownloadService } from "#lib/services/downloadService.js";
+import { EnvironmentPort } from "#lib/ports/environment.js";
+import { DownloadService } from "#lib/services/downloadService.js";
 import { logger } from "#lib/utils/logger.js";
 
 import { describeControlMessage, parseControlMessage, type TransferCallbacks } from "./protocol";
@@ -10,21 +11,17 @@ import { TransferSender } from "./sender";
 import { TransferSession } from "./session";
 
 export class TransferManager {
+  private readonly downloads = inject(DownloadService);
+  private readonly environment = inject(EnvironmentPort);
   private readonly session: TransferSession;
   private readonly sender: TransferSender;
   private readonly receiver: TransferReceiver;
   private readonly stopListeners: () => void;
 
-  constructor(
-    control: Channel,
-    files: Channel,
-    callbacks: TransferCallbacks,
-    downloads: DownloadService,
-    environment: EnvironmentPort,
-  ) {
+  constructor(control: Channel, files: Channel, callbacks: TransferCallbacks) {
     this.session = new TransferSession(control, files, callbacks);
     this.sender = new TransferSender(this.session);
-    this.receiver = new TransferReceiver(this.session, this.sender, downloads, environment);
+    this.receiver = new TransferReceiver(this.session, this.sender);
 
     const listeners = new AbortController();
     control.addEventListener(
@@ -160,6 +157,9 @@ export class TransferManager {
         break;
       case "resume":
         this.sender.onResume(message.fileId, message.hash, message.bytesOffset);
+        break;
+      case "credit":
+        this.sender.onCredit(message.fileId, message.bytesWritten);
         break;
     }
   }

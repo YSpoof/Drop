@@ -1,4 +1,6 @@
-import { downloadService } from "#lib/runtime.js";
+import { inject } from "quick-di";
+
+import { DownloadService } from "#lib/services/downloadService.js";
 import { flushTransferStats } from "#lib/utils/files/transferStats.js";
 import { abortActiveSession } from "#lib/utils/webrtc/SessionManager.js";
 
@@ -8,6 +10,6 @@ export function flushStatsOnHide(): void {
 
 export function abortOnPageClose(): void {
   abortActiveSession();
-  downloadService.abortAll();
+  inject(DownloadService).abortAll();
   void flushTransferStats();
 }

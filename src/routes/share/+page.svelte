@@ -1,10 +1,11 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { inject } from "quick-di";
   import { onDestroy, onMount } from "svelte";
   import { lazy } from "svelte-comp-lazyloader";
 
-  import { queueService } from "#lib/runtime.js";
+  import { QueueService } from "#lib/services/queueService.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
   import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
@@ -32,6 +33,8 @@
   const ShareStatus = lazy(() => import("#lib/components/share/ShareStatus.svelte"));
   const Files = lazy(() => import("#lib/components/transfer/Files.svelte"));
   const TransferProgress = lazy(() => import("#lib/components/transfer/TransferProgress.svelte"));
+
+  const queueService = inject(QueueService);
 
   const hostid = $derived(page.url.searchParams.get("hostid") ?? undefined);
   const code = $derived(page.url.searchParams.get("code") ?? undefined);

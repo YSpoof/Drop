@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
   import EmailAlertIcon from "~icons/mdi/email-alert-outline";
@@ -6,10 +7,11 @@
   import WaterSyncIcon from "~icons/mdi/water-sync";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { clipboard } from "#lib/runtime.js";
+  import { ClipboardPort } from "#lib/ports/clipboard.js";
   import { siteData } from "#lib/siteData.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
 
+  const clipboard = inject(ClipboardPort);
   let copied = $state(false);
 
   async function copyPixKey() {

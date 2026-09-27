@@ -1,8 +1,10 @@
-import type { FileAdapterPort } from "#lib/ports/fileAdapter.js";
+import { inject } from "quick-di";
+
+import { FileAdapterPort } from "#lib/ports/fileAdapter.js";
 import type { CreateDownloadStreamOptions } from "#lib/utils/files/transferTypes.js";
 
 export class DownloadService {
-  constructor(private readonly files: FileAdapterPort) {}
+  private readonly files = inject(FileAdapterPort);
 
   createWritableStream(filename: string, opts: CreateDownloadStreamOptions = {}) {
     return this.files.createWritableStream(filename, opts);
@@ -27,11 +29,11 @@ export class DownloadService {
   }
 
   getResumeOffset(hash: string, size: number): Promise<number> {
-    return this.files.getResumeOffset?.(hash, size) ?? Promise.resolve(0);
+    return this.files.getResumeOffset(hash, size);
   }
 
   dropIncomplete(hash?: string): Promise<void> {
-    return this.files.dropIncomplete?.(hash) ?? Promise.resolve();
+    return this.files.dropIncomplete(hash);
   }
 
   ensureReady(timeoutMs?: number): Promise<boolean> {

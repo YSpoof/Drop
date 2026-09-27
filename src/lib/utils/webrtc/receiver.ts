@@ -1,5 +1,7 @@
-import type { EnvironmentPort } from "#lib/ports/environment.js";
-import type { DownloadService } from "#lib/services/downloadService.js";
+import { inject } from "quick-di";
+
+import { EnvironmentPort } from "#lib/ports/environment.js";
+import { DownloadService } from "#lib/services/downloadService.js";
 import { DownloadError } from "#lib/utils/files/transferTypes.js";
 import { ZipDownloadSession } from "#lib/utils/files/zipDownload.js";
 
@@ -7,12 +9,16 @@ import type { FileMeta } from "./protocol";
 import type { TransferSender } from "./sender";
 import type { ReceiveState, TransferSession } from "./session";
 
+/** Send a credit once this many newly accepted bytes have piled up. */
+const CREDIT_BATCH = 1024 * 1024;
+
 export class TransferReceiver {
+  private readonly downloads = inject(DownloadService);
+  private readonly environment = inject(EnvironmentPort);
+
   constructor(
     private readonly session: TransferSession,
     private readonly sender: TransferSender,
-    private readonly downloads: DownloadService,
-    private readonly environment: EnvironmentPort,
   ) {}
 
   private usesZip(meta: FileMeta): boolean {
@@ -60,6 +66,21 @@ export class TransferReceiver {
     }
   }
 
+  /** Confirm accepted bytes. Caller must already have awaited the stream write. */
+  private maybeSendCredit(state: ReceiveState) {
+    const accepted = state.receivedBytes;
+    const pending = accepted - state.lastCredited;
+    if (pending <= 0) return;
+    if (pending < CREDIT_BATCH && accepted < state.meta.size) return;
+
+    state.lastCredited = accepted;
+    this.session.sendControl({
+      type: "credit",
+      fileId: state.meta.fileId,
+      bytesWritten: accepted,
+    });
+  }
+
   private abortStream(state: ReceiveState) {
     void state.streamWriter?.abort().catch(() => undefined);
   }
@@ -93,6 +114,7 @@ export class TransferReceiver {
 
     try {
       await this.applyChunkBytes(state, data);
+      this.maybeSendCredit(state);
     } catch (error) {
       this.failReceive(
         fileId,
@@ -129,6 +151,7 @@ export class TransferReceiver {
       meta,
       receivedBytes: 0,
       pendingChunks: [],
+      lastCredited: 0,
       sessionOpen: false,
       useZip,
       senderDone: false,
@@ -147,6 +170,7 @@ export class TransferReceiver {
           !useZip && meta.hash ? await this.downloads.getResumeOffset(meta.hash, meta.size) : 0;
         const aligned = Math.floor(existing / chunkSize) * chunkSize;
         state.receivedBytes = aligned;
+        state.lastCredited = aligned;
 
         if (useZip) {
           state.streamWriter = await this.getOrCreateZipSession(
@@ -174,6 +198,7 @@ export class TransferReceiver {
         state.pendingChunks = [];
         for (const chunk of buffered) {
           await this.applyChunkBytes(state, chunk);
+          this.maybeSendCredit(state);
         }
 
         if (state.receivedBytes > 0) {
@@ -279,7 +304,7 @@ export class TransferReceiver {
   private getOrCreateZipSession(filename?: string) {
     const receiver = this.session.receiver;
     if (!receiver.zipSession || receiver.zipSession.isFinalized()) {
-      receiver.zipSession = new ZipDownloadSession(this.downloads, filename, {
+      receiver.zipSession = new ZipDownloadSession(filename, {
         onAbort: () => this.onZipDownloadAborted(),
       });
     }

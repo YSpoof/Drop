@@ -1,6 +1,6 @@
-import type { NotificationsPort } from "#lib/ports/notifications.js";
+import { NotificationsPort } from "#lib/ports/notifications.js";
 
-export class NativeNotifications implements NotificationsPort {
+export class NativeNotifications extends NotificationsPort {
   readonly needsPermissionForHostShare = false;
 
   async ensurePermission(): Promise<boolean> {

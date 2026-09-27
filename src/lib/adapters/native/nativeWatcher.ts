@@ -1,9 +1,11 @@
-import { onFolderWatchEvent } from "#lib/adapters/native/neutralinoWatch.js";
-import type { NativeApi } from "#lib/ports/nativeApi.js";
-import type { WatcherEvent, WatcherPort } from "#lib/ports/watcher.js";
+import { inject } from "quick-di";
 
-export class NativeWatcher implements WatcherPort {
-  constructor(private readonly api: NativeApi) {}
+import { onFolderWatchEvent } from "#lib/adapters/native/neutralinoWatch.js";
+import { NativeApi } from "#lib/ports/nativeApi.js";
+import { WatcherPort, type WatcherEvent } from "#lib/ports/watcher.js";
+
+export class NativeWatcher extends WatcherPort {
+  private readonly api = inject(NativeApi);
 
   watch(watcherId: string, folderPath: string): Promise<void> {
     return this.api.watchFolder(watcherId, folderPath);

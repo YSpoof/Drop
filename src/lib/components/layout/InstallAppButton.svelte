@@ -1,15 +1,17 @@
 <script lang="ts">
+  import { inject } from "quick-di";
   import MonitorIcon from "~icons/mdi/monitor";
   import TrayArrowDownIcon from "~icons/mdi/tray-arrow-down";
   import WebIcon from "~icons/mdi/web";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { environment } from "#lib/runtime.js";
+  import { EnvironmentPort } from "#lib/ports/environment.js";
   import { siteData } from "#lib/siteData.js";
   import { installPromptStore } from "#lib/stores/installPrompt.svelte.js";
   import { toastStore } from "#lib/stores/toast.svelte.js";
   import { isWindowsOrLinux } from "#lib/utils/device/os.js";
 
+  const environment = inject(EnvironmentPort);
   const desktopOs = isWindowsOrLinux();
   const desktopFeatures = [
     "Transferências retomáveis",

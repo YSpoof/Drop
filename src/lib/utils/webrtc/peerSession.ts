@@ -1,6 +1,8 @@
 import { FastRTC, type Channel, type Peer, type SignalPayload } from "fastrtc";
+import { inject } from "quick-di";
 
-import { downloadService, transferService } from "#lib/runtime.js";
+import { DownloadService } from "#lib/services/downloadService.js";
+import { TransferService } from "#lib/services/transferService.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
@@ -21,6 +23,8 @@ export type PeerSessionDeps = {
 };
 
 export class PeerSessionCoordinator {
+  private readonly downloadService = inject(DownloadService);
+  private readonly transferService = inject(TransferService);
   private rtc: FastRTC | null = null;
   private transferManager: TransferManager | null = null;
   private activeTargetPeerId: string | null = null;
@@ -60,7 +64,7 @@ export class PeerSessionCoordinator {
   }
 
   disconnectPeer() {
-    downloadService.abortAll();
+    this.downloadService.abortAll();
     this.transferManager?.sendBye();
     this.cleanupPeerConnection();
   }
@@ -192,12 +196,12 @@ export class PeerSessionCoordinator {
     if (!ctrl || !files) return;
 
     if (this.lastConnectedPeerId && this.lastConnectedPeerId !== targetPeerId) {
-      await downloadService.dropIncomplete();
+      await this.downloadService.dropIncomplete();
     }
     if (this.ctrl !== ctrl || this.files !== files) return;
     this.lastConnectedPeerId = targetPeerId;
 
-    this.transferManager = transferService.startTransferManager(ctrl, files, () =>
+    this.transferManager = this.transferService.startTransferManager(ctrl, files, () =>
       this.cleanupPeerConnection(),
     );
   }
@@ -211,7 +215,7 @@ export class PeerSessionCoordinator {
     const joinConnecting = uiStore.codeJoinOpen && peerStore.codeJoinPhase === "connecting";
 
     transferStore.resetTransferState();
-    transferService.clearPendingBatchCompletions();
+    this.transferService.clearPendingBatchCompletions();
     this.transferManager?.abort();
     this.transferManager = null;
 
