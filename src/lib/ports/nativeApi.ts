@@ -14,5 +14,11 @@ export abstract class NativeApi {
   abstract writeStreamChunk(id: string, data: ArrayBuffer): Promise<void>;
   abstract closeWriteStream(id: string): Promise<void>;
   abstract abortWriteStream(id: string): Promise<void>;
-  abstract readFileChunk(filePath: string, start: number, length: number): Promise<ArrayBuffer>;
+  abstract readFileChunk(
+    filePath: string,
+    start: number,
+    length: number,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer>;
+  abstract writeClipboardText(text: string): Promise<void>;
 }

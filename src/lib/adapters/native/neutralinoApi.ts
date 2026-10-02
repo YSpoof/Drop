@@ -1,117 +1,21 @@
-import { filesystem, os } from "@neutralinojs/lib";
+import { filesystem, os, clipboard } from "@neutralinojs/lib";
 
-import { getNativeSocket } from "#lib/adapters/native/neutralinoClient.js";
 import { tryStats } from "#lib/adapters/native/neutralinoFs.js";
 import { unwatchFolder, watchFolder } from "#lib/adapters/native/neutralinoWatch.js";
+import {
+  openHttpWrite,
+  readViaStreamer,
+  type HttpWrite,
+} from "#lib/adapters/native/streamerClient.js";
 import type { NativeApi } from "#lib/ports/nativeApi.js";
 
-/** Appends are batched to this size: every native call is a base64 WebSocket round-trip. */
-const FLUSH_THRESHOLD = 4 * 1024 * 1024;
-
-/** `String.fromCharCode.apply` argument cap. Stays under the engine stack limit. */
-const BASE64_STEP = 0x4000;
-
-type NativeReply = {
-  id?: string;
-  data?: { error?: { message?: string }; success?: boolean };
-};
-
-/**
- * Neutralino's client encodes with one `String.fromCharCode` per byte, then `btoa`.
- * A 4 MiB flush blocks the receive loop for a long time, and the sender waits on that write.
- */
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += BASE64_STEP) {
-    const slice = bytes.subarray(index, index + BASE64_STEP);
-    binary += String.fromCharCode.apply(null, slice as unknown as number[]);
-  }
-  return btoa(binary);
-}
-
-function appendBinaryFile(path: string, data: ArrayBuffer): Promise<void> {
-  const socket = getNativeSocket();
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    return filesystem.appendBinaryFile(path, data);
-  }
-
-  const id = crypto.randomUUID();
-  const { promise, resolve, reject } = Promise.withResolvers<void>();
-  let settled = false;
-
-  const finish = (error?: Error) => {
-    if (settled) return;
-    settled = true;
-    socket.removeEventListener("message", onMessage);
-    socket.removeEventListener("close", onClose);
-    if (error) reject(error);
-    else resolve();
-  };
-
-  const onClose = () => {
-    finish(new Error("Native filesystem socket closed"));
-  };
-
-  const onMessage = (event: MessageEvent) => {
-    if (typeof event.data !== "string" || !event.data.includes(id)) return;
-
-    let message: NativeReply;
-    try {
-      message = JSON.parse(event.data) as NativeReply;
-    } catch {
-      return;
-    }
-    if (message.id !== id) return;
-    if (message.data?.error) {
-      finish(new Error(message.data.error.message ?? "Failed to append file"));
-      return;
-    }
-    if (message.data?.success) finish();
-  };
-
-  socket.addEventListener("message", onMessage);
-  socket.addEventListener("close", onClose);
-
-  try {
-    socket.send(
-      JSON.stringify({
-        id,
-        method: "filesystem.appendBinaryFile",
-        data: { path, data: encodeBase64(new Uint8Array(data)) },
-        accessToken: window.NL_TOKEN || sessionStorage.getItem("NL_TOKEN") || "",
-      }),
-    );
-  } catch (error) {
-    finish(error instanceof Error ? error : new Error("Failed to append file"));
-  }
-
-  return promise;
-}
-
-type OpenStream = {
-  path: string;
-  chunks: Uint8Array[];
-  pending: number;
-};
-
-const openStreams = new Map<string, OpenStream>();
-
-async function flush(stream: OpenStream) {
-  if (stream.pending === 0) return;
-
-  const merged = new Uint8Array(stream.pending);
-  let offset = 0;
-  for (const chunk of stream.chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  stream.chunks = [];
-  stream.pending = 0;
-
-  await appendBinaryFile(stream.path, merged.buffer as ArrayBuffer);
-}
+const openStreams = new Map<string, HttpWrite>();
 
 export const neutralinoApi: NativeApi = {
+  writeClipboardText(text: string) {
+    return clipboard.writeText(text);
+  },
+
   getDownloadsPath() {
     return os.getPath("downloads");
   },
@@ -159,45 +63,46 @@ export const neutralinoApi: NativeApi = {
     }
   },
 
-  ensureDir(path: string) {
-    return filesystem.createDirectory(path);
+  async ensureDir(path: string) {
+    if (await this.pathExists(path)) return;
+    try {
+      await filesystem.createDirectory(path);
+    } catch (error) {
+      if (await this.pathExists(path)) return;
+      throw error;
+    }
   },
 
   async openWriteStream(path: string, start = 0) {
-    // A non-zero start always equals the current size of the partial file, so appending
-    // resumes it. Starting from scratch has to truncate whatever is already there.
-    if (start === 0) await filesystem.writeBinaryFile(path, new ArrayBuffer(0));
-
     const id = crypto.randomUUID();
-    openStreams.set(id, { path, chunks: [], pending: 0 });
+    const http = await openHttpWrite(path, start);
+    openStreams.set(id, http);
     return id;
   },
 
   async writeStreamChunk(id: string, data: ArrayBuffer) {
     const stream = openStreams.get(id);
     if (!stream) throw new Error(`Unknown write stream: ${id}`);
-
-    stream.chunks.push(new Uint8Array(data));
-    stream.pending += data.byteLength;
-    if (stream.pending >= FLUSH_THRESHOLD) await flush(stream);
+    await stream.write(new Uint8Array(data));
   },
 
   async closeWriteStream(id: string) {
     const stream = openStreams.get(id);
     if (!stream) throw new Error(`Unknown write stream: ${id}`);
-
     try {
-      await flush(stream);
+      await stream.close();
     } finally {
       openStreams.delete(id);
     }
   },
 
   async abortWriteStream(id: string) {
+    const stream = openStreams.get(id);
     openStreams.delete(id);
+    await stream?.abort();
   },
 
-  readFileChunk(filePath: string, start: number, length: number) {
-    return filesystem.readBinaryFile(filePath, { pos: start, size: length });
+  readFileChunk(filePath: string, start: number, length: number, signal?: AbortSignal) {
+    return readViaStreamer(filePath, start, length, signal);
   },
 };

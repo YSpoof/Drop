@@ -6,8 +6,8 @@ import { nativeProviders } from "#lib/adapters/native/nativeProviders.js";
 import { startNeutralino } from "#lib/adapters/native/neutralinoClient.js";
 import { webProviders } from "#lib/adapters/web/webProviders.js";
 
-export const init: ClientInit = () => {
+export const init: ClientInit = async () => {
   const native = isNative();
   configure(native ? nativeProviders : webProviders);
-  if (native) startNeutralino();
+  if (native) await startNeutralino();
 };

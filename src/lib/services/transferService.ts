@@ -65,12 +65,13 @@ export class TransferService {
       return;
     }
 
-    if (info.fileCountInBatch < 2) {
+    if (info.direction === "received" && info.fileCountInBatch >= 2) {
+      toastStore.showToast(`${count} arquivos baixados.`, "success");
+    } else if (info.fileCountInBatch < 2) {
       const action = info.direction === "sent" ? "enviado" : "recebido";
       toastStore.showToast(`Arquivo ${action}: ${batch.succeeded[0]}`, "success");
     } else {
-      const action = info.direction === "sent" ? "enviados" : "recebidos";
-      toastStore.showToast(`${count} arquivos ${action}`, "success");
+      toastStore.showToast(`${count} arquivos enviados`, "success");
     }
 
     this.pendingBatchCompletions.delete(info.batchId);
@@ -126,7 +127,8 @@ export class TransferService {
         toastStore.showToast(message, "error");
       },
       readFileChunk: this.environment.hasNativeFs
-        ? (file, start, length) => this.fileReader.readChunk(file.file, start, length)
+        ? (file, start, length, signal) =>
+            this.fileReader.readChunk(file.file, start, length, signal)
         : undefined,
     };
   }

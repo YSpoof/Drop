@@ -17,6 +17,7 @@
     pathStack: string[];
     currentNodes: TreeNode<UnifiedItem>[];
     autoDownload: boolean;
+    activeDownloadId: string | null;
     onPull?: (fileId: string) => void;
     onPullBatch?: (fileIds: string[], zipFilename?: string) => void;
     onDeleteHistory?: (fileId: string | string[]) => void;
@@ -28,6 +29,7 @@
     pathStack,
     currentNodes,
     autoDownload,
+    activeDownloadId,
     onPull,
     onPullBatch,
     onDeleteHistory,
@@ -124,6 +126,7 @@
     <FileTreeNode
       {node}
       {autoDownload}
+      {activeDownloadId}
       {onPull}
       {onPullBatch}
       {onDeleteHistory}

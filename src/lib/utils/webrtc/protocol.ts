@@ -115,6 +115,7 @@ export interface TransferCallbacks {
     file: QueuedFile,
     start: number,
     length: number,
+    signal?: AbortSignal,
   ) => Promise<ArrayBuffer | undefined>;
 }
 

@@ -76,6 +76,21 @@ export function filePercent(item: TransferItem) {
   return Math.min(100, (item.bytesTransferred / item.size) * 100);
 }
 
+/** The received file that is actually transferring. Others clicked at the same time are waiting. */
+export function activeDownloadId(items: TransferItem[]): string | null {
+  const running = items.filter(
+    (item) => item.direction === "received" && item.status === "in-progress",
+  );
+  const started = running.find((item) => item.bytesTransferred > 0);
+  if (started) return started.id;
+  if (running.length === 1) return running[0]!.id;
+  return null;
+}
+
+export function isWaitingDownload(item: TransferItem, activeId: string | null): boolean {
+  return item.direction === "received" && item.status === "in-progress" && item.id !== activeId;
+}
+
 export function canDelete(u: UnifiedItem) {
   if (u.type === "queue") return true;
   return u.item.status === "pending" || u.item.status === "in-progress";
@@ -121,10 +136,12 @@ export function hasPendingReceived(node: TreeNode<UnifiedItem>): boolean {
 }
 
 /** Computes aggregate download progress for a folder of files */
-export function folderProgress(node: TreeNode<UnifiedItem>) {
+export function folderProgress(node: TreeNode<UnifiedItem>, activeId: string | null = null) {
   let bytesTransferred = 0;
   let size = 0;
   let hasInProgress = false;
+  let hasActive = false;
+  let hasWaiting = false;
 
   walkTree(node, (u) => {
     if (u.type === "history" && u.item.direction === "received") {
@@ -136,14 +153,18 @@ export function folderProgress(node: TreeNode<UnifiedItem>) {
       ) {
         bytesTransferred += item.bytesTransferred;
         size += item.size;
-        if (item.status === "in-progress") hasInProgress = true;
+        if (item.status === "in-progress") {
+          hasInProgress = true;
+          if (item.id === activeId) hasActive = true;
+          else hasWaiting = true;
+        }
       }
     }
     return [];
   });
 
-  if (size <= 0) return { percent: 0, downloading: false };
+  if (size <= 0) return { percent: 0, downloading: false, waiting: false };
   const percent = Math.min(100, (bytesTransferred / size) * 100);
   const downloading = hasInProgress || (percent > 0 && percent < 100);
-  return { percent, downloading };
+  return { percent, downloading, waiting: hasWaiting && !hasActive };
 }

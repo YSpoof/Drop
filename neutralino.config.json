@@ -11,14 +11,26 @@
   "port": 65173,
   "enableServer": true,
   "enableNativeAPI": true,
+  "enableExtensions": true,
+  "extensions": [
+    {
+      "id": "br.com.lzart.drop.streamer"
+    }
+  ],
   "tokenSecurity": "one-time",
   "nativeAllowList": [
     "app.*",
     "events.*",
+    "extensions.dispatch",
+    "extensions.getStats",
     "filesystem.*",
     "os.getPath",
     "os.showOpenDialog",
-    "os.showFolderDialog"
+    "os.showFolderDialog",
+    "os.execCommand",
+    "clipboard.writeText",
+    "computer.getOSInfo",
+    "resources.*"
   ],
   "modes": {
     "window": {
@@ -35,7 +47,7 @@
   },
   "cli": {
     "binaryName": "Drop",
-    "resourcesPath": "/native/empty/",
+    "resourcesPath": "/extensions/compiled/",
     "binaryVersion": "6.9.0",
     "clientVersion": "6.9.0",
     "frontendLibrary": {
