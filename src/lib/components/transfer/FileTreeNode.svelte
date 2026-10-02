@@ -10,12 +10,18 @@
     unifiedFileSubtitle,
     unifiedSizeDisplay,
   } from "#lib/utils/files/fileTreeDisplay.js";
-  import { filePercent, folderProgress, type UnifiedItem } from "#lib/utils/files/tree.js";
+  import {
+    filePercent,
+    folderProgress,
+    isWaitingDownload,
+    type UnifiedItem,
+  } from "#lib/utils/files/tree.js";
   import type { TreeNode } from "#lib/utils/files/tree.js";
 
   interface Props {
     node: TreeNode<UnifiedItem>;
     autoDownload: boolean;
+    activeDownloadId: string | null;
     onPull?: (fileId: string) => void;
     onPullBatch?: (fileIds: string[], zipFilename?: string) => void;
     onDeleteHistory?: (fileId: string | string[]) => void;
@@ -32,6 +38,7 @@
   let {
     node,
     autoDownload,
+    activeDownloadId,
     onPull,
     onPullBatch,
     onDeleteHistory,
@@ -47,7 +54,7 @@
 </script>
 
 {#if node.isDir}
-  {const progress = $derived(folderProgress(node))}
+  {const progress = $derived(folderProgress(node, activeDownloadId))}
   <li class="border-base-300 flex flex-col border-b py-1 last:border-b-0">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -89,7 +96,7 @@
     {#if progress.downloading}
       <div class="px-3 pb-2">
         <progress
-          class="progress progress-secondary w-full"
+          class={["progress progress-secondary w-full", progress.waiting && "animate-pulse"]}
           value={progress.percent}
           max="100"></progress>
       </div>
@@ -141,8 +148,11 @@
     </div>
     <div>
       <progress
-        class="progress progress-secondary w-full"
-        class:progress-success={u.type === "history" && u.item.status === "completed"}
+        class={[
+          "progress progress-secondary w-full",
+          u.type === "history" && u.item.status === "completed" && "progress-success",
+          u.type === "history" && isWaitingDownload(u.item, activeDownloadId) && "animate-pulse",
+        ]}
         value={fileProgress}
         max="100"></progress>
     </div>

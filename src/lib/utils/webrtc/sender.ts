@@ -331,7 +331,15 @@ export class TransferSender {
 
       let buffer: ArrayBuffer | undefined;
       if (session.callbacks.readFileChunk) {
-        buffer = await session.callbacks.readFileChunk(queued, offset, chunkSize);
+        try {
+          buffer = await session.callbacks.readFileChunk(queued, offset, chunkSize, signal);
+        } catch (error) {
+          if (signal.aborted || session.shouldStopSend(queued.id)) {
+            sender.clearSending();
+            return false;
+          }
+          throw error;
+        }
       }
       if (!buffer) {
         const slice = queued.file.slice(offset, offset + chunkSize);

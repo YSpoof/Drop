@@ -11,10 +11,15 @@ function nativeFilePath(file: File): string {
 export class NativeFileReader extends FileReaderPort {
   private readonly api = inject(NativeApi);
 
-  async readChunk(file: File, start: number, length: number): Promise<ArrayBuffer | undefined> {
+  async readChunk(
+    file: File,
+    start: number,
+    length: number,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer | undefined> {
     const path = nativeFilePath(file);
     if (!path) return undefined;
-    return this.api.readFileChunk(path, start, length);
+    return this.api.readFileChunk(path, start, length, signal);
   }
 
   nativePath(file: File): string {

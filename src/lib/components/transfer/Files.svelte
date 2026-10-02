@@ -10,7 +10,7 @@
   import { feedback } from "#lib/utils/feedback.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
   import type { TransferItem } from "#lib/utils/files/transferTypes.js";
-  import { buildTree, type UnifiedItem } from "#lib/utils/files/tree.js";
+  import { activeDownloadId, buildTree, type UnifiedItem } from "#lib/utils/files/tree.js";
 
   import FileDropZone from "./FileDropZone.svelte";
 
@@ -71,6 +71,8 @@
       pathStack = pathStack.slice(0, -1);
     }
   });
+
+  const activeDownload = $derived(activeDownloadId(history));
 
   const pendingReceivedCount = $derived(
     history.filter((item) => item.direction === "received" && item.status === "pending").length,
@@ -202,6 +204,7 @@
         {pathStack}
         {currentNodes}
         {autoDownload}
+        activeDownloadId={activeDownload}
         {onPull}
         {onPullBatch}
         {onDeleteHistory}

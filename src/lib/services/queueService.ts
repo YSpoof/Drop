@@ -120,9 +120,8 @@ export class QueueService {
       if (item.direction === "received") {
         if (transferManager) {
           transferManager.dismissReceivedFile(id);
-        } else {
-          transferStore.removeTransfer(id);
         }
+        transferStore.removeTransfer(id);
         continue;
       }
 

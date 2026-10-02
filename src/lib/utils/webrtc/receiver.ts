@@ -12,6 +12,15 @@ import type { ReceiveState, TransferSession } from "./session";
 /** Send a credit once this many newly accepted bytes have piled up. */
 const CREDIT_BATCH = 1024 * 1024;
 
+function thrownMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = error.message;
+    if (typeof message === "string" && message) return message;
+  }
+  return fallback;
+}
+
 export class TransferReceiver {
   private readonly downloads = inject(DownloadService);
   private readonly environment = inject(EnvironmentPort);
@@ -227,6 +236,7 @@ export class TransferReceiver {
     const sender = session.sender;
     if (session.aborted) return;
     if (session.cancelledFileIds.has(fileId)) return;
+    if (session.dismissedReceivedIds.has(fileId)) return;
     if (!session.receiver.receiving.has(fileId)) return;
     if (message === "Download cancelled") {
       this.abortBrowserDownload(fileId);
@@ -259,43 +269,36 @@ export class TransferReceiver {
       await state.streamWriter?.close();
     } catch (error) {
       receiver.receiving.set(fileId, state);
-      this.failReceive(
-        fileId,
-        state,
-        error instanceof Error ? error.message : "Failed to finalize download stream",
-      );
+      this.failReceive(fileId, state, thrownMessage(error, "Failed to finalize download stream"));
       return;
     }
 
-    if (
-      state.useZip &&
-      session.manualDownload &&
-      receiver.activePullBatch &&
-      receiver.activePullBatch.length > 1
-    ) {
+    const pullBatch = receiver.activePullBatch;
+    const multiPull = session.manualDownload && pullBatch !== null && pullBatch.length > 1;
+    let batchFinished = true;
+    if (multiPull && pullBatch) {
       receiver.pullBatchReceivedCount += 1;
-      if (receiver.pullBatchReceivedCount >= receiver.activePullBatch.length) {
-        try {
-          await receiver.zipSession?.finalize();
-        } catch (error) {
-          receiver.receiving.set(fileId, state);
-          this.failReceive(
-            fileId,
-            state,
-            error instanceof Error ? error.message : "Failed to finalize zip download",
-          );
-          return;
-        }
-        receiver.zipSession = null;
-        receiver.clearPullBatch();
-        session.completeReceiveBatch();
+      batchFinished = receiver.pullBatchReceivedCount >= pullBatch.length;
+    }
+
+    if (batchFinished && state.useZip && multiPull) {
+      try {
+        await receiver.zipSession?.finalize();
+      } catch (error) {
+        receiver.receiving.set(fileId, state);
+        this.failReceive(fileId, state, thrownMessage(error, "Failed to finalize zip download"));
+        return;
       }
-    } else if (!state.useZip && session.manualDownload) {
-      session.completeReceiveBatch();
+      receiver.zipSession = null;
     }
 
     session.emitReceiveHistory(state.meta, "completed");
     session.emitReceiveProgress(state.meta, "completed", state.meta.size);
+
+    if (session.manualDownload && batchFinished) {
+      if (multiPull) receiver.clearPullBatch();
+      session.completeReceiveBatch();
+    }
 
     session.sendControl({ type: "ack", fileId });
     void this.sender.trySendNext();
@@ -323,7 +326,12 @@ export class TransferReceiver {
 
   abortBrowserDownload(fileId: string) {
     const { session } = this;
-    if (session.aborted || session.cancelledFileIds.has(fileId)) return;
+    if (
+      session.aborted ||
+      session.cancelledFileIds.has(fileId) ||
+      session.dismissedReceivedIds.has(fileId)
+    )
+      return;
     const sender = session.sender;
     const state = session.receiver.receiving.get(fileId);
 
@@ -361,12 +369,16 @@ export class TransferReceiver {
     if (session.dismissedReceivedIds.has(fileId)) return;
     session.dismissedReceivedIds.add(fileId);
 
+    const hash =
+      session.receiver.receiving.get(fileId)?.meta.hash ??
+      session.receiver.pendingMetas.get(fileId)?.hash ??
+      session.receiver.awaitingStart.get(fileId)?.hash;
+
     session.receiver.pendingMetas.delete(fileId);
     session.receiver.awaitingStart.delete(fileId);
 
     const recvState = session.receiver.receiving.get(fileId);
     if (recvState) {
-      this.abortStream(recvState);
       session.receiver.receiving.delete(fileId);
 
       if (!session.receiver.receiving.size) {
@@ -376,8 +388,11 @@ export class TransferReceiver {
       session.sendControl({ type: "download-aborted", fileId });
     }
 
+    void (recvState?.streamWriter?.abort("discard") ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(() => (hash ? this.downloads.dropIncomplete(hash) : undefined));
+
     session.callbacks.onFileDismissed?.(fileId);
-    session.releaseFileTracking(fileId);
     session.pruneIdleTracking();
   }
 
