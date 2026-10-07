@@ -23,8 +23,9 @@
     "native": "pnpx @neutralinojs/neu",
     "native:update": "pnpm native update",
     "streamer:build": "sh scripts/build-streamer.sh",
+    "cli:build": "sh scripts/build-cli.sh",
     "native:dev": "pnpm streamer:build && pnpm native run",
-    "native:build": "pnpm native build --release --embed-resources",
+    "native:build": "rm -rf .tmp chromedata && pnpm native build --release --embed-resources",
     "native:preview": "./dist/Drop/Drop-linux_x64"
   },
   "dependencies": {
@@ -61,7 +62,7 @@
     "vite-plugin-sveltekit-ws": "^2.1.1"
   },
   "lint-staged": {
-    "*.{json,ts,js,svelte}": "oxfmt"
+    "*.{json,ts,js,svelte,go}": "oxfmt"
   },
   "packageManager": "pnpm@12.8.1"
 }

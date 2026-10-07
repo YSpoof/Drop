@@ -18,5 +18,7 @@ node_modules
 /bin
 /dist/
 /static/downloads/
+/native/extensions/compiled/*
 /.tmp/
+/chromedata/
 /neutralinojs.log

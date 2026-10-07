@@ -10,6 +10,10 @@ interface SiteData {
     windows: string;
     linux: string;
   };
+  cliDownloads: {
+    windows: string;
+    linux: string;
+  };
 }
 
 export const siteData: SiteData = {
@@ -24,5 +28,9 @@ export const siteData: SiteData = {
   desktopDownloads: {
     windows: "/downloads/Drop-win_x64.exe",
     linux: "/downloads/Drop-linux_x64",
+  },
+  cliDownloads: {
+    windows: "/downloads/Drop-cli-win_x64.exe",
+    linux: "/downloads/Drop-cli-linux_x64",
   },
 };

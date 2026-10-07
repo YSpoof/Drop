@@ -1,0 +1,16 @@
+# Build binary
+/dropcli
+
+# Go
+*.exe
+*.test
+*.out
+/vendor/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store

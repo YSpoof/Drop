@@ -36,7 +36,7 @@ async function extractExtensionBinaries(): Promise<void> {
     binaryName = "streamer-linux_x64";
   }
 
-  const sourcePath = `/extensions/compiled/${binaryName}`;
+  const sourcePath = `/native/extensions/compiled/${binaryName}`;
   const destPath = `${tmpDir}/${binaryName}`;
 
   try {
