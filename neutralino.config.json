@@ -49,7 +49,7 @@
     "binaryName": "Drop",
     "resourcesPath": "/native/extensions/compiled/",
     "resourcesExclude": "node_modules|chromedata|\\.git|\\.svelte-kit|dist|\\.tmp|openspec|playwright-report|test-results",
-    "binaryVersion": "6.9.0",
+    "binaryVersion": "6.10.0",
     "clientVersion": "6.9.0",
     "frontendLibrary": {
       "projectPath": ".",
