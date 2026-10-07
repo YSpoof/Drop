@@ -2,6 +2,7 @@ package quick
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -10,56 +11,123 @@ import (
 	"dropcli/internal/ui"
 	"dropcli/internal/ui/text"
 	"dropcli/internal/ui/tui"
+	"dropcli/libs/breakread"
 
 	"golang.org/x/term"
 )
 
+// hostConfirmExit runs the Ctrl+C confirm overlay during host PIN wait.
+// Tests may override; production uses tui.RunConfirmExit.
+var hostConfirmExit = tui.RunConfirmExit
+
+// TTY helpers — tests may stub so host-key paths run on pipes without a PTY.
+var (
+	hostIsTerminal = term.IsTerminal
+	hostMakeRaw    = term.MakeRaw
+	hostRestore    = term.Restore
+)
+
 // hostCopyKeys watches stdin for c/C while a host PIN is known.
-// Non-TTY stdin is a no-op (returns immediately). Safe to cancel via ctx.
+// Non-TTY stdin is a no-op. Safe to cancel via ctx.
 // onConfirm is invoked when the user confirms exit via the Ctrl+C overlay.
-func (r *Runner) hostCopyKeys(ctx context.Context, onConfirm func()) {
-	r.hostCopyKeysFrom(ctx, os.Stdin, onConfirm)
+// Returns a channel that closes when the TTY has been restored and is safe for
+// the inbox tea program to take over (may close before the read loop unwinds).
+func (r *Runner) hostCopyKeys(ctx context.Context, onConfirm func()) <-chan struct{} {
+	return r.hostCopyKeysFrom(ctx, os.Stdin, onConfirm)
 }
 
-func (r *Runner) hostCopyKeysFrom(ctx context.Context, in *os.File, onConfirm func()) {
+// hostCopyKeysFrom is like hostCopyKeys but reads from in (for tests).
+func (r *Runner) hostCopyKeysFrom(ctx context.Context, in *os.File, onConfirm func()) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		r.watchHostCopyKeys(ctx, in, onConfirm, done)
+	}()
+	return done
+}
+
+func (r *Runner) watchHostCopyKeys(ctx context.Context, in *os.File, onConfirm func(), handoff chan struct{}) {
+	var handoffOnce sync.Once
+	signalHandoff := func() {
+		handoffOnce.Do(func() { close(handoff) })
+	}
+	defer signalHandoff()
+
 	if in == nil || !hostCopyKeysEnabled(in) {
 		return
 	}
 	fd := int(in.Fd())
 
-	enterRaw := func() (restore func(), ok bool) {
-		oldState, err := term.MakeRaw(fd)
-		if err != nil {
-			return nil, false
-		}
-		setHostRawActive(true)
-		var once sync.Once
-		return func() {
-			once.Do(func() {
-				setHostRawActive(false)
-				_ = term.Restore(fd, oldState)
-			})
-		}, true
-	}
-
-	restore, ok := enterRaw()
-	if !ok {
+	cr, err := breakread.New(in)
+	if err != nil {
 		return
 	}
 	defer func() {
-		restore()
+		cr.Cancel()
+		_ = cr.Close()
+	}()
+
+	var rawMu sync.Mutex
+	var oldState *term.State
+	raw := false
+
+	leaveRaw := func() {
+		rawMu.Lock()
+		defer rawMu.Unlock()
+		if !raw {
+			return
+		}
+		raw = false
+		setHostRawActive(false)
+		if oldState != nil {
+			_ = hostRestore(fd, oldState)
+			oldState = nil
+		}
+		_ = in.SetReadDeadline(time.Time{})
+	}
+
+	enterRaw := func() bool {
+		rawMu.Lock()
+		defer rawMu.Unlock()
+		if raw {
+			return true
+		}
+		st, err := hostMakeRaw(fd)
+		if err != nil {
+			return false
+		}
+		oldState = st
+		raw = true
+		setHostRawActive(true)
+		return true
+	}
+
+	// Restore TTY + unblock stopHostKeys immediately (do not wait for Read).
+	finish := func() {
+		leaveRaw()
+		cr.Cancel()
+		signalHandoff()
+	}
+
+	if !enterRaw() {
+		return
+	}
+	defer finish()
+
+	go func() {
+		<-ctx.Done()
+		finish()
 	}()
 
 	buf := make([]byte, 1)
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
-		default:
 		}
 
-		_ = in.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
-		n, err := in.Read(buf)
+		n, err := cr.Read(buf)
+		if ctx.Err() != nil || errors.Is(err, breakread.ErrCanceled) {
+			return
+		}
 		if n == 0 || err != nil {
 			if err != nil && !os.IsTimeout(err) && err != io.EOF {
 				return
@@ -97,17 +165,15 @@ func (r *Runner) hostCopyKeysFrom(ctx context.Context, in *os.File, onConfirm fu
 				writeHostWait(r.Stderr, text.ShareLinkCopiedLine)
 			}
 		case 3: // Ctrl+C in raw mode — confirm overlay, do not cancel yet
-			restore()
-			confirmed, err := tui.RunConfirmExit()
-			if err != nil || confirmed {
+			leaveRaw()
+			confirmed, confErr := hostConfirmExit()
+			if confErr != nil || confirmed {
 				if onConfirm != nil {
 					onConfirm()
 				}
 				return
 			}
-			// ESC: re-enter raw and keep watching copy keys
-			restore, ok = enterRaw()
-			if !ok {
+			if !enterRaw() {
 				return
 			}
 		}
@@ -120,5 +186,5 @@ func hostCopyKeysEnabled(in *os.File) bool {
 	if in == nil {
 		return false
 	}
-	return term.IsTerminal(int(in.Fd()))
+	return hostIsTerminal(int(in.Fd()))
 }

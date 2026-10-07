@@ -51,12 +51,14 @@ type SignalingPeer struct {
 type PeerJoiningMessage struct {
 	Type      string         `json:"type"`
 	Requester *SignalingPeer `json:"requester"`
+	Lan       bool           `json:"lan,omitempty"`
 }
 
 // JoinAcceptedMessage is received by a joiner when successfully paired.
 type JoinAcceptedMessage struct {
 	Type string         `json:"type"`
 	Host *SignalingPeer `json:"host"`
+	Lan  bool           `json:"lan,omitempty"`
 }
 
 // JoinRejectedMessage is received by a joiner when pairing fails.

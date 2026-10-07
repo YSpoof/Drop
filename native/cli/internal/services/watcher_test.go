@@ -10,6 +10,26 @@ import (
 	"dropcli/internal/adapters/watcher"
 )
 
+func waitNotify(t *testing.T, svc *FolderWatcherService, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-svc.Notify():
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for watcher notification")
+	}
+}
+
+func drainQueue(svc *FolderWatcherService) []string {
+	var out []string
+	for {
+		path, ok := svc.Dequeue()
+		if !ok {
+			return out
+		}
+		out = append(out, path)
+	}
+}
+
 func TestFolderWatcherServiceDetectsNewFiles(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "watcher-test-*")
 	if err != nil {
@@ -30,22 +50,14 @@ func TestFolderWatcherServiceDetectsNewFiles(t *testing.T) {
 	}
 	defer svc.Close()
 
-	// Give the watcher a moment to set up
 	time.Sleep(50 * time.Millisecond)
 
-	// Create a file in the watched directory
 	testFile := filepath.Join(tmpDir, "hello.txt")
 	if err := os.WriteFile(testFile, []byte("hello world"), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Wait for the event to propagate
-	select {
-	case <-svc.Notify():
-		// notified
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for watcher notification")
-	}
+	waitNotify(t, svc, 2*time.Second)
 
 	path, ok := svc.Dequeue()
 	if !ok {
@@ -55,9 +67,8 @@ func TestFolderWatcherServiceDetectsNewFiles(t *testing.T) {
 		t.Fatalf("expected queued path %s, got %s", testFile, path)
 	}
 
-	// Queue should be empty now
-	if svc.QueueLen() != 0 {
-		t.Fatalf("expected empty queue, got %d items", svc.QueueLen())
+	if _, ok := svc.Dequeue(); ok {
+		t.Fatal("expected empty queue after single dequeue")
 	}
 }
 
@@ -68,7 +79,6 @@ func TestFolderWatcherServiceDetectsModifiedFiles(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Pre-create a file
 	testFile := filepath.Join(tmpDir, "existing.txt")
 	if err := os.WriteFile(testFile, []byte("initial"), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
@@ -89,18 +99,13 @@ func TestFolderWatcherServiceDetectsModifiedFiles(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Modify the existing file
 	if err := os.WriteFile(testFile, []byte("modified content"), 0644); err != nil {
 		t.Fatalf("failed to modify test file: %v", err)
 	}
 
-	select {
-	case <-svc.Notify():
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for watcher notification on modification")
-	}
+	waitNotify(t, svc, 2*time.Second)
 
-	files := svc.DequeueAll()
+	files := drainQueue(svc)
 	if len(files) == 0 {
 		t.Fatal("expected queued files from modification, got none")
 	}
@@ -150,11 +155,7 @@ func TestFolderWatcherServiceDetectsNestedCreate(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	select {
-	case <-svc.Notify():
-	case <-time.After(3 * time.Second):
-		t.Fatal("timed out waiting for nested file notification")
-	}
+	waitNotify(t, svc, 3*time.Second)
 
 	path, ok := svc.Dequeue()
 	if !ok {
@@ -193,17 +194,14 @@ func TestFolderWatcherServiceIgnoresDirectories(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Create a subdirectory — should NOT be queued
 	subDir := filepath.Join(tmpDir, "subdir")
 	if err := os.Mkdir(subDir, 0755); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 
-	// Give events a moment to process
 	time.Sleep(200 * time.Millisecond)
 
-	if svc.QueueLen() != 0 {
-		files := svc.DequeueAll()
+	if files := drainQueue(svc); len(files) != 0 {
 		t.Fatalf("expected no queued files for directory creation, got: %v", files)
 	}
 }

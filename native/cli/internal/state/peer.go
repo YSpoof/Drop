@@ -20,11 +20,12 @@ func (r *RemotePeerImpl) GetDisplayName() string {
 
 // PeerState manages the connection state with the remote peer.
 type PeerState struct {
-	mu        sync.Mutex
-	status    ConnectionStatus
-	role      Role
-	pin       string
-	remote    RemotePeer
+	mu     sync.Mutex
+	status ConnectionStatus
+	role   Role
+	pin    string
+	remote RemotePeer
+	viaLan bool
 }
 
 // NewPeerState creates a new PeerState in idle status.
@@ -93,6 +94,20 @@ func (p *PeerState) SetRemotePeer(remote RemotePeer) {
 	p.remote = remote
 }
 
+// GetViaLan reports whether the current pairing was accepted as LAN.
+func (p *PeerState) GetViaLan() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.viaLan
+}
+
+// SetViaLan records whether the current pairing is LAN (signaling lan flag).
+func (p *PeerState) SetViaLan(viaLan bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.viaLan = viaLan
+}
+
 // Clear resets the peer state to idle.
 func (p *PeerState) Clear() {
 	p.mu.Lock()
@@ -101,6 +116,7 @@ func (p *PeerState) Clear() {
 	p.role = RoleNone
 	p.pin = ""
 	p.remote = nil
+	p.viaLan = false
 }
 
 // RemotePeer interface defines the remote peer information.

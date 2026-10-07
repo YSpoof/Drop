@@ -8,6 +8,8 @@ import (
 type SignalingPeerInfo struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"displayName,omitempty"`
+	// Lan is true when signaling reports same-public-IP pairing (LAN path).
+	Lan bool `json:"lan,omitempty"`
 }
 
 // SignalingEventHandler handles asynchronous callbacks from the signaling connection.

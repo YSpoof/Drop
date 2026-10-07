@@ -67,6 +67,7 @@ func TestSignalingMessageMarshaling(t *testing.T) {
 			PeerID:      "peer-789",
 			DisplayName: "JoinerNode",
 		},
+		Lan: true,
 	}
 	data, err = json.Marshal(peerJoining)
 	if err != nil {
@@ -76,8 +77,17 @@ func TestSignalingMessageMarshaling(t *testing.T) {
 	if err := json.Unmarshal(data, &decodedJoining); err != nil {
 		t.Fatalf("failed to unmarshal peer-joining: %v", err)
 	}
-	if decodedJoining.Requester.PeerID != "peer-789" || decodedJoining.Requester.DisplayName != "JoinerNode" {
+	if decodedJoining.Requester.PeerID != "peer-789" || decodedJoining.Requester.DisplayName != "JoinerNode" || !decodedJoining.Lan {
 		t.Fatalf("unexpected peer joining: %+v", decodedJoining)
+	}
+
+	// 4b. PeerJoining missing lan → false
+	var missingLan PeerJoiningMessage
+	if err := json.Unmarshal([]byte(`{"type":"peer-joining","requester":{"peerId":"p1"}}`), &missingLan); err != nil {
+		t.Fatalf("unmarshal missing lan: %v", err)
+	}
+	if missingLan.Lan {
+		t.Fatal("missing lan must decode as false")
 	}
 
 	// 5. JoinAccepted
@@ -87,6 +97,7 @@ func TestSignalingMessageMarshaling(t *testing.T) {
 			PeerID:      "peer-host",
 			DisplayName: "HostNode",
 		},
+		Lan: true,
 	}
 	data, err = json.Marshal(joinAccepted)
 	if err != nil {
@@ -96,8 +107,17 @@ func TestSignalingMessageMarshaling(t *testing.T) {
 	if err := json.Unmarshal(data, &decodedAccepted); err != nil {
 		t.Fatalf("failed to unmarshal join-accepted: %v", err)
 	}
-	if decodedAccepted.Host.PeerID != "peer-host" {
+	if decodedAccepted.Host.PeerID != "peer-host" || !decodedAccepted.Lan {
 		t.Fatalf("unexpected join accepted: %+v", decodedAccepted)
+	}
+
+	// 5b. JoinAccepted missing lan → false
+	var missingLanAccepted JoinAcceptedMessage
+	if err := json.Unmarshal([]byte(`{"type":"join-accepted","host":{"peerId":"h1"}}`), &missingLanAccepted); err != nil {
+		t.Fatalf("unmarshal missing lan join-accepted: %v", err)
+	}
+	if missingLanAccepted.Lan {
+		t.Fatal("missing lan on join-accepted must decode as false")
 	}
 
 	// 6. JoinRejected

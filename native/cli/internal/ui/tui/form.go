@@ -51,7 +51,7 @@ func RunForm(defaultDeviceName, defaultDownloadDir string) (*FormResult, error) 
 				).
 				Value(&modeStr),
 		),
-	)
+	).WithTheme(SharedHuhTheme())
 
 	if err := modeForm.Run(); err != nil {
 		return nil, fmt.Errorf(text.ErrModeSelection, err)
@@ -68,7 +68,7 @@ func RunForm(defaultDeviceName, defaultDownloadDir string) (*FormResult, error) 
 					Value(&result.PIN).
 					Validate(ValidatePIN),
 			),
-		)
+		).WithTheme(SharedHuhTheme())
 
 		if err := pinForm.Run(); err != nil {
 			return nil, fmt.Errorf(text.ErrPINEntry, err)
@@ -86,7 +86,7 @@ func RunForm(defaultDeviceName, defaultDownloadDir string) (*FormResult, error) 
 				Value(&result.DownloadDir).
 				Validate(validateDir),
 		),
-	)
+	).WithTheme(SharedHuhTheme())
 
 	if err := settingsForm.Run(); err != nil {
 		return nil, fmt.Errorf(text.ErrSettingsEntry, err)
@@ -148,7 +148,7 @@ func RunConfigMenu(settings *state.Settings) error {
 				Title(text.ResetTransferStats).
 				Value(&resetStats),
 		),
-	)
+	).WithTheme(SharedHuhTheme())
 
 	if err := form.Run(); err != nil {
 		return fmt.Errorf(text.ErrConfigMenu, err)
@@ -163,7 +163,7 @@ func RunConfigMenu(settings *state.Settings) error {
 			huh.NewGroup(
 				huh.NewNote().Title(status),
 			),
-		)
+		).WithTheme(SharedHuhTheme())
 		_ = note.Run()
 	}
 

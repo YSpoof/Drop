@@ -30,6 +30,7 @@ type FileTransfer struct {
 	Name             string            `json:"name"`
 	Size             int64             `json:"size"`
 	Mime             string            `json:"mime"`
+	Hash             string            `json:"hash,omitempty"` // Drop identity hash
 	Direction        TransferDirection `json:"direction"`
 	Status           TransferStatus    `json:"status"`
 	TransferredBytes int64             `json:"transferredBytes"`
@@ -77,12 +78,42 @@ func LoadTransferStatsFromConfig() TransferStats {
 }
 
 // AddTransfer adds or updates a file transfer entry.
+// For receives with a non-empty identity hash, prior non-completed receive rows
+// for that hash are removed and the new row is inserted at the first replaced position.
 func (ts *TransferState) AddTransfer(t *FileTransfer) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
+	insertAt := -1
+	if t.Direction == DirectionReceive && t.Hash != "" {
+		newOrder := make([]string, 0, len(ts.order))
+		for _, id := range ts.order {
+			existing, ok := ts.transfers[id]
+			if !ok {
+				continue
+			}
+			sameIdentity := id != t.ID &&
+				existing.Direction == DirectionReceive &&
+				existing.Hash == t.Hash &&
+				existing.Status != TransferCompleted
+			if sameIdentity {
+				if insertAt < 0 {
+					insertAt = len(newOrder)
+				}
+				delete(ts.transfers, id)
+				continue
+			}
+			newOrder = append(newOrder, id)
+		}
+		ts.order = newOrder
+	}
+
 	if _, exists := ts.transfers[t.ID]; !exists {
-		ts.order = append(ts.order, t.ID)
+		if insertAt >= 0 && insertAt <= len(ts.order) {
+			ts.order = append(ts.order[:insertAt], append([]string{t.ID}, ts.order[insertAt:]...)...)
+		} else {
+			ts.order = append(ts.order, t.ID)
+		}
 	}
 	ts.transfers[t.ID] = t
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func TestConfirmModelFirstCtrlCStaysOpen(t *testing.T) {
-	m := NewConfirmModel()
+	m := ConfirmModel{}
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	cm := next.(ConfirmModel)
 	if cm.Done() {

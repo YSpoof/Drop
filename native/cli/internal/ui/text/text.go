@@ -58,30 +58,39 @@ const (
 	StatusConnected        = "Conectado"
 	StatusDisconnected     = "Desconectado"
 	StatusFailed           = "Falhou"
-	StatusWaitingReconnect = "aguardando reconexão"
-	ConnectedTo            = "Conectado a: %s"
+	StatusWaitingReconnect = "Aguardando reconexão"
+	ConnectedTo            = "Peer: %s"
 	PINLabel               = "PIN: %s"
+	LabelLAN = "LAN"
+)
+
+// Transfer status reasons (TUI chrome).
+const (
+	PeerLost = "conexão perdida"
 )
 
 // Inbox chrome.
 const (
-	InboxTitle       = "DropCli — Caixa de entrada"
-	CopyPINHint      = "c copiar PIN  C copiar link de compartilhamento"
-	PendingOffers    = "Ofertas pendentes"
-	PendingNone      = "  (nenhuma — aguardando o peer anunciar arquivos)"
-	Transfers        = "Transferências"
-	TransfersNone    = "  (nenhuma ainda)"
-	InboxHelp        = "↑/↓ mover  espaço marcar  a todos  d baixar  r remover  c PIN  C link  q sair"
-	NothingSelected  = "Nada selecionado"
-	DownloadFailed   = "Falha ao baixar: %v"
+	InboxTitle      = "DropCli — Caixa de entrada"
+	CopyPINHint     = "c copiar PIN  C copiar link de compartilhamento"
+	PendingOffers   = "Ofertas pendentes"
+	PendingNone     = "Nenhuma oferta — aguardando o peer anunciar arquivos"
+	Transfers       = "Transferências"
+	TransfersNone   = "Nenhuma transferência ainda"
+	InboxHelp       = "↑/↓ mover  enter pasta  esc voltar  espaço marcar  a todos  d baixar  r remover  f buscar  c PIN  C link  q sair"
+	InboxSearchHelp = "digite para filtrar  ↑/↓ resultados  enter confirmar  esc cancelar"
+	SearchPrompt    = "Buscar: %s"
+	ScrollHint      = "%d–%d / %d"
+	NothingSelected = "Nada selecionado"
+	DownloadFailed  = "Falha ao baixar: %v"
 	DownloadingNamed = "Baixando %s…"
-	RemoveFailed     = "Falha ao remover: %v"
-	RemovedNamed     = "Removido %s"
-	NFiles           = "%d arquivos"
-	CopyPINFailed    = "Falha ao copiar PIN: %v"
-	PINCopied        = "PIN copiado"
-	CopyLinkFailed   = "Falha ao copiar link: %v"
-	ShareLinkCopied  = "Link de compartilhamento copiado"
+	RemoveFailed    = "Falha ao remover: %v"
+	RemovedNamed    = "Removido %s"
+	NFiles          = "%d arquivos"
+	CopyPINFailed   = "Falha ao copiar PIN: %v"
+	PINCopied       = "PIN copiado"
+	CopyLinkFailed  = "Falha ao copiar link: %v"
+	ShareLinkCopied = "Link de compartilhamento copiado"
 )
 
 // Flag help / usage (flag names stay English).
@@ -115,7 +124,7 @@ const (
 	PressCopyHint           = "Pressione c para copiar o PIN, C para copiar o link\n"
 	PeerJoined              = "Peer entrou: %s\n"
 	JoinAccepted            = "Entrada aceita por: %s\n"
-	WaitingReconnect        = "aguardando reconexão...\n"
+	WaitingReconnect        = "Aguardando reconexão...\n"
 	TransferringFile        = "Transferindo arquivo: %s\n"
 	TransferComplete        = "Transferência concluída: %s\n"
 	WatchingDir             = "Observando diretório %s. Pressione Ctrl+C para sair.\n"

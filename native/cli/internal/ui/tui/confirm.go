@@ -47,11 +47,6 @@ type ConfirmModel struct {
 	result  ConfirmResult
 }
 
-// NewConfirmModel returns an inactive confirm model (first Ctrl+C will show it).
-func NewConfirmModel() ConfirmModel {
-	return ConfirmModel{}
-}
-
 // NewConfirmOverlay returns a model already showing the overlay (first interrupt already consumed).
 func NewConfirmOverlay() ConfirmModel {
 	return ConfirmModel{visible: true}
@@ -112,9 +107,6 @@ func (m ConfirmModel) Visible() bool {
 func (m ConfirmModel) Done() bool {
 	return m.done
 }
-
-var confirmTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
-var confirmHintStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
 // ConfirmOverlayView renders the full-viewport confirm copy centered in the given size.
 func ConfirmOverlayView(width, height int) string {

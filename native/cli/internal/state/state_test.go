@@ -58,6 +58,19 @@ func TestPeerState(t *testing.T) {
 		t.Fatalf("unexpected remote peer: %+v", remote)
 	}
 
+	if p.GetViaLan() {
+		t.Fatal("viaLan must default false")
+	}
+	p.SetViaLan(true)
+	if !p.GetViaLan() {
+		t.Fatal("expected viaLan true after SetViaLan(true)")
+	}
+	p.SetViaLan(false)
+	if p.GetViaLan() {
+		t.Fatal("expected viaLan false after SetViaLan(false)")
+	}
+	p.SetViaLan(true)
+
 	p.Clear()
 	if p.GetStatus() != StatusIdle {
 		t.Fatalf("expected StatusIdle after clear, got %v", p.GetStatus())
@@ -67,6 +80,9 @@ func TestPeerState(t *testing.T) {
 	}
 	if _, ok := p.GetRemotePeer(); ok {
 		t.Fatal("expected no remote peer after clear")
+	}
+	if p.GetViaLan() {
+		t.Fatal("expected viaLan cleared after Clear")
 	}
 }
 
@@ -113,6 +129,56 @@ func TestTransferState(t *testing.T) {
 	all := ts.GetAll()
 	if len(all) != 1 || all[0].Status != TransferCompleted {
 		t.Fatalf("unexpected all transfers: %+v", all)
+	}
+}
+
+func TestTransferStateReplaceReceiveByHash(t *testing.T) {
+	ts := NewTransferState()
+	hash := "abc123identity"
+
+	ts.AddTransfer(&FileTransfer{
+		ID:        "other",
+		Name:      "keep.txt",
+		Direction: DirectionReceive,
+		Status:    TransferCompleted,
+		Hash:      "other-hash",
+	})
+	ts.AddTransfer(&FileTransfer{
+		ID:        "file-old",
+		Name:      "resume.bin",
+		Direction: DirectionReceive,
+		Status:    TransferFailed,
+		Hash:      hash,
+		Error:     "conexão perdida",
+	})
+	ts.AddTransfer(&FileTransfer{
+		ID:        "tail",
+		Name:      "after.txt",
+		Direction: DirectionSend,
+		Status:    TransferPending,
+	})
+
+	ts.AddTransfer(&FileTransfer{
+		ID:        "file-new",
+		Name:      "resume.bin",
+		Direction: DirectionReceive,
+		Status:    TransferPending,
+		Hash:      hash,
+	})
+
+	all := ts.GetAll()
+	if len(all) != 3 {
+		t.Fatalf("expected 3 rows after replace, got %d: %+v", len(all), all)
+	}
+	if all[0].ID != "other" || all[1].ID != "file-new" || all[2].ID != "tail" {
+		t.Fatalf("unexpected order after replace: %+v", all)
+	}
+	if _, ok := ts.GetTransfer("file-old"); ok {
+		t.Fatal("expected old failed row removed")
+	}
+	got, ok := ts.GetTransfer("file-new")
+	if !ok || got.Hash != hash || got.Status != TransferPending {
+		t.Fatalf("unexpected new transfer: %+v", got)
 	}
 }
 

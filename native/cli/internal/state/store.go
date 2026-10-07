@@ -10,10 +10,9 @@ import (
 // Store manages the persistent configuration file (.dropConfig) in the user's home directory.
 // It provides atomic read/write operations with error handling for missing or corrupt files.
 type Store struct {
-	mu        sync.Mutex
+	mu         sync.Mutex
 	configPath string
 	tmpPath    string
-	isTest     bool
 }
 
 // NewStore creates a new Store instance with the default config file location.
@@ -28,15 +27,6 @@ func NewStore() (*Store, error) {
 		tmpPath:    configPath + ".tmp",
 	}
 	return s, nil
-}
-
-// NewTestStore creates a store for testing, avoiding real home directory.
-func NewTestStore(path string) *Store {
-	return &Store{
-		configPath: path,
-		tmpPath:    path + ".tmp",
-		isTest:     true,
-	}
 }
 
 // Load reads the config from disk, returning an empty config on error/missing.

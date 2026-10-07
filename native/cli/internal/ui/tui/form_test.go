@@ -43,15 +43,10 @@ func TestFormResult_Modes(t *testing.T) {
 }
 
 func TestResetStatsConfirmationPath(t *testing.T) {
-	// Use a temp file for store to avoid permission issues
-	tmpFile, err := os.CreateTemp("", "dropConfigTest")
-	if err != nil {
-		t.Fatalf("failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
+	t.Setenv("HOME", t.TempDir())
+	_ = os.Unsetenv(state.EnvDropWSURL)
 
 	settings := state.NewSettings()
-	settings.WithStore(state.NewTestStore(tmpFile.Name()))
 
 	// Set initial stats
 	stats := &state.TransferStats{

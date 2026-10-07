@@ -6,12 +6,19 @@ import (
 	"testing"
 )
 
+func newTestStore(path string) *Store {
+	return &Store{
+		configPath: path,
+		tmpPath:    path + ".tmp",
+	}
+}
+
 func testSettings(t *testing.T) *Settings {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	path := filepath.Join(t.TempDir(), ".dropConfig")
 	s := NewSettings()
-	s.WithStore(NewTestStore(path))
+	s.WithStore(newTestStore(path))
 	return s
 }
 
@@ -206,7 +213,7 @@ func TestVisitRoundTrip(t *testing.T) {
 
 	path := filepath.Join(home, ConfigFile)
 	s := NewSettings()
-	s.WithStore(NewTestStore(path))
+	s.WithStore(newTestStore(path))
 
 	if _, err := s.RecordVisit(); err != nil {
 		t.Fatalf("RecordVisit: %v", err)
@@ -216,7 +223,7 @@ func TestVisitRoundTrip(t *testing.T) {
 	}
 
 	s2 := NewSettings()
-	s2.WithStore(NewTestStore(path))
+	s2.WithStore(newTestStore(path))
 	cfg, err := s2.LoadConfig()
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)

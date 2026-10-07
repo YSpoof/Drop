@@ -208,6 +208,7 @@ func (c *Client) readLoop() {
 				h.OnPeerJoining(ports.SignalingPeerInfo{
 					ID:          msg.Requester.PeerID,
 					DisplayName: msg.Requester.DisplayName,
+					Lan:         msg.Lan,
 				})
 			}
 		case TypeJoinAccepted:
@@ -216,6 +217,7 @@ func (c *Client) readLoop() {
 				h.OnJoinAccepted(ports.SignalingPeerInfo{
 					ID:          msg.Host.PeerID,
 					DisplayName: msg.Host.DisplayName,
+					Lan:         msg.Lan,
 				})
 			}
 		case TypeJoinRejected:

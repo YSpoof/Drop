@@ -8,8 +8,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Host PIN wait: raw 0x03 → RunConfirmExit. Outcomes match ConfirmModel.
-// Peer-start still only stops keys via hostKeysCancel (separate from session cancel).
+// Host PIN wait: raw 0x03 → hostConfirmExit (RunConfirmExit). Outcomes match ConfirmModel.
+// Peer-start stops keys via hostKeysCancel + done barrier (separate from session cancel).
+// Restore-once after confirm is covered by TestHostCopyKeysDoneAfterConfirmExitRestoresOnce.
 
 func TestHostInterruptConfirmExitCallsOnConfirm(t *testing.T) {
 	called := false

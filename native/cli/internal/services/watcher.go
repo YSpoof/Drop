@@ -66,16 +66,6 @@ func (s *FolderWatcherService) Watch(dir string) error {
 	return nil
 }
 
-// Dir returns the first absolute watch root, or empty if none.
-func (s *FolderWatcherService) Dir() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.roots) == 0 {
-		return ""
-	}
-	return s.roots[0]
-}
-
 // AnnounceName returns the Drop-compatible meta.name for a queued absolute path.
 func (s *FolderWatcherService) AnnounceName(absPath string) string {
 	s.mu.Lock()
@@ -198,26 +188,6 @@ func (s *FolderWatcherService) Dequeue() (string, bool) {
 	path := s.queue[0]
 	s.queue = s.queue[1:]
 	return path, true
-}
-
-// DequeueAll removes and returns all queued file paths.
-func (s *FolderWatcherService) DequeueAll() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if len(s.queue) == 0 {
-		return nil
-	}
-	result := s.queue
-	s.queue = make([]string, 0)
-	return result
-}
-
-// QueueLen returns the number of queued file paths.
-func (s *FolderWatcherService) QueueLen() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.queue)
 }
 
 // Notify returns a channel that is signaled when new items are available.

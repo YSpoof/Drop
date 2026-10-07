@@ -45,7 +45,7 @@ func RunDonationReminder(settings *state.Settings) error {
 					).
 					Value(&action),
 			),
-		)
+		).WithTheme(SharedHuhTheme())
 
 		if err := form.Run(); err != nil {
 			return fmt.Errorf(text.ErrDonationReminder, err)

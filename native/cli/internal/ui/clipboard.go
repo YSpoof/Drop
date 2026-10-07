@@ -1,8 +1,8 @@
 package ui
 
-import "github.com/atotto/clipboard"
+import "dropcli/libs/clip"
 
 // CopyToClipboard writes text to the system clipboard.
 func CopyToClipboard(text string) error {
-	return clipboard.WriteAll(text)
+	return clip.Write(text)
 }
