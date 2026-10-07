@@ -18,9 +18,11 @@ const (
 // JSON tags are required for serialization.
 // Auto-download is session-scoped only (not persisted); legacy autoDownload JSON is ignored on load.
 type Config struct {
-	DeviceName    string        `json:"deviceName"`
-	DownloadDir   string        `json:"downloadDir"`
-	TransferStats TransferStats `json:"transferStats"`
+	DeviceName             string        `json:"deviceName"`
+	DownloadDir            string        `json:"downloadDir"`
+	TransferStats          TransferStats `json:"transferStats"`
+	VisitCount             int           `json:"visitCount"`
+	DonationReminderAnchor int           `json:"donationReminderAnchor"`
 }
 
 // TransferStats tracks lifetime upload and download totals.
@@ -40,7 +42,6 @@ func (c *Config) IsEmpty() bool {
 func (ts *TransferStats) IsZero() bool {
 	return ts.UploadBytes == 0 && ts.DownloadBytes == 0 && ts.UploadFiles == 0 && ts.DownloadFiles == 0
 }
-
 
 // NormalizeWebSocketURL ensures the URL uses WebSocket schemes (ws:// or wss://).
 func NormalizeWebSocketURL(raw string) string {
@@ -81,8 +82,8 @@ const (
 type Role string
 
 const (
-	RoleNone  Role = "none"
-	RoleHost  Role = "host"
+	RoleNone   Role = "none"
+	RoleHost   Role = "host"
 	RoleJoiner Role = "joiner"
 )
 
@@ -97,7 +98,7 @@ type Settings struct {
 	configPath string
 	loadedCfg  *Config
 
-	store   *Store
+	store *Store
 }
 
 // WithStore allows injecting a custom store for testing.
@@ -237,7 +238,8 @@ func (s *Settings) LoadConfig() (*Config, error) {
 }
 
 // SaveConfig atomically writes the current settings to disk.
-// Preserves existing TransferStats so a settings save does not wipe lifetime totals.
+// Preserves existing TransferStats and donation visit fields so a settings
+// save does not wipe lifetime totals or reminder progress.
 func (s *Settings) SaveConfig() error {
 	if s.store == nil {
 		return errors.New("store not initialized")
@@ -250,9 +252,11 @@ func (s *Settings) SaveConfig() error {
 
 	s.mu.RLock()
 	cfg := &Config{
-		DeviceName:    s.deviceName,
-		DownloadDir:   s.downloadDir,
-		TransferStats: existing.TransferStats,
+		DeviceName:             s.deviceName,
+		DownloadDir:            s.downloadDir,
+		TransferStats:          existing.TransferStats,
+		VisitCount:             existing.VisitCount,
+		DonationReminderAnchor: existing.DonationReminderAnchor,
 	}
 	s.mu.RUnlock()
 

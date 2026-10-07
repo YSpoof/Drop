@@ -53,6 +53,9 @@ func run(ctx context.Context, args []string) error {
 		settings.SetDownloadDir(cfg.OutputDir)
 	}
 
+	// Count every process start (quick and interactive). Reminder UI only in interactive mode menu.
+	due, _ := settings.RecordVisit()
+
 	defer func() {
 		_ = settings.SaveConfig()
 	}()
@@ -60,7 +63,7 @@ func run(ctx context.Context, args []string) error {
 	if cfg.Quick {
 		return runQuick(ctx, cfg, settings)
 	}
-	return runInteractive(ctx, cfg, settings)
+	return runInteractive(ctx, cfg, settings, due)
 }
 
 // runQuick executes the non-interactive headless mode.
@@ -84,7 +87,8 @@ func runQuick(ctx context.Context, cfg *quick.QuickConfig, settings *state.Setti
 
 // runInteractive starts the TUI form flow then runs the connected session.
 // When -s/-c already select a role, skips mode/PIN prompts. Paths are retained for send.
-func runInteractive(ctx context.Context, cfg *quick.QuickConfig, settings *state.Settings) error {
+// donationDue gates the reminder prompt; only shown when the mode menu will run.
+func runInteractive(ctx context.Context, cfg *quick.QuickConfig, settings *state.Settings, donationDue bool) error {
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
 		hostname = "dropcli-node"
@@ -105,6 +109,12 @@ func runInteractive(ctx context.Context, cfg *quick.QuickConfig, settings *state
 			}
 		}
 	} else {
+		if donationDue {
+			if err := tui.RunDonationReminder(settings); err != nil {
+				return err
+			}
+		}
+
 		// Form phase: immediate SIGINT cancel (not a session wait surface).
 		formCtx, stopForm := signal.NotifyContext(ctx, syscall.SIGINT)
 		result, err := tui.RunForm(deviceName, settings.GetDownloadDir())

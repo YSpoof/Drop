@@ -35,6 +35,20 @@ const (
 	ErrSettingsNil      = "configurações não podem ser nulas"
 )
 
+// Donation reminder / Configurações PIX block (match web DonationReminderModal / InfoModal).
+const (
+	DonationTitle       = "Gostou do Drop?"
+	DonationBody        = "O Drop é gratuito. Um PIX ajuda a manter o projeto."
+	DonationPIXHint     = "Chave PIX aleatória — selecione para copiar:"
+	DonationCopyPIX     = "Copiar chave PIX"
+	DonationClose       = "Fechar"
+	DonationPIXLabel    = "Chave PIX"
+	PIXCopied           = "Chave PIX copiada"
+	CopyPIXFailed       = "Falha ao copiar chave PIX: %v"
+	ErrDonationReminder = "lembrete de doação falhou: %w"
+	ErrDismissDonation  = "falha ao dispensar lembrete de doação: %w"
+)
+
 // Connection / role status (CLI chrome).
 const (
 	RoleHostLabel          = "Host"

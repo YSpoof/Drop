@@ -94,7 +94,7 @@ The CLI SHALL start an interactive terminal prompt when launched without `-q` an
 
 #### Scenario: User opens config menu
 - **WHEN** user launches the CLI without flags and selects `Configurações` (or the equivalent settings entry when offered)
-- **THEN** the CLI presents a settings form with the current persisted device name, download directory, and a reset-stats option
+- **THEN** the CLI presents a settings form with the current persisted device name, download directory, a reset-stats option, and the project PIX key with a copy control
 - **AND** the form does not include an auto-download control
 
 ### Requirement: Interactive PIN input

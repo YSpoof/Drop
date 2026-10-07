@@ -117,7 +117,8 @@ func validateDir(input string) error {
 }
 
 // RunConfigMenu presents an interactive form to view and modify settings (*state.Settings)
-// and offers a confirmation prompt to reset transfer statistics.
+// and offers a confirmation prompt to reset transfer statistics plus a PIX copy control.
+// Opening or copying PIX from settings does not dismiss a due donation reminder.
 func RunConfigMenu(settings *state.Settings) error {
 	if settings == nil {
 		return errors.New(text.ErrSettingsNil)
@@ -126,6 +127,7 @@ func RunConfigMenu(settings *state.Settings) error {
 	deviceName := settings.GetDeviceName()
 	downloadDir := settings.GetDownloadDir()
 	var resetStats bool
+	var copyPIX bool
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -136,6 +138,12 @@ func RunConfigMenu(settings *state.Settings) error {
 				Title(text.DownloadDir).
 				Value(&downloadDir).
 				Validate(validateDir),
+			huh.NewNote().
+				Title(text.DonationPIXLabel).
+				Description(state.DonationPixKey+"\n"+text.DonationPIXHint),
+			huh.NewConfirm().
+				Title(text.DonationCopyPIX).
+				Value(&copyPIX),
 			huh.NewConfirm().
 				Title(text.ResetTransferStats).
 				Value(&resetStats),
@@ -148,6 +156,16 @@ func RunConfigMenu(settings *state.Settings) error {
 
 	settings.SetDeviceName(deviceName)
 	settings.SetDownloadDir(downloadDir)
+
+	if copyPIX {
+		status, _ := CopyDonationPIX()
+		note := huh.NewForm(
+			huh.NewGroup(
+				huh.NewNote().Title(status),
+			),
+		)
+		_ = note.Run()
+	}
 
 	if resetStats {
 		if err := settings.ResetStats(); err != nil {
