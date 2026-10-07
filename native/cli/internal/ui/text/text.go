@@ -122,6 +122,11 @@ const (
 	FailedAnnounceMode      = "Falha ao anunciar download-mode: %v\n"
 	AnnouncedDownloadMode   = "Anunciado download-mode manual=%v\n"
 	ErrPrefix               = "erro:"
+
+	// Confirm-to-exit overlay (alt-screen).
+	ConfirmExitTitle    = "Sair da sessão?"
+	ConfirmExitHint     = "Pressione Ctrl+C novamente para sair"
+	ConfirmContinueHint = "Pressione ESC para continuar"
 )
 
 // Fatal / returned errors shown to the operator.

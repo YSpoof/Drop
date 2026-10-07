@@ -37,12 +37,15 @@ type InboxModel struct {
 	peerID        string
 	wsURL         string
 
-	cursor   int
-	selected map[string]bool
-	status   string
-	quitting bool
-	bye      bool
-	err      error
+	cursor     int
+	selected   map[string]bool
+	status     string
+	quitting   bool
+	bye        bool
+	err        error
+	confirming bool
+	width      int
+	height     int
 }
 
 // NewInboxModel builds an inbox session model.
@@ -79,9 +82,30 @@ func InboxError(err error) tea.Msg { return inboxErrMsg{err: err} }
 
 func (m InboxModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "ctrl+c":
+				setConfirmShowing(false)
+				m.confirming = false
+				m.quitting = true
+				return m, tea.Quit
+			case "esc":
+				m.confirming = false
+				setConfirmShowing(false)
+				return m, nil
+			}
+			return m, nil
+		}
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
+			m.confirming = true
+			setConfirmShowing(true)
+			return m, nil
+		case "q":
 			m.quitting = true
 			return m, tea.Quit
 		case "up", "k":
@@ -174,10 +198,18 @@ func (m InboxModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pruneSelection()
 		m.clampCursor()
 	case inboxByeMsg:
+		if m.confirming {
+			setConfirmShowing(false)
+			m.confirming = false
+		}
 		m.bye = true
 		m.quitting = true
 		return m, tea.Quit
 	case inboxErrMsg:
+		if m.confirming {
+			setConfirmShowing(false)
+			m.confirming = false
+		}
 		m.err = msg.err
 		m.quitting = true
 		return m, tea.Quit
@@ -250,6 +282,9 @@ func (m *InboxModel) clampCursor() {
 func (m InboxModel) View() string {
 	if m.quitting {
 		return ""
+	}
+	if m.confirming {
+		return ConfirmOverlayView(m.width, m.height)
 	}
 
 	var sb strings.Builder

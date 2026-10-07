@@ -18,13 +18,25 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	// SIGTERM always stops the process. SIGINT is handled inside Runner wait
+	// surfaces via the confirm-to-exit overlay (TTY) so a first Ctrl+C does not
+	// cancel the run context.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	defer stop()
 
-	if err := run(ctx, os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, text.ErrPrefix, err)
-		os.Exit(1)
+	if code := exitFromRun(run(ctx, os.Args[1:])); code != 0 {
+		os.Exit(code)
 	}
+}
+
+// exitFromRun maps run errors to process exit codes.
+// Intentional user cancel (context.Canceled) is a clean silent exit 0.
+func exitFromRun(err error) int {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return 0
+	}
+	fmt.Fprintln(os.Stderr, text.ErrPrefix, err)
+	return 1
 }
 
 func run(ctx context.Context, args []string) error {
@@ -93,8 +105,14 @@ func runInteractive(ctx context.Context, cfg *quick.QuickConfig, settings *state
 			}
 		}
 	} else {
+		// Form phase: immediate SIGINT cancel (not a session wait surface).
+		formCtx, stopForm := signal.NotifyContext(ctx, syscall.SIGINT)
 		result, err := tui.RunForm(deviceName, settings.GetDownloadDir())
+		stopForm()
 		if err != nil {
+			if formCtx.Err() != nil {
+				return formCtx.Err()
+			}
 			return fmt.Errorf(text.ErrTUIForm, err)
 		}
 

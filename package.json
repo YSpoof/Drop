@@ -62,7 +62,7 @@
     "vite-plugin-sveltekit-ws": "^2.1.1"
   },
   "lint-staged": {
-    "*.{json,ts,js,svelte,go}": "oxfmt"
+    "*.{json,ts,js,svelte}": "oxfmt"
   },
   "packageManager": "pnpm@12.8.1"
 }

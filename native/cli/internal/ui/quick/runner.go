@@ -305,6 +305,12 @@ func (r *Runner) Run(ctx context.Context, cfg *QuickConfig) error {
 		return err
 	}
 
+	// Session cancel is confirm-gated on TTY (SIGINT overlay / raw Ctrl+C).
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stopSig := tui.WatchSIGINTConfirm(ctx, cancel)
+	defer stopSig()
+
 	if cfg.OutputDir != "" {
 		r.settings.SetDownloadDir(cfg.OutputDir)
 	}
@@ -394,7 +400,7 @@ func (r *Runner) Run(ctx context.Context, cfg *QuickConfig) error {
 	hostKeysCtx, hostKeysCancel := context.WithCancel(ctx)
 	defer hostKeysCancel()
 	if cfg.Host {
-		go r.hostCopyKeys(hostKeysCtx)
+		go r.hostCopyKeys(hostKeysCtx, cancel)
 	}
 	select {
 	case <-ctx.Done():
@@ -835,6 +841,9 @@ func (r *Runner) runReceiveInbox(
 		r.deviceState.GetPeerID(),
 		r.settings.GetWSURL(),
 	)
+	// Inbox owns Ctrl+C confirm; watcher only drains SIGINT so the process is not killed.
+	tui.SetTeaOwnsSIGINT(true)
+	defer tui.SetTeaOwnsSIGINT(false)
 	p := tea.NewProgram(model, tea.WithContext(ctx), tea.WithOutput(r.Stdout), tea.WithInput(os.Stdin))
 
 	r.downloadSvc.SetOnPendingChange(func() {
@@ -911,14 +920,15 @@ func (h *quickSignalingHandler) OnConnected() {
 
 func (h *quickSignalingHandler) OnCodeAssigned(code string) {
 	h.r.peerState.SetPIN(code)
-	fmt.Fprintf(h.r.Stdout, text.AssignedPIN, code)
+	fprintfHostWait(h.r.Stdout, text.AssignedPIN, code)
 	if h.cfg.Host {
-		fmt.Fprint(h.r.Stdout, text.PressCopyHint)
+		writeHostWait(h.r.Stdout, text.PressCopyHint)
 	}
 }
 
 func (h *quickSignalingHandler) OnPeerJoining(peer ports.SignalingPeerInfo) {
-	fmt.Fprintf(h.r.Stdout, text.PeerJoined, peer.DisplayName)
+	// May race with host raw mode — use CRLF-aware writer.
+	fprintfHostWait(h.r.Stdout, text.PeerJoined, peer.DisplayName)
 	h.startSession(peer)
 }
 

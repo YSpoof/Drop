@@ -2,7 +2,6 @@ package quick
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -10,30 +9,46 @@ import (
 
 	"dropcli/internal/ui"
 	"dropcli/internal/ui/text"
+	"dropcli/internal/ui/tui"
 
 	"golang.org/x/term"
 )
 
 // hostCopyKeys watches stdin for c/C while a host PIN is known.
 // Non-TTY stdin is a no-op (returns immediately). Safe to cancel via ctx.
-func (r *Runner) hostCopyKeys(ctx context.Context) {
-	in := os.Stdin
-	fd := int(in.Fd())
-	if !term.IsTerminal(fd) {
+// onConfirm is invoked when the user confirms exit via the Ctrl+C overlay.
+func (r *Runner) hostCopyKeys(ctx context.Context, onConfirm func()) {
+	r.hostCopyKeysFrom(ctx, os.Stdin, onConfirm)
+}
+
+func (r *Runner) hostCopyKeysFrom(ctx context.Context, in *os.File, onConfirm func()) {
+	if in == nil || !hostCopyKeysEnabled(in) {
 		return
+	}
+	fd := int(in.Fd())
+
+	enterRaw := func() (restore func(), ok bool) {
+		oldState, err := term.MakeRaw(fd)
+		if err != nil {
+			return nil, false
+		}
+		setHostRawActive(true)
+		var once sync.Once
+		return func() {
+			once.Do(func() {
+				setHostRawActive(false)
+				_ = term.Restore(fd, oldState)
+			})
+		}, true
 	}
 
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
+	restore, ok := enterRaw()
+	if !ok {
 		return
 	}
-	var restoreOnce sync.Once
-	restore := func() {
-		restoreOnce.Do(func() {
-			_ = term.Restore(fd, oldState)
-		})
-	}
-	defer restore()
+	defer func() {
+		restore()
+	}()
 
 	buf := make([]byte, 1)
 	for {
@@ -53,31 +68,48 @@ func (r *Runner) hostCopyKeys(ctx context.Context) {
 		}
 
 		pin := r.peerState.GetPIN()
-		if pin == "" {
+		if pin == "" && buf[0] != 3 {
 			continue
 		}
 
 		switch buf[0] {
 		case 'c':
+			if pin == "" {
+				continue
+			}
 			if err := ui.CopyToClipboard(pin); err != nil {
-				fmt.Fprintf(r.Stderr, text.CopyPINFailedLine, err)
+				fprintfHostWait(r.Stderr, text.CopyPINFailedLine, err)
 			} else {
-				fmt.Fprint(r.Stderr, text.PINCopiedLine)
+				writeHostWait(r.Stderr, text.PINCopiedLine)
 			}
 		case 'C':
+			if pin == "" {
+				continue
+			}
 			peerID := r.deviceState.GetPeerID()
 			if peerID == "" {
 				continue
 			}
 			link := ui.ShareURL(r.settings.GetWSURL(), peerID, pin)
 			if err := ui.CopyToClipboard(link); err != nil {
-				fmt.Fprintf(r.Stderr, text.CopyLinkFailedLine, err)
+				fprintfHostWait(r.Stderr, text.CopyLinkFailedLine, err)
 			} else {
-				fmt.Fprint(r.Stderr, text.ShareLinkCopiedLine)
+				writeHostWait(r.Stderr, text.ShareLinkCopiedLine)
 			}
-		case 3: // Ctrl+C in raw mode
+		case 3: // Ctrl+C in raw mode — confirm overlay, do not cancel yet
 			restore()
-			return
+			confirmed, err := tui.RunConfirmExit()
+			if err != nil || confirmed {
+				if onConfirm != nil {
+					onConfirm()
+				}
+				return
+			}
+			// ESC: re-enter raw and keep watching copy keys
+			restore, ok = enterRaw()
+			if !ok {
+				return
+			}
 		}
 	}
 }
