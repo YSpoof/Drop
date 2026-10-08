@@ -78,19 +78,27 @@ export function requireStreamer(): Promise<StreamerSession> {
   return promise;
 }
 
-/** Subscribes to the sidecar and asks again until it answers. Does not block UI startup. */
-export async function connectStreamer(): Promise<void> {
+/** Subscribes to the sidecar and asks again until it answers or `timeoutMs` elapses. */
+export async function connectStreamer(timeoutMs = READY_TIMEOUT_MS): Promise<void> {
   await events.on("streamerReady", (event) => {
     noteReady(event.detail);
   });
+  const deadline = Date.now() + timeoutMs;
   while (!ready) {
+    if (Date.now() >= deadline) {
+      throw new Error("File streamer is not running");
+    }
     try {
       await extensions.dispatch(EXTENSION_ID, "streamerAck", {});
     } catch {
       // Sidecar is not connected yet.
     }
     if (ready) return;
-    await wait(ACK_DELAY_MS);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error("File streamer is not running");
+    }
+    await wait(Math.min(ACK_DELAY_MS, remaining));
   }
 }
 

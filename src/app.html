@@ -70,6 +70,10 @@
 
     <script src="http://localhost:65173/__neutralino_globals.js"></script>
 
+    <link
+      rel="stylesheet"
+      href="__DROP_APP_CSS__" />
+
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="tap">
@@ -79,6 +83,25 @@
         window.__dropInstallPrompt = e;
       });
     </script>
+    <div
+      id="drop-boot-splash"
+      class="bg-base-100 fixed inset-0 z-99999 flex items-center justify-center">
+      <div class="flex flex-col items-center gap-4">
+        <div
+          class="bg-primary text-primary-content animate-bounce grid h-20 w-20 place-items-center rounded-sm">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            class="size-16"
+            aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 3.2S6 10 6 14c0 3.3 2.7 6 6 6s6-2.7 6-6c0-4-6-10.8-6-10.8m0 5.3V10c2.2 0 4 1.8 4 4c0 .8-.2 1.6-.7 2.2l-1.1-1.1c.2-.3.3-.7.3-1.1c0-1.4-1.1-2.5-2.5-2.5V13l-2.2-2.2zm-3.3 3.3l1.1 1.1c-.2.3-.3.7-.3 1.1c0 1.4 1.1 2.5 2.5 2.5V15l2.2 2.2l-2.2 2.3V18c-2.2 0-4-1.8-4-4c0-.8.2-1.6.7-2.2" />
+          </svg>
+        </div>
+        <span class="skeleton skeleton-text text-lg font-bold">Carregando...</span>
+      </div>
+    </div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

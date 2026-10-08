@@ -7,6 +7,7 @@
 build
 data
 node_modules
+openspec
 playwrite-report
 scripts
 test_results

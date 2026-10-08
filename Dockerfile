@@ -31,7 +31,9 @@ RUN npm i -g pnpm@latest
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm i --frozen-lockfile --ignore-scripts
 
-COPY . .
+# Native packaging inputs only — keep narrow so web-only edits cache this stage
+COPY neutralino.config.json ./
+COPY static/images/pwa/512.png ./static/images/pwa/512.png
 COPY --from=go-clients /src/native/extensions/compiled/ ./native/extensions/compiled/
 RUN pnpm run native:update && pnpm run native:build \
   && mkdir -p /out \

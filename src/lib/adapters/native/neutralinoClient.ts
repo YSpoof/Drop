@@ -2,12 +2,12 @@ import { init, os, resources, computer, filesystem, extensions } from "@neutrali
 
 import { connectStreamer } from "#lib/adapters/native/streamerClient.js";
 
-/** Opens the WebSocket to the framework. Native calls queue until it is ready. */
+/** Opens the framework WebSocket, extracts the streamer, and waits until it is ready (or rejects). */
 export async function startNeutralino(): Promise<void> {
   init();
 
-  // Extract extension binaries from resources and listen for streamer connection
-  await Promise.all([extractExtensionBinaries(), connectStreamer()]);
+  // Extract extension binaries from resources and wait for streamer connection
+  await Promise.all([extractExtensionBinaries(), connectStreamer(2000)]);
 }
 
 /**

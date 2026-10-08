@@ -1,5 +1,4 @@
 <script lang="ts">
-  import "./layout.css";
   import { dev } from "$app/env";
   import { updated } from "$app/state";
   import { onMount } from "svelte";
