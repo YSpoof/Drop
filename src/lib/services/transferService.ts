@@ -3,7 +3,6 @@ import { inject } from "quick-di";
 
 import { EnvironmentPort } from "#lib/ports/environment.js";
 import { FileReaderPort } from "#lib/ports/fileReader.js";
-import { DownloadService } from "#lib/services/downloadService.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
@@ -19,7 +18,6 @@ type PendingBatchCompletion = {
 
 export class TransferService {
   private readonly fileReader = inject(FileReaderPort);
-  private readonly downloads = inject(DownloadService);
   private readonly environment = inject(EnvironmentPort);
   private pendingBatchCompletions = new Map<string, PendingBatchCompletion>();
 

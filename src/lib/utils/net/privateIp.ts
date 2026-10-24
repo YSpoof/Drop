@@ -12,12 +12,6 @@ function parseIpv4(ip: string): [number, number, number, number] | null {
   return [parts[0]!, parts[1]!, parts[2]!, parts[3]!];
 }
 
-export function isPrivateIp(ip: string): boolean {
-  const parts = parseIpv4(ip);
-  if (!parts) return false;
-  return isPrivateOctet(parts[0], parts[1]);
-}
-
 export function isPublicIpv4(ip: string): boolean {
   const parts = parseIpv4(ip);
   if (!parts) return false;

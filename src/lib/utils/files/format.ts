@@ -17,12 +17,3 @@ export function formatDuration(seconds: number): string {
   const sec = Math.round(seconds % 60);
   return `${min}m ${sec}s`;
 }
-
-export function formatEta(remainingBytes: number, bytesPerSec: number): string {
-  if (bytesPerSec <= 0) return "—";
-  return formatDuration(remainingBytes / bytesPerSec);
-}
-
-export function formatPercent(progress: number): string {
-  return `${Math.round(progress * 100)}%`;
-}

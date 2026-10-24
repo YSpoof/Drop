@@ -1,8 +1,5 @@
 import type { Channel } from "fastrtc";
-import { inject } from "quick-di";
 
-import { EnvironmentPort } from "#lib/ports/environment.js";
-import { DownloadService } from "#lib/services/downloadService.js";
 import { logger } from "#lib/utils/logger.js";
 
 import { describeControlMessage, parseControlMessage, type TransferCallbacks } from "./protocol";
@@ -11,8 +8,6 @@ import { TransferSender } from "./sender";
 import { TransferSession } from "./session";
 
 export class TransferManager {
-  private readonly downloads = inject(DownloadService);
-  private readonly environment = inject(EnvironmentPort);
   private readonly session: TransferSession;
   private readonly sender: TransferSender;
   private readonly receiver: TransferReceiver;

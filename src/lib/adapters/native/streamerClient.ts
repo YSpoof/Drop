@@ -32,10 +32,6 @@ let ready: StreamerSession | null = null;
 const readyWait = Promise.withResolvers<StreamerSession>();
 const openReads = new Map<string, OpenRead>();
 
-export function streamerSession(): StreamerSession | null {
-  return ready;
-}
-
 function wait(ms: number): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, ms);

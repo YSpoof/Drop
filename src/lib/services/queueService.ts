@@ -62,7 +62,7 @@ export class QueueService {
   }
 
   /** Called by FolderWatcher when a new file appears in a watched folder. */
-  addWatchedFile(groupId: string, file: QueuedFile) {
+  addWatchedFile(_groupId: string, file: QueuedFile) {
     transferStore.appendQueue([file]);
     if (peerStore.connected) transferStore.promoteToHistory([file]);
     this.scheduleNotify();

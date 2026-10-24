@@ -26,7 +26,3 @@ export function createQueuedFiles(
   });
   return items;
 }
-
-export function totalQueueBytes(queue: QueuedFile[]): number {
-  return queue.reduce((sum, item) => sum + item.file.size, 0);
-}
