@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"dropcli/internal/state"
+	"dropnative/cli/internal/state"
 )
 
 // ShareOrigin derives the HTTP(S) origin used for Drop share links from a signaling WS URL.

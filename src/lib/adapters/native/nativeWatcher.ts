@@ -1,6 +1,6 @@
 import { inject } from "quick-di";
 
-import { onFolderWatchEvent } from "#lib/adapters/native/neutralinoWatch.js";
+import { onFolderWatchEvent } from "#lib/adapters/native/goNativeWatch.js";
 import { NativeApi } from "#lib/ports/nativeApi.js";
 import { WatcherPort, type WatcherEvent } from "#lib/ports/watcher.js";
 

@@ -7,12 +7,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/adapters/signaling"
-	"dropcli/internal/ports"
-	"dropcli/internal/services"
-	"dropcli/internal/state"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/adapters/signaling"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/services"
+	"dropnative/cli/internal/state"
+	"dropnative/internal/webrtc"
 )
 
 type Runner struct {

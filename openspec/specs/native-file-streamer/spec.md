@@ -8,22 +8,22 @@ Move native transfer file bytes between the desktop shell and disk as raw stream
 
 ### Requirement: Native shell starts a loopback streamer
 
-When the native shell starts, it SHALL launch a streamer sidecar bound to `127.0.0.1` on an ephemeral port. The sidecar SHALL tell the shell that port and a per-process token before the shell uses it for transfer bytes. The startup message on standard input is bootstrap data, and that input closing MUST NOT stop the sidecar. The sidecar SHALL exit when the framework connection closes. The web app SHALL NOT launch this sidecar.
+When the native shell starts, it SHALL run an in-process HTTP streamer bound to `127.0.0.1` on an ephemeral port. The streamer SHALL share the per-process token with the native shell. When the shell terminates, the streamer stops accepting connections. The web app SHALL NOT launch this streamer.
 
-#### Scenario: Sidecar announces an address
+#### Scenario: Streamer announces an address
 
-- **WHEN** the native shell has started the sidecar
+- **WHEN** the native shell has started
 - **THEN** the shell learns a `127.0.0.1` port and a token for that process
 
-#### Scenario: Shell exit stops the sidecar
+#### Scenario: Shell exit stops the streamer
 
-- **WHEN** the native shell closes its framework connection
-- **THEN** the sidecar exits and stops accepting connections
+- **WHEN** the native shell closes
+- **THEN** the streamer stops accepting connections
 
-#### Scenario: Web app has no sidecar
+#### Scenario: Web app has no streamer
 
 - **WHEN** the app is running in a browser
-- **THEN** no streamer sidecar is started and transfers do not call it
+- **THEN** no streamer is started and transfers do not call it
 
 ### Requirement: Streamer rejects unauthenticated clients
 
@@ -103,42 +103,23 @@ A native send or receive SHALL read and write file bytes only through the stream
 
 ### Requirement: Non-byte filesystem work stays put
 
-Listing, creating, and removing directories, moving and removing files, reading file size and existence, watching folders, picking folders, and writing the clipboard MUST keep working through their current native calls. They MUST NOT depend on the streamer being ready.
+Listing, creating, and removing directories, moving and removing files, reading file size and existence, watching folders, picking folders, and writing the clipboard MUST work through Go native host bridge calls. They MUST NOT depend on the file streaming endpoints being active.
 
 #### Scenario: Rename after a streamed receive
 
 - **WHEN** a streamed receive has closed and the app moves the partial file to its final name
-- **THEN** the move uses the current native filesystem call and does not require another streamer request
+- **THEN** the move uses the Go native host bridge call and does not require another streamer request
 
 #### Scenario: Folder watch without the sidecar
 
-- **WHEN** the sidecar is not running and the user picks a folder to watch
-- **THEN** the folder dialog and the watch still use the current native calls
+- **WHEN** no file transfer is active and the user picks a folder to watch
+- **THEN** the folder dialog and the watch use the Go native host bridge calls
 
-### Requirement: Packaged shells include an x64 streamer
+### Requirement: Streamer runs in-process with the native host
 
-A packaged native shell for linux x64 and windows x64 SHALL include a streamer executable for that OS embedded within the application resources. The streamer source and its compiled binaries SHALL live under `native/extensions/` in this repository. The production/CI native package build SHALL compile those binaries for linux x64 and windows x64 before packaging. The native shell SHALL extract the streamer executable from the Neutralino resources path that embeds those compiled binaries to a writable temporary location at runtime and launch that executable. The streamer extension will no longer be launched automatically by Neutralino via configuration commands.
+The Go desktop shell SHALL run the HTTP file streamer within the same process as the native shell and RPC bridge, eliminating runtime binary extraction to temporary directories.
 
-#### Scenario: Each package can launch its sidecar
+#### Scenario: Streamer starts in-process
 
-- **WHEN** a linux x64 or windows x64 package starts
-- **THEN** that package launches the streamer executable built for the same OS and x64
-
-#### Scenario: Extension is extracted from resources at startup
-
-- **WHEN** the native shell starts
-- **THEN** the shell extracts the platform-appropriate streamer binary from the configured Neutralino resources path for compiled streamers under the `native/extensions` tree to a writable temporary directory
-- **AND** the shell makes the binary executable and launches the streamer process using Neutralino.os.spawnProcess()
-- **AND** the shell provides the streamer with the necessary Neutralino bootstrap data via stdin (port, token, connectToken, extensionID)
-- **AND** the streamer executable runs and communicates with the shell as specified, broadcasting `streamerReady` events
-
-#### Scenario: Extension cleanup on shell exit
-
-- **WHEN** the native shell closes its framework connection
-- **THEN** the spawned streamer process exits
-- **AND** any temporary extracted extension files may be cleaned up
-
-#### Scenario: CI compiles streamer from native/extensions
-
-- **WHEN** the production Docker/CI native package stage runs
-- **THEN** it builds `streamer-linux_x64` and `streamer-win_x64.exe` from `native/extensions/streamer` (or equivalent module path under `native/extensions`) before embedding them in the package
+- **WHEN** the Go desktop shell process starts
+- **THEN** the HTTP file streamer initializes in-process without extracting sidecar binaries to disk

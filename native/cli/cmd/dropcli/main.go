@@ -11,12 +11,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/adapters/signaling"
-	"dropcli/internal/state"
-	"dropcli/internal/ui/quick"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/adapters/signaling"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/quick"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
 )
 
 func main() {

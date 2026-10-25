@@ -1,31 +1,32 @@
 package watcher
 
 import (
-	"dropcli/internal/ports"
+	"dropnative/cli/internal/ports"
+	"dropnative/internal/fswatch"
 
 	"github.com/fsnotify/fsnotify"
 )
 
 // Watcher implements ports.WatcherPort using fsnotify/fsnotify.
 type Watcher struct {
-	fsWatcher *fsnotify.Watcher
-	events    chan ports.WatchEvent
-	errors    chan error
-	done      chan struct{}
+	source *fswatch.Source
+	events chan ports.WatchEvent
+	errors chan error
+	done   chan struct{}
 }
 
 // New creates and starts a new filesystem Watcher.
 func New() (*Watcher, error) {
-	fsw, err := fsnotify.NewWatcher()
+	source, err := fswatch.New()
 	if err != nil {
 		return nil, err
 	}
 
 	w := &Watcher{
-		fsWatcher: fsw,
-		events:    make(chan ports.WatchEvent, 256),
-		errors:    make(chan error, 16),
-		done:      make(chan struct{}),
+		source: source,
+		events: make(chan ports.WatchEvent, 256),
+		errors: make(chan error, 16),
+		done:   make(chan struct{}),
 	}
 
 	go w.loop()
@@ -43,7 +44,7 @@ func (w *Watcher) loop() {
 		case <-w.done:
 			return
 
-		case ev, ok := <-w.fsWatcher.Events:
+		case ev, ok := <-w.source.Events():
 			if !ok {
 				return
 			}
@@ -57,7 +58,7 @@ func (w *Watcher) loop() {
 				return
 			}
 
-		case err, ok := <-w.fsWatcher.Errors:
+		case err, ok := <-w.source.Errors():
 			if !ok {
 				return
 			}
@@ -90,12 +91,12 @@ func mapOp(op fsnotify.Op) ports.WatchOp {
 
 // Add adds a directory path to the watch list.
 func (w *Watcher) Add(path string) error {
-	return w.fsWatcher.Add(path)
+	return w.source.Add(path)
 }
 
 // Remove stops watching a directory path.
 func (w *Watcher) Remove(path string) error {
-	return w.fsWatcher.Remove(path)
+	return w.source.Remove(path)
 }
 
 // Events returns the channel of incoming file events.
@@ -117,5 +118,5 @@ func (w *Watcher) Close() error {
 	default:
 		close(w.done)
 	}
-	return w.fsWatcher.Close()
+	return w.source.Close()
 }

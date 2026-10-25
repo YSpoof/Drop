@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"dropcli/internal/ports"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
 )
 
 // QuickConfig encapsulates command-line options for quick mode execution.

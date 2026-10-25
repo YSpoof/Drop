@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/services"
-	"dropcli/internal/state"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/services"
+	"dropnative/cli/internal/state"
+	"dropnative/internal/webrtc"
 
 	pionwebrtc "github.com/pion/webrtc/v4"
 )

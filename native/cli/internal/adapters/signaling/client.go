@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"dropcli/internal/ports"
+	"dropnative/cli/internal/ports"
 
 	"github.com/gorilla/websocket"
 )

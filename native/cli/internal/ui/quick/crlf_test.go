@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/ui/text"
 )
 
 func TestToCRLFConvertsBareNewlines(t *testing.T) {

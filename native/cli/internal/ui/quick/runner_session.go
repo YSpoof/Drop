@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"dropcli/internal/ports"
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
+	"dropnative/internal/webrtc"
 )
 
 const resumeAfterDisconnect = 2 * time.Second

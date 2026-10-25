@@ -7,37 +7,16 @@ RUN npm i -g pnpm@latest
 # Copy lockfiles so installs are reproducible and match local pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-FROM golang:bookworm AS go-clients
+FROM golang:1.27.3-alpine AS go-clients
 WORKDIR /src
 
-COPY native/extensions/streamer ./native/extensions/streamer
-WORKDIR /src/native/extensions/streamer
-RUN mkdir -p /src/native/extensions/compiled \
-  && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /src/native/extensions/compiled/streamer-linux_x64 . \
-  && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /src/native/extensions/compiled/streamer-win_x64.exe .
-
-WORKDIR /src
-COPY native/cli ./native/cli
-WORKDIR /src/native/cli
+COPY native ./native
+WORKDIR /src/native
 RUN mkdir -p /out/downloads \
-  && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-cli-linux_x64 ./cmd/dropcli \
-  && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-cli-win_x64.exe ./cmd/dropcli
-
-FROM node:bookworm AS native
-WORKDIR /app
-
-RUN npm i -g pnpm@latest
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm i --frozen-lockfile --ignore-scripts
-
-# Native packaging inputs only — keep narrow so web-only edits cache this stage
-COPY neutralino.config.json ./
-COPY static/images/pwa/512.png ./static/images/pwa/512.png
-COPY --from=go-clients /src/native/extensions/compiled/ ./native/extensions/compiled/
-RUN pnpm run native:update && pnpm run native:build \
-  && mkdir -p /out \
-  && cp dist/Drop/Drop-linux_x64 dist/Drop/Drop-win_x64.exe /out/
+  && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-linux_x64 ./desktop \
+  && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-win_x64.exe ./desktop \
+  && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-cli-linux_x64 ./cli/cmd/dropcli \
+  && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /out/downloads/Drop-cli-win_x64.exe ./cli/cmd/dropcli
 
 FROM base AS prod-deps
 # Use pnpm with the frozen lockfile to install only production deps
@@ -48,7 +27,6 @@ FROM base AS build
 COPY --from=prod-deps /app/node_modules ./node_modules
 RUN pnpm i --frozen-lockfile --ignore-scripts
 COPY . .
-COPY --from=native /out/ ./static/downloads/
 COPY --from=go-clients /out/downloads/ ./static/downloads/
 RUN pnpm run build
 

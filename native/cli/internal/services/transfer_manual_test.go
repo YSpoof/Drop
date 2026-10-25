@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/state"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/state"
 )
 
 func TestManualAutoPullOnRetainedDrop(t *testing.T) {

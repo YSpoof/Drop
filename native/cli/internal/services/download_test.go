@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/state"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/state"
+	"dropnative/internal/webrtc"
 )
 
 func TestDownloadServiceStreamAndFlowControl(t *testing.T) {

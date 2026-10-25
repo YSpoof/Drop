@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"dropcli/internal/adapters/fs"
-	"dropcli/internal/adapters/watcher"
+	"dropnative/cli/internal/adapters/fs"
+	"dropnative/cli/internal/adapters/watcher"
 )
 
 func waitNotify(t *testing.T, svc *FolderWatcherService, timeout time.Duration) {

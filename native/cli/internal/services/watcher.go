@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"dropcli/internal/ports"
+	"dropnative/cli/internal/ports"
 )
 
 // FolderWatcherService detects added and modified files in a target directory

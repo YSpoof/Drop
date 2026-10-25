@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"dropcli/internal/services"
+	"dropnative/cli/internal/services"
 )
 
 func (m *InboxModel) enterRow() {

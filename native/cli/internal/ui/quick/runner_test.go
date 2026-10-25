@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"dropcli/internal/ui/quick"
+	"dropnative/cli/internal/ui/quick"
 )
 
 // ---- ParseArgs / NewFlagSet tests ----

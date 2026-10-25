@@ -3,7 +3,7 @@ package quick
 import (
 	"testing"
 
-	"dropcli/internal/ui/tui"
+	"dropnative/cli/internal/ui/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

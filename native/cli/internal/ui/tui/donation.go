@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"dropcli/internal/state"
-	"dropcli/internal/ui"
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui"
+	"dropnative/cli/internal/ui/text"
 
 	"github.com/charmbracelet/huh"
 )

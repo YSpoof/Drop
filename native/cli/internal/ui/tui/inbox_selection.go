@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/ui/text"
 	"fmt"
 )
 

@@ -4,7 +4,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/ui/text"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

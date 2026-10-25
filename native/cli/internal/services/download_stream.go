@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"dropcli/internal/state"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/state"
+	"dropnative/internal/webrtc"
 )
 
 func (d *DownloadService) HandleStart(start webrtc.StartMessage) error {

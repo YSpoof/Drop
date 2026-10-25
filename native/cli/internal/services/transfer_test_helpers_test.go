@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 
-	"dropcli/internal/webrtc"
+	"dropnative/internal/webrtc"
 )
 
 func webrtcMeta(fileID, name string, size int64, hash string) webrtc.MetaMessage {

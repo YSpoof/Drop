@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"dropcli/internal/state"
+	"dropnative/cli/internal/state"
 )
 
 func TestValidatePIN_Valid(t *testing.T) {

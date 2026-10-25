@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"dropcli/internal/ui"
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/ui"
+	"dropnative/cli/internal/ui/text"
 	"fmt"
 	"sort"
 	"strings"

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"dropcli/internal/ports"
-	"dropcli/internal/state"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/state"
+	"dropnative/internal/webrtc"
 
 	pionwebrtc "github.com/pion/webrtc/v4"
 )

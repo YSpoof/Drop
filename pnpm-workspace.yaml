@@ -4,8 +4,8 @@ allowBuilds:
   esbuild: true
   utf-8-validate: true
 minimumReleaseAgeExclude:
-  - '@sveltejs/kit@3.0.0'
-  - '@sveltejs/adapter-node@6.0.0'
+  - "@sveltejs/kit@3.0.0"
+  - "@sveltejs/adapter-node@6.0.0"
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild

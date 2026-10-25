@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/internal/webrtc"
 )
 
 func (s *TransferService) SendFile(ctx context.Context, filePath string) error {

@@ -1,3 +1,5 @@
+import { goNativeApi } from "#lib/adapters/native/goNativeApi.js";
+import { GoNativePicker } from "#lib/adapters/native/goNativePicker.js";
 import { NativeClipboard } from "#lib/adapters/native/nativeClipboard.js";
 import { NativeEnvironment } from "#lib/adapters/native/nativeEnvironment.js";
 import { NativeFileReader } from "#lib/adapters/native/nativeFileReader.js";
@@ -5,8 +7,6 @@ import { NativeFsFileAdapter } from "#lib/adapters/native/nativeFsFileAdapter.js
 import { NativeNotifications } from "#lib/adapters/native/nativeNotifications.js";
 import { NativeReceiveFolder } from "#lib/adapters/native/nativeReceiveFolder.js";
 import { NativeWatcher } from "#lib/adapters/native/nativeWatcher.js";
-import { neutralinoApi } from "#lib/adapters/native/neutralinoApi.js";
-import { NeutralinoPicker } from "#lib/adapters/native/neutralinoPicker.js";
 import { ClipboardPort } from "#lib/ports/clipboard.js";
 import { EnvironmentPort } from "#lib/ports/environment.js";
 import { FileAdapterPort } from "#lib/ports/fileAdapter.js";
@@ -18,11 +18,11 @@ import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
 import { WatcherPort } from "#lib/ports/watcher.js";
 
 export const nativeProviders = [
-  { provide: NativeApi, useValue: neutralinoApi },
+  { provide: NativeApi, useValue: goNativeApi },
   { provide: EnvironmentPort, useClass: NativeEnvironment },
   { provide: NotificationsPort, useClass: NativeNotifications },
   { provide: WatcherPort, useClass: NativeWatcher },
-  { provide: PickerPort, useClass: NeutralinoPicker },
+  { provide: PickerPort, useClass: GoNativePicker },
   { provide: FileAdapterPort, useClass: NativeFsFileAdapter },
   { provide: FileReaderPort, useClass: NativeFileReader },
   { provide: ReceiveFolderPort, useClass: NativeReceiveFolder },

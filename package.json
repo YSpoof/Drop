@@ -20,13 +20,10 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
-    "native": "pnpx @neutralinojs/neu",
-    "native:update": "pnpm native update",
-    "streamer:build": "sh scripts/build-streamer.sh",
     "cli:build": "sh scripts/build-cli.sh",
-    "native:dev": "pnpm streamer:build && pnpm native run",
-    "native:build": "rm -rf .tmp chromedata && pnpm native build --release --embed-resources",
-    "native:preview": "./dist/Drop/Drop-linux_x64"
+    "native:dev": "sh scripts/native-dev.sh",
+    "native:build": "sh scripts/build-desktop.sh",
+    "native:preview": "./dist/Drop-linux_x64"
   },
   "dependencies": {
     "desfetch": "^1.2.1",
@@ -36,33 +33,31 @@
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
-    "@neutralinojs/lib": "^6.10.0",
-    "@neutralinojs/neu": "^11.8.0",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.1",
     "@sveltejs/adapter-node": "^6.0.0",
-    "@sveltejs/kit": "^3.0.1",
+    "@sveltejs/kit": "^3.1.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@types/ws": "^8.18.2",
     "@typescript/native": "npm:typescript@^7.0.2",
     "client-zip": "^2.5.1",
-    "daisyui": "^5.7.47",
+    "daisyui": "^5.7.50",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "localforage": "^1.10.0",
-    "oxfmt": "^0.72.0",
-    "svelte": "^5.57.1",
-    "svelte-check": "^4.7.6",
+    "oxfmt": "^0.74.0",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.7",
     "svelte-comp-lazyloader": "^1.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
     "unplugin-icons": "^24.0.0",
-    "vite": "^8.3.3",
+    "vite": "^8.3.5",
     "vite-plugin-sveltekit-ws": "^2.1.2"
   },
   "lint-staged": {
     "*.{json,ts,js,svelte}": "oxfmt"
   },
-  "packageManager": "pnpm@12.8.1"
+  "packageManager": "pnpm@12.15.0"
 }

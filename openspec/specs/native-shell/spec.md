@@ -8,45 +8,54 @@ Connects the desktop shell’s remote HTTPS UI to the local Neutralino framework
 
 ### Requirement: Framework socket uses loopback plain WebSocket
 
-When the app runs inside the native shell and opens the Neutralino framework connection, it SHALL connect to `127.0.0.1` on the framework port using plain `ws://`. It MUST NOT use the page hostname (for example the remote HTTPS origin host) as the WebSocket host. It MUST NOT use `wss://` for this framework connection.
+When the app runs inside the native shell and opens the native host connection, it SHALL connect to `127.0.0.1` on the announced native port using plain `ws://` and provide the process authentication token. It MUST NOT use the page hostname as the WebSocket host. It MUST NOT use `wss://` for this framework connection.
 
 #### Scenario: Packaged app on remote HTTPS UI
 
-- **WHEN** the packaged native shell loads the UI from the HTTPS production origin and starts Neutralino
-- **THEN** the framework WebSocket URL host is `127.0.0.1` and the scheme is `ws`
+- **WHEN** the packaged native shell loads the UI from the HTTPS production origin and starts the native host connection
+- **THEN** the WebSocket URL host is `127.0.0.1`, the scheme is `ws`, and the request includes the process token
 
 #### Scenario: Web browser has no framework socket
 
 - **WHEN** the app runs in a normal browser without native shell credentials
-- **THEN** no Neutralino framework WebSocket is opened
+- **THEN** no native host WebSocket is opened
 
-### Requirement: Loopback target is set before Neutralino init
+### Requirement: Bootstrap credentials passed via launch parameters
 
-The native client bootstrap SHALL establish the loopback framework-host targeting before Neutralino `init` runs, so the client library does not fall back to `location.hostname`.
+When the Go native shell launches Chrome, it SHALL provide the loopback port and session authentication token via query parameters in the initial `--app` URL. The client bootstrap SHALL read and sanitize these parameters before initializing the native bridge.
 
-#### Scenario: Init sees loopback injection
+#### Scenario: Launch with bootstrap query parameters
 
-- **WHEN** native bootstrap is about to call Neutralino `init`
-- **THEN** the runtime already indicates framework globals were injected (so the client library selects `127.0.0.1`)
+- **WHEN** the Go native shell launches the browser window
+- **THEN** the initial URL contains the loopback port and authentication token
 
-### Requirement: Providers configured after Neutralino startup succeeds
+#### Scenario: Sanitize URL after reading credentials
 
-Client bootstrap SHALL attempt Neutralino startup (framework init, extension binary extract, and streamer ready) before choosing DI providers. When startup completes successfully, the client MUST configure native providers. When startup fails or the streamer is not ready within 2 seconds, the client MUST configure web providers and MUST NOT show a warning or toast about the failure.
+- **WHEN** the client initializes and reads the bootstrap credentials
+- **THEN** it removes the credentials from the browser address bar
 
-#### Scenario: Successful startup selects native
+### Requirement: Providers configured after Go native host startup succeeds
 
-- **WHEN** Neutralino startup completes successfully (framework connected and streamer ready)
+Client bootstrap SHALL attempt Go native host connection (WebSocket connection and token handshake) before choosing DI providers. When startup completes successfully within 2 seconds, the client MUST configure native providers. When connection fails or times out, the client MUST configure web providers and MUST NOT show a warning or toast about the failure.
+
+#### Scenario: Successful connection selects native
+
+- **WHEN** Go native host startup completes successfully within 2 seconds
 - **THEN** the client configures native providers
 
 #### Scenario: Failed or timed-out startup selects web
 
-- **WHEN** Neutralino startup fails or the streamer is not ready within 2 seconds
-- **THEN** the client configures web providers and shows no warning or toast about the failure
+- **WHEN** Go native host startup fails or times out after 2 seconds
+- **THEN** the client configures web providers and shows no warning or toast
 
-#### Scenario: Native providers only after ready
+### Requirement: Window lifecycle terminates shell process
 
-- **WHEN** bootstrap is still awaiting Neutralino startup
-- **THEN** neither native nor web providers have been configured yet
+When the Chrome window is closed by the user, the Go native shell process SHALL detect the browser exit and terminate itself cleanly.
+
+#### Scenario: Chrome close terminates Go shell
+
+- **WHEN** the user closes the Chrome window
+- **THEN** the Go native shell process exits cleanly
 
 ### Requirement: Boot loading screen until providers configured
 

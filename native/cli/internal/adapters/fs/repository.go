@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"dropcli/internal/ports"
+	"dropnative/cli/internal/ports"
 )
 
 const dropSuffix = ".drop"

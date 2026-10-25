@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"dropcli/internal/services"
-	"dropcli/internal/state"
-	"dropcli/internal/ui"
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/services"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui"
+	"dropnative/cli/internal/ui/text"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

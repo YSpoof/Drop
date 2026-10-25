@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"dropcli/internal/ports"
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/internal/webrtc"
 )
 
 type PendingOffer struct {

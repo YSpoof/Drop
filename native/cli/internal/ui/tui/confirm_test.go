@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/ui/text"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

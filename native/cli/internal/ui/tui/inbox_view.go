@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
 )
 
 func (m InboxModel) pendingPageSize() int {

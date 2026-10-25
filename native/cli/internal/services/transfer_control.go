@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"dropcli/internal/webrtc"
+	"dropnative/internal/webrtc"
 )
 
 func (s *TransferService) SendDownloadMode(manual bool) error {

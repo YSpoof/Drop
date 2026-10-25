@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"dropcli/internal/adapters/watcher"
-	"dropcli/internal/ports"
-	"dropcli/internal/services"
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/adapters/watcher"
+	"dropnative/cli/internal/ports"
+	"dropnative/cli/internal/services"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
+	"dropnative/internal/webrtc"
 
 	pionwebrtc "github.com/pion/webrtc/v4"
 )

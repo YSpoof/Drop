@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"dropcli/internal/ui"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
-	"dropcli/libs/breakread"
+	"dropnative/cli/internal/ui"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
+	"dropnative/cli/libs/breakread"
 
 	"golang.org/x/term"
 )

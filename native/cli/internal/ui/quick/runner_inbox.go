@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"dropcli/internal/services"
-	"dropcli/internal/state"
-	"dropcli/internal/ui/text"
-	"dropcli/internal/ui/tui"
-	"dropcli/internal/webrtc"
+	"dropnative/cli/internal/services"
+	"dropnative/cli/internal/state"
+	"dropnative/cli/internal/ui/text"
+	"dropnative/cli/internal/ui/tui"
+	"dropnative/internal/webrtc"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

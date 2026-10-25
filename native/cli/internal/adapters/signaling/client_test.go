@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"dropcli/internal/ports"
+	"dropnative/cli/internal/ports"
 
 	"github.com/gorilla/websocket"
 )
