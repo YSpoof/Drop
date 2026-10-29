@@ -1,11 +1,24 @@
-node_modules
-# Output
-.output
-/.svelte-kit
-/build
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+frontend/.svelte-kit/
+frontend/build/
+bin/
+dist/
+
+# Downloaded client artifacts
+/downloads/
+/static/downloads/
+frontend/static/downloads/
+
+# Environment
 .env
 !.env.example
-/.pnpm-store
+
+# pnpm
+.pnpm-store/
 
 # Playwright
 /test-results/
@@ -13,12 +26,10 @@ node_modules
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+frontend/test-results/
+frontend/playwright-report/
 
-# Native / Neutralinojs
-/bin
-/dist/
-/static/downloads/
-/native/extensions/compiled/*
+# Misc
 /.tmp/
 /chromedata/
 /neutralinojs.log

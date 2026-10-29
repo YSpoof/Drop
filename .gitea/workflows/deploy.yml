@@ -15,7 +15,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.REGISTRY }}:5000/${{ vars.IMAGE_NAME }}:latest -t ${{ secrets.REGISTRY }}:5000/${{ vars.IMAGE_NAME }}:${{ github.sha }} .
+          docker build \
+            --build-arg BUILD_SHA=${{ github.sha }} \
+            -t ${{ secrets.REGISTRY }}:5000/${{ vars.IMAGE_NAME }}:latest \
+            -t ${{ secrets.REGISTRY }}:5000/${{ vars.IMAGE_NAME }}:${{ github.sha }} .
 
       - name: Push image to registry
         run: |

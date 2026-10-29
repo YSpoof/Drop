@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Connects the desktop shell’s remote HTTPS UI to the local Neutralino framework over a loopback plain WebSocket so native APIs can initialize in the packaged app.
+Connects the desktop shell’s remote HTTPS UI to the local Go native host over a loopback plain WebSocket so native APIs can initialize in the packaged app.
 
 ## Requirements
 

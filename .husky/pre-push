@@ -15,5 +15,5 @@ done
 
 if [ "$pushing_to_main" = true ]; then
   echo "Push targets main — running Playwright tests..."
-  pnpm run prepush || exit 1
+  pnpm --dir frontend exec playwright test || exit 1
 fi

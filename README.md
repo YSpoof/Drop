@@ -161,6 +161,15 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 
 ---
 
+## 🛠️ Desenvolvimento
+
+Use o `Makefile` na raiz:
+
+- `make build` — compila o frontend (adapter-static) e embute no binário Go
+- `make dev` — sobe o backend Go e o Vite dev server
+- `make test` — roda testes Go e Playwright
+- `make clean` — remove artefatos de build
+
 ## 📜 Licença
 
 Este projeto é distribuído sob a licença MIT.
