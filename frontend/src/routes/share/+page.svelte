@@ -5,9 +5,9 @@
   import { onDestroy, onMount } from "svelte";
   import { lazy } from "svelte-comp-lazyloader";
 
+  import LazyModal from "#lib/components/ui/LazyModal.svelte";
   import { QueueService } from "#lib/services/queueService.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
-  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { peerStore } from "#lib/stores/peerStore.svelte.js";
   import { transferStore } from "#lib/stores/transferStore.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
@@ -77,7 +77,8 @@
     unregisterSession(session);
   });
 
-  let wasConnected = $state(false);
+  // The one place a guest goes home after the peer leaves, whether it left or we disconnected.
+  let wasConnected = false;
   $effect(() => {
     if (peerStore.connected) {
       wasConnected = true;
@@ -98,10 +99,7 @@
     peerName={peerStore.connectedPeerInfo?.displayName}
     codeJoinPhase={peerStore.codeJoinPhase}
     onLeave={() => leaveShare(session)}
-    onDisconnect={() => {
-      session.peerSession.disconnectPeer();
-      if (!isHost) void goto("/", { reset: true });
-    }} />
+    onDisconnect={() => session.peerSession.disconnectPeer()} />
 
   <div class="flex flex-col gap-6">
     <TransferProgress
@@ -136,17 +134,17 @@
     return err;
   }} />
 
-{#if lazyLoad.has("codeJoin")}
+<LazyModal open={uiStore.codeJoinOpen}>
   <CodeJoinModal
     open={uiStore.codeJoinOpen}
     phase={peerStore.codeJoinPhase}
     peerName={peerStore.connectedPeerInfo?.displayName}
     onClose={() => session.codeJoin.cancel()} />
-{/if}
+</LazyModal>
 
-{#if lazyLoad.has("unsupportedBrowser")}
+<LazyModal open={uiStore.unsupportedBrowserModalOpen}>
   <UnsupportedBrowserModal />
-{/if}
+</LazyModal>
 
 <svelte:window ononline={() => session.wakeSignaling("online")} />
 <svelte:document

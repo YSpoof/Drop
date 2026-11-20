@@ -1,11 +1,6 @@
 <script lang="ts">
-  import { inject } from "quick-di";
-  import CheckCircleIcon from "~icons/mdi/check-circle";
-  import ContentCopyIcon from "~icons/mdi/content-copy";
-
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-  import { ClipboardPort } from "#lib/ports/clipboard.js";
-  import { siteData } from "#lib/siteData.js";
+  import PixKeyButton from "#lib/components/ui/PixKeyButton.svelte";
 
   interface Props {
     open: boolean;
@@ -13,21 +8,6 @@
   }
 
   let { open, onDismiss }: Props = $props();
-
-  const clipboard = inject(ClipboardPort);
-  let copied = $state(false);
-
-  async function copyPixKey() {
-    try {
-      await clipboard.writeText(siteData.donationPixKey);
-      copied = true;
-      setTimeout(() => {
-        copied = false;
-      }, 2500);
-    } catch {
-      // ignore
-    }
-  }
 
   function dismiss() {
     if (!open) return;
@@ -44,18 +24,7 @@
       O Drop é gratuito. Um PIX ajuda a manter o projeto.
     </p>
     <p class="text-base-content/60 text-sm">Chave PIX aleatória, toque para copiar:</p>
-    <button
-      type="button"
-      class="btn btn-sm justify-between font-mono"
-      class:btn-success={copied}
-      onclick={copyPixKey}>
-      <span class="truncate">{siteData.donationPixKey}</span>
-      {#if copied}
-        <CheckCircleIcon class="text-base" />
-      {:else}
-        <ContentCopyIcon class="text-base" />
-      {/if}
-    </button>
+    <PixKeyButton />
   </div>
 
   {#snippet modalActions()}

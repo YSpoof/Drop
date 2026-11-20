@@ -22,13 +22,13 @@ use crate::protocol::Ctrl;
 use crate::rtc::{Inbound, Peer};
 use crate::state::{Command, Shared};
 
-/// `files` chunks the link holds before `chunk` waits for the pump.
+/// `files` frames the link holds before `chunk` waits for the pump.
 const LINK_CHUNKS: usize = 16;
 
 /// Outbound half of a connection.
 #[derive(Clone)]
 pub struct Link {
-    /// Bytes per `files` chunk, announced in `start`.
+    /// File bytes per `files` frame (without the stream header), announced in `start`.
     pub chunk_size: usize,
     ctrl: mpsc::UnboundedSender<Ctrl>,
     files: mpsc::Sender<Bytes>,
@@ -57,7 +57,7 @@ impl Link {
         let _ = self.ctrl.send(msg);
     }
 
-    /// Queues a `files` chunk; `false` once the link is gone.
+    /// Queues a `files` frame; `false` once the link is gone.
     pub async fn chunk(&self, data: Bytes) -> bool {
         self.files.send(data).await.is_ok()
     }
@@ -158,8 +158,8 @@ async fn dispatch(
                     Ctrl::Meta { file_id, name, size, hash, .. } => {
                         inbox.on_meta(link, cx, file_id, name, size, hash).await;
                     }
-                    Ctrl::Start { file_id, chunk_size, .. } => {
-                        inbox.on_start(link, cx, &file_id, chunk_size).await;
+                    Ctrl::Start { file_id, chunk_size, stream_id, .. } => {
+                        inbox.on_start(link, cx, &file_id, chunk_size, stream_id).await;
                     }
                     Ctrl::Done { file_id } => inbox.on_done(link, cx, &file_id).await,
                     Ctrl::BatchDone => inbox.on_batch_done(cx),
@@ -173,8 +173,8 @@ async fn dispatch(
                     }
                 }
             }
-            chunk = inbound.files.recv() => match chunk {
-                Some(chunk) => inbox.on_chunk(link, cx, chunk).await,
+            frame = inbound.files.recv() => match frame {
+                Some(frame) => inbox.on_frame(link, cx, frame).await,
                 None => return End::Lost,
             },
             cmd = commands.recv() => match cmd {

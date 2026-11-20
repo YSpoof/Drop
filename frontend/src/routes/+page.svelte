@@ -7,10 +7,10 @@
   import LightningBoltIcon from "~icons/mdi/lightning-bolt";
   import NumericIcon from "~icons/mdi/numeric";
 
+  import LazyModal from "#lib/components/ui/LazyModal.svelte";
   import { SHARE_CODE_DIGITS } from "#lib/consts.js";
   import { NotificationsPort } from "#lib/ports/notifications.js";
   import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
-  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import {
     dismissDonationReminder,
@@ -34,16 +34,8 @@
   let due = $state(false);
   let handoffSettled = $state(false);
 
-  let reminderOpen = $derived(
-    due &&
-      handoffSettled &&
-      !possessOpen &&
-      !uiStore.setupWizardOpen &&
-      !uiStore.infoModalOpen &&
-      !uiStore.statsModalOpen &&
-      !uiStore.settingsModalOpen &&
-      !uiStore.shareNotifyModalOpen &&
-      !updated.current,
+  const reminderOpen = $derived(
+    due && handoffSettled && !possessOpen && !uiStore.anyModalOpen && !updated.current,
   );
 
   function gotoHostShare() {
@@ -63,7 +55,6 @@
 
     uiStore.shareNotifyDenied =
       typeof Notification === "undefined" || Notification.permission === "denied";
-    lazyLoad.mark("shareNotify");
     uiStore.shareNotifyModalOpen = true;
   }
 
@@ -81,6 +72,12 @@
     if (!reminderOpen) return;
     due = false;
     void readVisitCount().then((visitCount) => dismissDonationReminder(visitCount));
+  }
+
+  function closeShareNotify() {
+    uiStore.shareNotifyModalOpen = false;
+    // A cancelled incoming-share handoff stays on home, which is calm again.
+    handoffSettled = true;
   }
 
   async function handleShareNotifyContinue() {
@@ -150,14 +147,16 @@
     goto("/share/?code=" + code);
   }} />
 
-<DonationReminderModal
-  open={reminderOpen}
-  onDismiss={dismissReminder} />
+<LazyModal open={reminderOpen}>
+  <DonationReminderModal
+    open={reminderOpen}
+    onDismiss={dismissReminder} />
+</LazyModal>
 
-{#if lazyLoad.has("shareNotify")}
+<LazyModal open={uiStore.shareNotifyModalOpen}>
   <ShareNotifyPermissionModal
     open={uiStore.shareNotifyModalOpen}
     denied={uiStore.shareNotifyDenied}
-    onClose={() => (uiStore.shareNotifyModalOpen = false)}
+    onClose={closeShareNotify}
     onContinue={handleShareNotifyContinue} />
-{/if}
+</LazyModal>

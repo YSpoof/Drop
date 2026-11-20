@@ -1,11 +1,14 @@
 //! Control messages exchanged on the `ctrl` data channel (JSON text frames).
 
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 /// Sender-side flow-control window per file.
 pub const SEND_WINDOW: u64 = 8 * 1024 * 1024;
 /// Receiver grants credit every this many bytes.
 pub const CREDIT_BATCH: u64 = 1024 * 1024;
+/// Bytes of the big-endian stream ID that starts every `files` frame.
+pub const FRAME_HEADER: usize = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(
@@ -26,6 +29,7 @@ pub enum Ctrl {
     Start {
         file_id: String,
         chunk_size: u32,
+        stream_id: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         offset: Option<u64>,
     },
@@ -73,6 +77,12 @@ impl Ctrl {
     pub fn decode(text: &str) -> serde_json::Result<Self> {
         serde_json::from_str(text)
     }
+}
+
+/// Splits a `files` frame into its stream ID and file bytes; `None` when it is too short.
+pub fn split_frame(frame: &Bytes) -> Option<(u32, Bytes)> {
+    let header = frame.get(..FRAME_HEADER)?.try_into().ok()?;
+    Some((u32::from_be_bytes(header), frame.slice(FRAME_HEADER..)))
 }
 
 /// Identity shared with the browser (`meta.hash`, `resume.hash`): `name|size|mtimeMs`.

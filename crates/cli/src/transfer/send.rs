@@ -17,14 +17,12 @@ use tokio::time::{Instant, sleep_until};
 use super::{Cx, End, Link};
 use crate::config::Direction;
 use crate::device::random_hex;
-use crate::protocol::{Ctrl, SEND_WINDOW, file_identity};
+use crate::protocol::{Ctrl, FRAME_HEADER, SEND_WINDOW, file_identity};
 use crate::state::{Transfer, TransferStatus, update_transfer};
-use crate::text;
+use crate::text::{self, ACK_TIMED_OUT, RESUME_TIMED_OUT};
 
 pub const RESUME_TIMEOUT: Duration = Duration::from_secs(30);
 pub const ACK_TIMEOUT: Duration = Duration::from_secs(15);
-/// Failure reason when the receiver never acknowledges a file.
-use crate::text::ACK_TIMED_OUT;
 const MIME: &str = "application/octet-stream";
 
 /// A file to send and the name announced for it.
@@ -107,11 +105,15 @@ pub(super) struct Io<'a> {
 pub struct Outbox {
     queue: Vec<Queued>,
     pulls: Vec<String>,
+    /// The peer pulls files itself. Assumed until its `download-mode` says otherwise, so
+    /// nothing starts before the peer chose its mode.
     remote_manual: bool,
     /// Return [`End::Sent`] once the queue is empty.
     exit_when_sent: bool,
     sent_since_batch: bool,
     queue_open: bool,
+    /// Stream ID of the last `start`; every `start` takes the next one.
+    stream_id: u32,
 }
 
 impl Outbox {
@@ -119,10 +121,11 @@ impl Outbox {
         let mut outbox = Self {
             queue: Vec::new(),
             pulls: Vec::new(),
-            remote_manual: false,
+            remote_manual: true,
             exit_when_sent,
             sent_since_batch: false,
             queue_open: true,
+            stream_id: 0,
         };
         files.into_iter().for_each(|f| outbox.push(f));
         outbox
@@ -136,7 +139,7 @@ impl Outbox {
     pub fn abort(&mut self) {
         self.queue.iter_mut().for_each(|q| q.offer = None);
         self.pulls.clear();
-        self.remote_manual = false;
+        self.remote_manual = true;
         self.sent_since_batch = false;
     }
 
@@ -269,6 +272,10 @@ impl Outbox {
             Err(Stop::Aborted) => self.aborted(io.cx, id),
             Err(Stop::Cancelled) => self.cancelled(io.cx, id),
             Err(Stop::Failed(reason)) => {
+                io.link.send(Ctrl::Cancel {
+                    file_id: id.into(),
+                    reason: Some(reason.clone()),
+                });
                 self.remove(id);
                 update_transfer(&io.cx.state, id, |t| {
                     t.set(TransferStatus::Failed, Some(&reason))
@@ -280,7 +287,8 @@ impl Outbox {
         Ok(())
     }
 
-    /// `start`, up to 30 s for `resume`, chunks within the window, `done`, up to 15 s for `ack`.
+    /// `start` with a new stream ID, up to 30 s for `resume`, frames within the window, `done`,
+    /// up to 15 s for `ack`.
     async fn stream(
         &mut self,
         io: &mut Io<'_>,
@@ -289,15 +297,18 @@ impl Outbox {
     ) -> Result<(), Stop> {
         let (id, size) = (offer.id.as_str(), offer.size);
         let chunk = io.link.chunk_size.max(1);
+        self.stream_id = self.stream_id.wrapping_add(1);
+        let header = self.stream_id.to_be_bytes();
         io.link.send(Ctrl::Start {
             file_id: id.into(),
             chunk_size: chunk as u32,
+            stream_id: self.stream_id,
             offset: None,
         });
         let deadline = Instant::now() + RESUME_TIMEOUT;
         let offset = loop {
             match self.next_event(io, id, Some(deadline)).await? {
-                None => break 0,
+                None => return Err(Stop::Failed(RESUME_TIMED_OUT.into())),
                 Some(Ctrl::Resume {
                     hash, bytes_offset, ..
                 }) if hash == offer.hash && bytes_offset < size => break bytes_offset,
@@ -317,8 +328,11 @@ impl Outbox {
                 let event = self.next_event(io, id, None).await?;
                 credit(io.cx, id, size, &mut confirmed, event);
             }
-            let mut buf = vec![0; len as usize];
-            file.read_exact(&mut buf).await.map_err(failed)?;
+            let mut buf = vec![0; FRAME_HEADER + len as usize];
+            buf[..FRAME_HEADER].copy_from_slice(&header);
+            file.read_exact(&mut buf[FRAME_HEADER..])
+                .await
+                .map_err(failed)?;
             self.send_chunk(io, id, size, &mut confirmed, Bytes::from(buf))
                 .await?;
             sent += len;
@@ -334,7 +348,7 @@ impl Outbox {
         }
     }
 
-    /// Queues one chunk while still reacting to control events.
+    /// Queues one frame while still reacting to control events.
     async fn send_chunk(
         &mut self,
         io: &mut Io<'_>,

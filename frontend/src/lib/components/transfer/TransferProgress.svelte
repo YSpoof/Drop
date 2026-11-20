@@ -13,6 +13,8 @@
 
   let { transfers, queue }: Props = $props();
 
+  const SPEED_IDLE_MS = 3000;
+
   const transferIds = $derived(new Set(transfers.map((t) => t.id)));
   const pendingQueueBytes = $derived(
     queue
@@ -72,6 +74,13 @@
     } else {
       prevSnapshot = { uploadBytes, downloadBytes, time: now };
     }
+
+    // Reruns on every byte change, so this only fires after SPEED_IDLE_MS without progress.
+    const idle = setTimeout(() => {
+      uploadSpeedBytesPerSec = 0;
+      downloadSpeedBytesPerSec = 0;
+    }, SPEED_IDLE_MS);
+    return () => clearTimeout(idle);
   });
 </script>
 

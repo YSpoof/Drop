@@ -5,14 +5,13 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
-// vite-plugin-sveltekit-ws removed: signaling is handled by the backend.
 
 export default defineConfig({
   plugins: [
     tailwindcss(),
     sveltekit({
       compilerOptions: {
-        // defaults to rune mode for the project, execept for `node_modules`. Can be removed in svelte 6.
+        // Runes mode for the project, except for `node_modules`. Can be removed in svelte 6.
         runes: ({ filename }) => {
           const relativePath = relative(import.meta.dirname, filename);
           const pathSegments = relativePath.toLowerCase().split(sep);
@@ -32,12 +31,8 @@ export default defineConfig({
       version: {
         pollInterval: 1000 * 30, // 30 seconds
       },
-      csrf: {
-        trustedOrigins: ["*"],
-      },
     }),
     Icons({ compiler: "svelte" }),
-    // signaling handled by the backend; no SvelteKit WebSocket plugin needed.
   ],
   build: {
     target: "esnext",
@@ -52,7 +47,7 @@ export default defineConfig({
         ws: true,
       },
     },
-    allowedHosts: ["dev.lzart.com.br"],
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS?.split(",").map((host) => host.trim()),
     forwardConsole: true,
     watch: {
       ignored: [

@@ -2,11 +2,11 @@
 .cursor
 .husky
 .pnpm-store
-.svelte-kit
+**/.svelte-kit
 .vscode
 build
 data
-node_modules
+**/node_modules
 openspec
 playwrite-report
 scripts

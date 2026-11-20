@@ -79,8 +79,7 @@
       {#if !cantClose}
         <button
           onclick={(e) => handleClose(e, false)}
-          disabled={cantClose}
-          class="btn btn-sm btn-circle gelatin">
+          class="btn btn-sm btn-circle">
           <CloseIcon class="text-lg" />
         </button>
       {/if}

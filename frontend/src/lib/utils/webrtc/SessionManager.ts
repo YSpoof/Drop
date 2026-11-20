@@ -58,7 +58,7 @@ export class SessionManager {
       signaling: this.signaling,
       codeJoin: this.codeJoin,
     });
-    this.queueService.bind(() => this.peerSession.getTransferManager());
+    this.queueService.bind(() => this.peerSession.getEngine());
   }
 
   announce() {
@@ -108,7 +108,7 @@ export class SessionManager {
 
   destroy() {
     this.peerSession.abort();
-    this.signaling.disconnect();
+    this.signaling.stop();
     this.peerSession.disposePeerConnection();
     this.codeJoin.destroy();
     this.queueService.reset();

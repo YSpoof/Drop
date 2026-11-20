@@ -2,8 +2,7 @@
   import CheckCircleIcon from "~icons/mdi/check-circle";
 
   import GenericModal from "#lib/components/ui/GenericModal.svelte";
-
-  type CodeJoinPhase = "waiting" | "connecting" | "connected";
+  import type { CodeJoinPhase } from "#lib/stores/peerStore.svelte.js";
 
   interface Props {
     open: boolean;

@@ -73,5 +73,5 @@ export async function loadIdentity(): Promise<DeviceIdentity> {
 }
 
 export async function saveDisplayName(name: string) {
-  localForage.setItem(DISPLAY_NAME_KEY, name);
+  await localForage.setItem(DISPLAY_NAME_KEY, name);
 }

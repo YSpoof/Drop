@@ -1,8 +1,8 @@
-import { CODE_JOIN_RETRY_MS, CODE_JOIN_WAIT_MS } from "#lib/consts.js";
 import {
   CODE_JOIN_CLOSE_MS,
   CODE_JOIN_CONNECTED_CLOSE_MS,
-  PAIRING_TIMEOUT_MS,
+  CODE_JOIN_RETRY_MS,
+  CODE_JOIN_WAIT_MS,
 } from "#lib/consts.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
@@ -15,7 +15,6 @@ export class CodeJoinController {
   private joinWait: PromiseWithResolvers<string | null> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private waitTimeout: ReturnType<typeof setTimeout> | null = null;
-  private pairingTimeout: ReturnType<typeof setTimeout> | null = null;
   private connectedTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -57,9 +56,8 @@ export class CodeJoinController {
     this.resolveJoin(null);
 
     peerStore.codeJoinPhase = "connecting";
-    peerStore.connectingPeerId = hostId;
+    // The pairing timeout lives in the peer session; it reports back through `fail`.
     this.peerSession().connectPeer(hostId, lan);
-    this.armPairingTimeout();
   }
 
   onJoinRejected() {
@@ -75,7 +73,6 @@ export class CodeJoinController {
 
   onPeerConnected() {
     this.clearRetry();
-    this.clearPairingTimeout();
     if (uiStore.codeJoinOpen) this.finishSuccess();
   }
 
@@ -89,7 +86,6 @@ export class CodeJoinController {
     if (!uiStore.codeJoinOpen || this.connectedTimeout) return;
 
     this.clearRetry();
-    this.clearPairingTimeout();
     peerStore.codeJoinPhase = "connected";
     this.connectedTimeout = setTimeout(() => {
       this.connectedTimeout = null;
@@ -102,13 +98,11 @@ export class CodeJoinController {
     this.code = null;
     this.clearTimers();
 
-    if (this.peerSession().hasPeerConnection()) {
-      this.peerSession().disposePeerConnection({ markHandled: true });
-    }
+    if (this.peerSession().hasPeerConnection()) this.peerSession().dropPeer();
     peerStore.connectingPeerId = null;
     peerStore.connectedPeerInfo = null;
 
-    this.signaling.suspend();
+    this.signaling.stop();
     this.closeOverlay();
 
     if (this.joinWait) {
@@ -118,8 +112,14 @@ export class CodeJoinController {
     this.onJoinFailed(message);
   }
 
+  /** Closing the overlay; once connected it only hides it and keeps the connection. */
   cancel() {
     if (!uiStore.codeJoinOpen) return;
+    if (peerStore.codeJoinPhase === "connected") {
+      this.clearConnectedTimeout();
+      this.closeOverlay();
+      return;
+    }
     this.fail("Conexão cancelada");
   }
 
@@ -150,21 +150,6 @@ export class CodeJoinController {
     }, CODE_JOIN_WAIT_MS);
   }
 
-  private armPairingTimeout() {
-    this.clearPairingTimeout();
-    this.pairingTimeout = setTimeout(() => {
-      this.pairingTimeout = null;
-      if (peerStore.connectedPeerId) return;
-      this.fail("Falha na conexão");
-    }, PAIRING_TIMEOUT_MS);
-  }
-
-  private clearPairingTimeout() {
-    if (!this.pairingTimeout) return;
-    clearTimeout(this.pairingTimeout);
-    this.pairingTimeout = null;
-  }
-
   private clearJoinWait() {
     if (!this.waitTimeout) return;
     clearTimeout(this.waitTimeout);
@@ -186,7 +171,6 @@ export class CodeJoinController {
   private clearTimers() {
     this.clearJoinWait();
     this.clearRetry();
-    this.clearPairingTimeout();
     this.clearConnectedTimeout();
   }
 

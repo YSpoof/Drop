@@ -20,6 +20,16 @@
 
   let { open, name, actions, onSelect, onClose }: Props = $props();
 
+  function actionClass(id: FileTreeAction["id"]) {
+    switch (id) {
+      case "remove":
+        return "btn-error";
+      case "download":
+      case "download-folder":
+        return "btn-accent";
+    }
+  }
+
   function handleSelect(id: FileTreeAction["id"]) {
     onSelect(id);
     onClose();
@@ -35,11 +45,7 @@
     {#each actions as action (action.id)}
       <button
         type="button"
-        class="btn-block btn btn-soft flex items-center gap-2 {action.id === 'remove'
-          ? 'btn-error'
-          : action.id.includes('download')
-            ? 'btn-accent'
-            : ''}"
+        class="btn-block btn btn-soft flex items-center gap-2 {actionClass(action.id)}"
         onclick={() => handleSelect(action.id)}>
         {#if action.id === "download"}
           <FileDownloadIcon class="text-base" />

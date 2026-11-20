@@ -22,20 +22,6 @@
   font-style: normal;
 }
 
-@theme {
-  --animate-fade-in-scale: fade-in-scale 1.2s ease-in-out infinite alternate;
-  @keyframes fade-in-scale {
-    0% {
-      opacity: 0.9;
-      transform: scale(0.95);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-}
-
 @plugin "daisyui/theme/index.js" {
   name: "light";
   default: true;
@@ -126,8 +112,6 @@ html {
 }
 
 .card {
-  view-transition-name: var(--cardId);
-
   transition:
     opacity 0.3s ease,
     translate 0.3s ease;

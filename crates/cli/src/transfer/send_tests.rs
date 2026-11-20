@@ -7,6 +7,7 @@ use tokio::time::timeout;
 
 use super::*;
 use crate::config::Store;
+use crate::protocol::split_frame;
 use crate::rtc::Inbound;
 use crate::state::{Command, SessionState, Shared};
 use crate::transfer::{self, Inbox, Outbound};
@@ -54,6 +55,10 @@ impl Harness {
 struct Remote {
     out: Outbound,
     events: UnboundedSender<Ctrl>,
+    /// File bytes per frame announced by the link.
+    chunk: usize,
+    /// Stream ID of the last `start`.
+    stream: u32,
 }
 
 impl Remote {
@@ -88,7 +93,19 @@ impl Remote {
 
     async fn start(&mut self) -> String {
         match self.until(|m| matches!(m, Ctrl::Start { .. })).await {
-            Ctrl::Start { file_id, .. } => file_id,
+            Ctrl::Start {
+                file_id,
+                chunk_size,
+                stream_id,
+                ..
+            } => {
+                assert_eq!(
+                    chunk_size as usize, self.chunk,
+                    "chunk size counts file bytes"
+                );
+                self.stream = stream_id;
+                file_id
+            }
             _ => unreachable!(),
         }
     }
@@ -105,35 +122,41 @@ impl Remote {
         });
     }
 
-    /// Reads `len` file bytes.
+    /// Reads `len` file bytes from frames of the last started stream.
     async fn bytes(&mut self, len: usize) -> Vec<u8> {
         let mut data = Vec::new();
         while data.len() < len {
-            let chunk = timeout(WAIT, self.out.files.recv()).await.unwrap().unwrap();
+            let frame = timeout(WAIT, self.out.files.recv()).await.unwrap().unwrap();
+            let (stream, chunk) = split_frame(&frame).expect("frame header");
+            assert_eq!(stream, self.stream, "frame of the current stream");
+            assert!(chunk.len() <= self.chunk, "at most one chunk per frame");
             data.extend_from_slice(&chunk);
         }
         data
     }
 }
 
-/// Runs `outbox` on a fresh link with `drive` as the remote. Returns how the outbox ended,
-/// `None` when it is still running [`SETTLE`] after the driver finished.
+/// Runs `outbox` on a fresh link with `drive` as the remote, which first announces `mode`
+/// with `download-mode` (`None`: the driver does it). Returns how the outbox ended, `None`
+/// when it is still running [`SETTLE`] after the driver finished.
 async fn session<F: Future<Output = ()>>(
     outbox: &mut Outbox,
     cx: &Cx,
     chunk: usize,
-    manual_peer: bool,
+    mode: Option<bool>,
     drive: impl FnOnce(Remote) -> F,
 ) -> Option<End> {
     let (link, out) = Link::new(chunk);
     let (events_tx, mut events) = mpsc::unbounded_channel();
     let (_queue_tx, mut queue) = mpsc::unbounded_channel();
-    if manual_peer {
-        events_tx.send(Ctrl::DownloadMode { manual: true }).unwrap();
+    if let Some(manual) = mode {
+        events_tx.send(Ctrl::DownloadMode { manual }).unwrap();
     }
     let remote = Remote {
         out,
         events: events_tx,
+        chunk,
+        stream: 0,
     };
     let run = outbox.run(&link, &mut events, &mut queue, cx);
     let drive = drive(remote);
@@ -174,7 +197,7 @@ async fn watched_file_announces_relative_name_and_hash() {
     let path = h.file("root/nested/a.txt", b"hi");
     let entry = Outgoing::watched(path, &h.dir.path().join("root"));
     let mut outbox = Outbox::new(vec![entry], true);
-    let end = session(&mut outbox, &h.cx, 1024, false, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 1024, Some(false), |mut remote| async move {
         let (id, name, hash) = remote.meta().await;
         assert_eq!(name, "root/nested/a.txt");
         assert!(hash.starts_with("root/nested/a.txt|2|"), "{hash}");
@@ -207,7 +230,7 @@ async fn manual_peer_gets_no_start_before_pull() {
     let h = harness();
     let path = h.file("file.bin", &[1; 4096]);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
-    let end = session(&mut outbox, &h.cx, 1024, true, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 1024, Some(true), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         let early = timeout(Duration::from_millis(150), remote.out.ctrl.recv()).await;
         assert!(early.is_err(), "nothing before pull: {early:?}");
@@ -226,12 +249,68 @@ async fn manual_peer_gets_no_start_before_pull() {
 }
 
 #[tokio::test]
+async fn sender_waits_for_download_mode_before_the_first_start() {
+    let h = harness();
+    let path = h.file("mode.bin", b"mode");
+    let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
+    let end = session(&mut outbox, &h.cx, 1024, None, |mut remote| async move {
+        let (id, _, hash) = remote.meta().await;
+        let early = timeout(Duration::from_millis(150), remote.out.ctrl.recv()).await;
+        assert!(early.is_err(), "nothing before download-mode: {early:?}");
+
+        remote.send(Ctrl::DownloadMode { manual: false });
+        assert_eq!(remote.start().await, id, "an auto peer starts once it said so");
+        remote.resume(&id, &hash, 0);
+        assert_eq!(remote.bytes(4).await, b"mode");
+        remote.until(|m| matches!(m, Ctrl::Done { .. })).await;
+        remote.send(Ctrl::Ack { file_id: id });
+    })
+    .await;
+    assert_eq!(end, Some(End::Sent));
+}
+
+#[tokio::test]
+async fn manual_remote_after_reconnect_is_not_sent_an_unpulled_file() {
+    let h = harness();
+    let path = h.file("again.bin", &[7; 64 * 1024]);
+    let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
+    let first = session(&mut outbox, &h.cx, 4096, Some(false), |mut remote| async move {
+        let (id, _, hash) = remote.meta().await;
+        remote.start().await;
+        remote.resume(&id, &hash, 0);
+        remote.bytes(4096).await;
+    })
+    .await;
+    assert_eq!(first, Some(End::Lost));
+    outbox.abort();
+
+    // The new peer is manual; its `download-mode` comes after the announcement.
+    let end = session(&mut outbox, &h.cx, 4096, None, |mut remote| async move {
+        let (id, _, hash) = remote.meta().await;
+        remote.send(Ctrl::DownloadMode { manual: true });
+        let early = timeout(Duration::from_millis(150), remote.out.ctrl.recv()).await;
+        assert!(early.is_err(), "no start for an unpulled file: {early:?}");
+
+        remote.send(Ctrl::Pull {
+            file_id: id.clone(),
+        });
+        assert_eq!(remote.start().await, id);
+        remote.resume(&id, &hash, 0);
+        remote.bytes(64 * 1024).await;
+        remote.until(|m| matches!(m, Ctrl::Done { .. })).await;
+        remote.send(Ctrl::Ack { file_id: id });
+    })
+    .await;
+    assert_eq!(end, Some(End::Sent));
+}
+
+#[tokio::test]
 async fn download_aborted_before_pull_keeps_offer_pending() {
     let h = harness();
     let path = h.file("x.bin", b"data");
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
     let state = h.cx.state.clone();
-    let end = session(&mut outbox, &h.cx, 1024, true, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 1024, Some(true), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.send(Ctrl::DownloadAborted {
             file_id: id.clone(),
@@ -257,7 +336,7 @@ async fn download_aborted_mid_send_resets_to_pending() {
     let path = h.file("big.bin", &[2; 256 * 1024]);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
     let state = h.cx.state.clone();
-    let end = session(&mut outbox, &h.cx, 4096, false, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 4096, Some(false), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.start().await;
         remote.resume(&id, &hash, 0);
@@ -292,7 +371,7 @@ async fn inbound_cancel_stops_the_send_and_moves_on() {
     let files = vec![Outgoing::file(big), Outgoing::file(small)];
     let mut outbox = Outbox::new(files, true);
     let state = h.cx.state.clone();
-    let end = session(&mut outbox, &h.cx, 4096, false, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 4096, Some(false), |mut remote| async move {
         let (big_id, _, big_hash) = remote.meta().await;
         let (small_id, _, small_hash) = remote.meta().await;
         assert_eq!(remote.start().await, big_id);
@@ -309,8 +388,8 @@ async fn inbound_cancel_stops_the_send_and_moves_on() {
             "next file follows the cancel"
         );
         let mut big_bytes = 4096;
-        while let Ok(chunk) = remote.out.files.try_recv() {
-            big_bytes += chunk.len();
+        while let Ok(frame) = remote.out.files.try_recv() {
+            big_bytes += frame.len() - FRAME_HEADER;
         }
         assert!(big_bytes < total, "the cancelled file was not sent in full");
         let row = state.borrow().transfers[0].clone();
@@ -338,9 +417,10 @@ async fn resume_offset_is_honored_only_for_matching_hash() {
     let path = h.file("r.bin", &data);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], false);
     let tail = data[2000..].to_vec();
-    session(&mut outbox, &h.cx, 1000, false, |mut remote| async move {
+    session(&mut outbox, &h.cx, 1000, Some(false), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.start().await;
+        let first = remote.stream;
         remote.resume(&id, "other|1|2", 2000);
         assert_eq!(
             remote.bytes(4000).await.len(),
@@ -354,6 +434,10 @@ async fn resume_offset_is_honored_only_for_matching_hash() {
             file_id: id.clone(),
         });
         remote.start().await;
+        assert_ne!(
+            remote.stream, first,
+            "a new start of the same file gets a new stream"
+        );
         remote.resume(&id, &hash, 2000);
         assert_eq!(
             remote.bytes(2000).await,
@@ -370,7 +454,7 @@ async fn window_holds_at_8_mib_until_credit_for_that_file() {
     let chunk = 64 * 1024;
     let path = h.file("w.bin", &vec![9; 9 << 20]);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
-    let end = session(&mut outbox, &h.cx, chunk, false, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, chunk, Some(false), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.start().await;
         remote.resume(&id, &hash, 0);
@@ -403,7 +487,7 @@ async fn progress_follows_credits_and_stays_below_size_until_ack() {
     let path = h.file("p.bin", &[1; 3000]);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
     let state = h.cx.state.clone();
-    session(&mut outbox, &h.cx, 1000, false, |mut remote| async move {
+    session(&mut outbox, &h.cx, 1000, Some(false), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.start().await;
         remote.resume(&id, &hash, 0);
@@ -430,15 +514,40 @@ async fn progress_follows_credits_and_stays_below_size_until_ack() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn missing_resume_starts_at_zero_and_missing_ack_fails() {
+async fn missing_resume_fails_the_file_and_sends_cancel() {
     let h = harness();
     let path = h.file("t.bin", b"abc");
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
-    let end = session(&mut outbox, &h.cx, 1024, false, |mut remote| async move {
-        remote.meta().await;
+    let end = session(&mut outbox, &h.cx, 1024, Some(false), |mut remote| async move {
+        let (id, _, _) = remote.meta().await;
         remote.start().await;
+        let cancel = remote.until(|m| matches!(m, Ctrl::Cancel { .. })).await;
+        assert_eq!(
+            cancel,
+            Ctrl::Cancel { file_id: id, reason: Some(RESUME_TIMED_OUT.into()) }
+        );
+        assert_eq!(remote.ctrl().await, Ctrl::BatchDone);
+    })
+    .await;
+    assert_eq!(end, Some(End::Sent));
+    let row = h.cx.state.borrow().transfers[0].clone();
+    assert_eq!(row.status, TransferStatus::Failed);
+    assert_eq!(row.reason.as_deref(), Some(RESUME_TIMED_OUT));
+}
+
+#[tokio::test(start_paused = true)]
+async fn missing_ack_fails_the_file_and_sends_cancel() {
+    let h = harness();
+    let path = h.file("t.bin", b"abc");
+    let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
+    let end = session(&mut outbox, &h.cx, 1024, Some(false), |mut remote| async move {
+        let (id, _, hash) = remote.meta().await;
+        remote.start().await;
+        remote.resume(&id, &hash, 0);
         assert_eq!(remote.bytes(3).await, b"abc");
         remote.until(|m| matches!(m, Ctrl::Done { .. })).await;
+        let cancel = remote.until(|m| matches!(m, Ctrl::Cancel { .. })).await;
+        assert_eq!(cancel, Ctrl::Cancel { file_id: id, reason: Some(ACK_TIMED_OUT.into()) });
         assert_eq!(remote.ctrl().await, Ctrl::BatchDone);
     })
     .await;
@@ -453,7 +562,7 @@ async fn peer_loss_requeues_and_reannounces_with_one_row() {
     let h = harness();
     let path = h.file("again.bin", &[5; 64 * 1024]);
     let mut outbox = Outbox::new(vec![Outgoing::file(path)], true);
-    let first = session(&mut outbox, &h.cx, 4096, false, |mut remote| async move {
+    let first = session(&mut outbox, &h.cx, 4096, Some(false), |mut remote| async move {
         let (id, _, hash) = remote.meta().await;
         remote.start().await;
         remote.resume(&id, &hash, 0);
@@ -467,7 +576,7 @@ async fn peer_loss_requeues_and_reannounces_with_one_row() {
     let old_id = h.cx.state.borrow().transfers[0].id.clone();
     assert_eq!(h.row(&old_id).reason.as_deref(), Some("conexão perdida"));
 
-    let end = session(&mut outbox, &h.cx, 4096, false, |mut remote| async move {
+    let end = session(&mut outbox, &h.cx, 4096, Some(false), |mut remote| async move {
         let (id, name, hash) = remote.meta().await;
         assert_ne!(id, old_id);
         assert_eq!(name, "again.bin");
@@ -493,12 +602,15 @@ async fn files_queued_while_connected_are_announced_and_sent() {
     let (events_tx, mut events) = mpsc::unbounded_channel();
     let (queue_tx, mut queue) = mpsc::unbounded_channel();
     let run = outbox.run(&link, &mut events, &mut queue, &h.cx);
+    events_tx.send(Ctrl::DownloadMode { manual: false }).unwrap();
     let drive = async {
         queue_tx.send(Outgoing::file(path)).unwrap();
         let Some(Ctrl::Meta { file_id, hash, .. }) = out.ctrl.recv().await else {
             panic!("meta first");
         };
-        out.ctrl.recv().await; // start
+        let Some(Ctrl::Start { stream_id, .. }) = out.ctrl.recv().await else {
+            panic!("start after meta");
+        };
         events_tx
             .send(Ctrl::Resume {
                 file_id: file_id.clone(),
@@ -506,7 +618,9 @@ async fn files_queued_while_connected_are_announced_and_sent() {
                 bytes_offset: 0,
             })
             .unwrap();
-        assert_eq!(&out.files.recv().await.unwrap()[..], b"late");
+        let frame = out.files.recv().await.unwrap();
+        assert_eq!(frame[..FRAME_HEADER], stream_id.to_be_bytes());
+        assert_eq!(&frame[FRAME_HEADER..], b"late");
     };
     tokio::select! {
         end = run => panic!("outbox ended: {end:?}"),

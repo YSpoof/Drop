@@ -11,6 +11,7 @@
   import { siteData } from "#lib/siteData.js";
   import { installPromptStore } from "#lib/stores/installPrompt.svelte.js";
   import { toastStore } from "#lib/stores/toast.svelte.js";
+  import { uiStore } from "#lib/stores/uiStore.svelte.js";
   import { isWindowsOrLinux } from "#lib/utils/device/os.js";
 
   type ProductChoice = "cli" | "app" | null;
@@ -29,14 +30,13 @@
     "card bg-base-100 dark:bg-base-300 border-2 border-transparent text-left shadow-sm";
   const downloadLinkClass = "btn btn-sm btn-block btn-primary btn-soft";
 
-  let modalOpen = $state(false);
   let productChoice = $state<ProductChoice>(null);
   const showButton = $derived(
     !environment.isDesktop && (desktopOs || !!installPromptStore.current),
   );
 
   const closeModal = () => {
-    modalOpen = false;
+    uiStore.installModalOpen = false;
     productChoice = null;
   };
 
@@ -59,7 +59,7 @@
   const handleClick = () => {
     if (desktopOs) {
       productChoice = null;
-      modalOpen = true;
+      uiStore.installModalOpen = true;
       return;
     }
     void installPwa();
@@ -77,7 +77,7 @@
 {/if}
 
 <GenericModal
-  open={modalOpen}
+  open={uiStore.installModalOpen}
   title="Instalar aplicativo"
   onClose={closeModal}
   modalClass="w-full md:max-w-sm">

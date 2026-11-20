@@ -243,6 +243,11 @@ pub fn err_reset_stats(err: impl Display) -> String {
     format!("falha ao zerar estatísticas: {err}")
 }
 
-/// Transfer failure reasons.
+// Transfer failure reasons.
+
+/// The written length differs from `meta.size`.
 pub const SIZE_MISMATCH: &str = "tamanho divergente";
+/// The receiver never acknowledged a file.
 pub const ACK_TIMED_OUT: &str = "tempo esgotado aguardando confirmação";
+/// The receiver never answered `start` with `resume`.
+pub const RESUME_TIMED_OUT: &str = "tempo esgotado aguardando o destinatário";

@@ -11,8 +11,20 @@ class UiStore {
   statsModalOpen = $state(false);
   settingsModalOpen = $state(false);
   shareNotifyModalOpen = $state(false);
+  installModalOpen = $state(false);
   shareNotifyDenied = $state(false);
   devMode = $state(initialDevMode);
+
+  anyModalOpen = $derived(
+    this.unsupportedBrowserModalOpen ||
+      this.codeJoinOpen ||
+      this.setupWizardOpen ||
+      this.infoModalOpen ||
+      this.statsModalOpen ||
+      this.settingsModalOpen ||
+      this.shareNotifyModalOpen ||
+      this.installModalOpen,
+  );
 
   setDevMode(value: boolean) {
     this.devMode = value;

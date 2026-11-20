@@ -1,13 +1,13 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { inject } from "quick-di";
+import { untrack } from "svelte";
 
 import { ClipboardPort } from "#lib/ports/clipboard.js";
 import { NotificationsPort } from "#lib/ports/notifications.js";
 import { DownloadService } from "#lib/services/downloadService.js";
 import { QueueService } from "#lib/services/queueService.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
-import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
@@ -105,25 +105,16 @@ export function setupSessionEffects(
     }
   });
 
+  // Re-announce only when the code or role changes; announce() also reads the display name
+  // and dev-mode logger state, which must not trigger a new announce on every keystroke.
   $effect(() => {
     options.getCode();
     options.getIsHost();
-    session.announce();
+    untrack(() => session.announce());
   });
 
   $effect(() => {
     session.peerSession.setManualDownload(!transferStore.autoDownload);
-  });
-
-  $effect(() => {
-    if (uiStore.codeJoinOpen && peerStore.connectedPeerId) {
-      session.codeJoin.finishSuccess();
-    }
-  });
-
-  $effect.pre(() => {
-    if (uiStore.unsupportedBrowserModalOpen) lazyLoad.mark("unsupportedBrowser");
-    if (uiStore.codeJoinOpen) lazyLoad.mark("codeJoin");
   });
 }
 

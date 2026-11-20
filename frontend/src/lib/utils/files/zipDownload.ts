@@ -27,14 +27,59 @@ interface QueuedEntry {
   input: ReadableStream<Uint8Array>;
 }
 
+type AddEntry = () => Promise<WritableStreamDefaultWriter<Uint8Array>>;
+
+/** Abort/cancel outcomes that callers already handle; anything else rejects `finalize()`. */
+function isBenign(error: unknown) {
+  if (error === undefined) return true; // writer.abort() without a reason
+  return error instanceof DownloadError && error.message === "Download cancelled";
+}
+
+const ignore = () => undefined;
+
+/**
+ * One file inside the zip. It joins the archive on its first write (or on `close` when it
+ * is empty), so an entry aborted before any byte leaves no trace. Aborting after bytes were
+ * written ends the entry where it stopped: the archive keeps that truncated file, with its
+ * real CRC and size, and stays valid for every other entry.
+ */
+export class ZipEntry {
+  private writer: Promise<WritableStreamDefaultWriter<Uint8Array>> | null = null;
+  private ended = false;
+
+  constructor(private readonly add: AddEntry) {}
+
+  async write(bytes: Uint8Array) {
+    if (this.ended) throw new Error("Zip entry closed");
+    this.writer ??= this.add();
+    await (await this.writer).write(bytes);
+  }
+
+  async close() {
+    if (this.ended) throw new Error("Zip entry closed");
+    this.ended = true;
+    this.writer ??= this.add();
+    await (await this.writer).close();
+  }
+
+  /** Never errors the zip: an unwritten entry is skipped, a started one is ended. */
+  async abort() {
+    if (this.ended) return;
+    this.ended = true;
+    const writer = await this.writer?.catch(ignore);
+    await writer?.close().catch(ignore);
+  }
+}
+
 export class ZipDownloadSession {
   private readonly downloads = inject(DownloadService);
   private queue: QueuedEntry[] = [];
+  private entryControls: TransformStreamDefaultController<Uint8Array>[] = [];
   private usedNames = new Set<string>();
   private wake: (() => void) | null = null;
   private closed = false;
-  private started = false;
   private finalized = false;
+  private starting: Promise<void> | null = null;
   private streamDone = Promise.resolve();
   private readonly filename: string;
 
@@ -45,63 +90,59 @@ export class ZipDownloadSession {
     this.filename = filename;
   }
 
-  isFinalized() {
-    return this.finalized;
-  }
-
   private async start() {
-    if (this.started || typeof window === "undefined") return;
-    this.started = true;
+    if (typeof window === "undefined") return;
 
     const fileStream = await this.downloads.createWritableStream(this.filename, {
       mime: "application/zip",
       onAbort: this.opts.onAbort,
     });
     const { downloadZip } = await import("client-zip");
-    const response = downloadZip(this.entries());
+    const body = downloadZip(this.entries()).body;
+    if (!body) throw new Error("Zip response has no body");
 
-    this.streamDone = (async () => {
-      if (!response.body) {
-        throw new Error("Zip response has no body");
-      }
-      await response.body.pipeTo(fileStream);
-    })().catch((error) => {
-      // Browser/SW abort and entry teardown surface here; callers that care await finalize().
-      if (error instanceof Error && error.message === "Zip entry aborted") return;
-      if (error instanceof DownloadError && error.message === "Download cancelled") return;
-      throw error;
+    this.streamDone = body.pipeTo(fileStream).catch((error: unknown) => {
+      this.fail(error);
+      if (!isBenign(error)) throw error;
     });
+    // `finalize()` reports the failure; until then it is not an unhandled rejection.
+    this.streamDone.catch(ignore);
   }
 
-  async openEntry(name: string, size: number): Promise<WritableStreamDefaultWriter<Uint8Array>> {
-    if (this.finalized) {
-      throw new Error("Zip download already finalized");
-    }
-    if (!this.started) await this.start();
-
-    let streamController!: ReadableStreamDefaultController<Uint8Array>;
-    const input = new ReadableStream<Uint8Array>({
-      start(controller) {
-        streamController = controller;
-      },
-    });
-
-    const entryName = uniqueName(name, this.usedNames);
-    this.queue.push({ name: entryName, size, input });
+  /** The zip stream died: error every entry so no writer waits forever. */
+  private fail(error: unknown) {
+    this.closed = true;
     this.wake?.();
     this.wake = null;
+    for (const control of this.entryControls) control.error(error);
+  }
 
-    return new WritableStream<Uint8Array>({
-      write(chunk) {
-        streamController.enqueue(chunk);
+  /** A new entry. Its writes resolve only as the zip stream consumes them (backpressure). */
+  async openEntry(name: string, size: number): Promise<ZipEntry> {
+    if (this.finalized) throw new Error("Zip download already finalized");
+    return new ZipEntry(() => this.add(name, size));
+  }
+
+  /** Queues an entry into the zip; the download itself starts with the first entry. */
+  private async add(name: string, size: number): Promise<WritableStreamDefaultWriter<Uint8Array>> {
+    if (this.closed) throw new Error("Zip download closed");
+    // A failed start resets, so the next entry retries instead of queueing into nothing.
+    this.starting ??= this.start().catch((error: unknown) => {
+      this.starting = null;
+      throw error;
+    });
+    await this.starting;
+    if (this.closed) throw new Error("Zip download closed");
+
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>({
+      start: (control) => {
+        this.entryControls.push(control);
       },
-      close() {
-        streamController.close();
-      },
-      abort(reason) {
-        streamController.error(reason ?? new Error("Zip entry aborted"));
-      },
-    }).getWriter();
+    });
+    this.queue.push({ name: uniqueName(name, this.usedNames), size, input: readable });
+    this.wake?.();
+    this.wake = null;
+    return writable.getWriter();
   }
 
   async finalize() {

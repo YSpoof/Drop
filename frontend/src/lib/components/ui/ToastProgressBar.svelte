@@ -49,7 +49,7 @@
   class="pointer-events-none absolute bottom-0 left-0 h-1 w-full bg-black/15"
   aria-hidden="true">
   <div
-    class={`toast-progress-fill h-full ${progressClass}`}
+    class={`h-full ${progressClass}`}
     style={`width:${progress * 100}%;`}>
   </div>
 </div>

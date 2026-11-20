@@ -49,10 +49,6 @@ class ToastStore {
   removeToast(toastId: number) {
     this.toastsPool = this.toastsPool.filter((item) => item.id !== toastId);
   }
-
-  clearToasts() {
-    this.toastsPool = [];
-  }
 }
 
 export const toastStore = new ToastStore();

@@ -1,6 +1,7 @@
-import { FastRTC, type Channel, type Peer, type SignalPayload } from "fastrtc";
+import { FastRTC, type Peer, type SignalPayload } from "fastrtc";
 import { inject } from "quick-di";
 
+import { PAIRING_TIMEOUT_MS } from "#lib/consts.js";
 import { DownloadService } from "#lib/services/downloadService.js";
 import { TransferService } from "#lib/services/transferService.js";
 import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
@@ -8,14 +9,13 @@ import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
 import { uiStore } from "#lib/stores/uiStore.svelte.js";
+import type { Engine } from "#lib/transfer/engine.js";
 import { logger } from "#lib/utils/logger.js";
 import type { SignalingClient } from "#lib/utils/signaling/client.js";
 import type { CodeJoinController } from "#lib/utils/webrtc/codeJoin.js";
-import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
+import { CTRL_LABEL, FILES_LABEL, PeerLink } from "#lib/utils/webrtc/link.js";
 
 const RESUME_AFTER_DISCONNECT_MS = 2_000;
-const CTRL_LABEL = "ctrl";
-const FILES_LABEL = "files";
 
 export type PeerSessionDeps = {
   signaling: SignalingClient;
@@ -26,21 +26,19 @@ export class PeerSessionCoordinator {
   private readonly downloadService = inject(DownloadService);
   private readonly transferService = inject(TransferService);
   private rtc: FastRTC | null = null;
-  private transferManager: TransferManager | null = null;
+  private link: PeerLink | null = null;
+  private engine: Engine | null = null;
   private activeTargetPeerId: string | null = null;
   private peerDisconnectHandled = false;
   private pendingLan = false;
   private lastConnectedPeerId: string | null = null;
-  private channelsStarted = false;
-  private ctrl: Channel | null = null;
-  private files: Channel | null = null;
   private stopRtcEvents: (() => void) | null = null;
-  private stopChannelClose: (() => void) | null = null;
+  private pairingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly deps: PeerSessionDeps) {}
 
-  getTransferManager() {
-    return this.transferManager;
+  getEngine() {
+    return this.engine;
   }
 
   hasPeerConnection() {
@@ -48,68 +46,82 @@ export class PeerSessionCoordinator {
   }
 
   setManualDownload(manual: boolean) {
-    this.transferManager?.setManualDownload(manual);
+    this.engine?.setManual(manual);
   }
 
+  /** Starts a new pairing; a re-pair with the same peer replaces its old connection. */
   connectPeer(targetPeerId: string, lan = false) {
+    this.setupRtc(targetPeerId, true);
     this.pendingLan = lan;
-    this.setupRtc(targetPeerId);
-    this.onPeerReady(this.rtc!.connect(targetPeerId));
+    peerStore.connectedPeerId = null;
+    peerStore.connectingPeerId = targetPeerId;
+    this.armPairingTimeout();
+    this.openLink(this.rtc!.connect(targetPeerId));
   }
 
   handleSignal(fromPeerId: string, payload: SignalPayload) {
     if (this.activeTargetPeerId && this.activeTargetPeerId !== fromPeerId) return;
     this.setupRtc(fromPeerId);
-    this.onPeerReady(this.rtc!.receive(fromPeerId, payload));
+    this.openLink(this.rtc!.receive(fromPeerId, payload));
   }
 
   disconnectPeer() {
     this.downloadService.abortAll();
-    this.transferManager?.sendBye();
+    this.engine?.bye();
     this.cleanupPeerConnection();
   }
 
+  /**
+   * Stops the engine, resets the peer and transfer state, and closes the connection, without
+   * the disconnect toast or a signaling resume (a failed or cancelled code join).
+   */
+  dropPeer() {
+    transferStore.resetTransferState();
+    this.transferService.clearPendingBatchCompletions();
+    this.abort();
+
+    peerStore.connectedPeerId = null;
+    peerStore.connectedPeerInfo = null;
+    peerStore.connectingPeerId = null;
+    peerStore.connectedViaLan = false;
+    this.pendingLan = false;
+
+    this.disposePeerConnection({ markHandled: true });
+  }
+
   handlePageUnload() {
-    this.transferManager?.abort();
-    this.transferManager = null;
+    this.abort();
     this.disposePeerConnection();
   }
 
   abort() {
-    this.transferManager?.abort();
-    this.transferManager = null;
+    this.engine?.close();
+    this.engine = null;
   }
 
   disposePeerConnection(options?: { markHandled?: boolean }) {
-    const handled = options?.markHandled ?? false;
     this.peerDisconnectHandled = true;
-    const rtc = this.rtc;
+    this.clearPairingTimeout();
+    const { rtc, link } = this;
     this.rtc = null;
+    this.link = null;
     this.activeTargetPeerId = null;
-    this.ctrl = null;
-    this.files = null;
-    this.channelsStarted = false;
+    link?.close();
     this.stopRtcEvents?.();
-    this.stopChannelClose?.();
     this.stopRtcEvents = null;
-    this.stopChannelClose = null;
     rtc?.dispose();
-    this.peerDisconnectHandled = handled;
+    this.peerDisconnectHandled = options?.markHandled ?? false;
   }
 
-  private setupRtc(targetPeerId: string) {
-    if (this.rtc && this.activeTargetPeerId === targetPeerId) return;
+  private setupRtc(targetPeerId: string, fresh = false) {
+    if (!fresh && this.rtc && this.activeTargetPeerId === targetPeerId) return;
 
-    this.transferManager?.abort();
-    this.transferManager = null;
+    this.abort();
     transferStore.resetTransferState();
     this.disposePeerConnection();
 
     this.peerDisconnectHandled = false;
     this.activeTargetPeerId = targetPeerId;
-    this.channelsStarted = false;
-    this.ctrl = null;
-    this.files = null;
 
     const rtc = new FastRTC({
       id: deviceStore.identity.peerId,
@@ -122,88 +134,51 @@ export class PeerSessionCoordinator {
     rtc.channel(FILES_LABEL, { ordered: true });
 
     const events = new AbortController();
-    rtc.addEventListener(
-      "leave",
-      ({ id }) => {
-        if (id !== targetPeerId) return;
-        this.cleanupPeerConnection();
-      },
-      { signal: events.signal },
-    );
-    rtc.addEventListener(
-      "error",
-      ({ id }) => {
-        if (id !== targetPeerId) return;
-        this.cleanupPeerConnection();
-      },
-      { signal: events.signal },
-    );
+    const onLoss = ({ id }: { id: string }) => {
+      if (id === targetPeerId) this.cleanupPeerConnection();
+    };
+    rtc.addEventListener("leave", onLoss, { signal: events.signal });
+    rtc.addEventListener("error", onLoss, { signal: events.signal });
     this.stopRtcEvents = () => events.abort();
   }
 
-  private onPeerReady(peer: Peer) {
-    void peer.ready.then(
-      () => {
-        if (!this.rtc) return;
-        if (this.channelsStarted) return;
-        if (peer.id !== this.activeTargetPeerId) return;
-        this.ctrl = peer.channels.get(CTRL_LABEL) ?? null;
-        this.files = peer.channels.get(FILES_LABEL) ?? null;
-        this.watchChannelClose();
-        this.tryStartTransfers(peer.id);
-      },
+  /** Builds the link once per peer; `rtc.receive` hands back the same peer for every signal. */
+  private openLink(peer: Peer) {
+    if (this.link) return;
+    const link = new PeerLink();
+    this.link = link;
+    link.closed.addEventListener("abort", () => {
+      if (this.link === link) this.cleanupPeerConnection();
+    });
+    link.open(peer).then(
+      () => this.onLinkOpen(peer.id, link),
       () => undefined,
     );
   }
 
-  private watchChannelClose() {
-    this.stopChannelClose?.();
-    this.stopChannelClose = null;
-    const { ctrl, files } = this;
-    if (!ctrl || !files) return;
-    const events = new AbortController();
-    const onClose = () => this.cleanupPeerConnection();
-    ctrl.addEventListener("close", onClose, { signal: events.signal });
-    files.addEventListener("close", onClose, { signal: events.signal });
-    this.stopChannelClose = () => events.abort();
-  }
+  private async onLinkOpen(targetPeerId: string, link: PeerLink) {
+    if (this.link !== link) return;
 
-  private tryStartTransfers(targetPeerId: string) {
-    if (this.channelsStarted) return;
-    if (!this.ctrl || !this.files) return;
-    if (this.ctrl.readyState !== "open" || this.files.readyState !== "open") return;
-    this.channelsStarted = true;
-
+    this.clearPairingTimeout();
     peerStore.connectedPeerId = targetPeerId;
     peerStore.connectingPeerId = null;
     peerStore.connectedViaLan = this.pendingLan;
     this.peerDisconnectHandled = false;
-    logger.log(`(Share) peer connect lan=${this.pendingLan}`);
+    logger.log(`(Share) peer connect lan=${this.pendingLan} chunk=${link.chunkSize}`);
 
     if (uiStore.codeJoinOpen) {
       this.deps.codeJoin.onPeerConnected();
     } else {
       toastStore.showToast("Conectado", "success");
     }
-    this.deps.signaling.suspend();
-
-    void this.startTransfers(targetPeerId);
-  }
-
-  private async startTransfers(targetPeerId: string) {
-    const ctrl = this.ctrl;
-    const files = this.files;
-    if (!ctrl || !files) return;
+    this.deps.signaling.stop();
 
     if (this.lastConnectedPeerId && this.lastConnectedPeerId !== targetPeerId) {
       await this.downloadService.dropIncomplete();
     }
-    if (this.ctrl !== ctrl || this.files !== files) return;
+    if (this.link !== link) return;
     this.lastConnectedPeerId = targetPeerId;
-
-    this.transferManager = this.transferService.startTransferManager(ctrl, files, () =>
-      this.cleanupPeerConnection(),
-    );
+    this.engine = this.transferService.start(link, () => this.cleanupPeerConnection());
   }
 
   private cleanupPeerConnection() {
@@ -213,20 +188,7 @@ export class PeerSessionCoordinator {
     logger.log("(Share) peer disconnect");
 
     const joinConnecting = uiStore.codeJoinOpen && peerStore.codeJoinPhase === "connecting";
-
-    transferStore.resetTransferState();
-    this.transferService.clearPendingBatchCompletions();
-    this.transferManager?.abort();
-    this.transferManager = null;
-
-    peerStore.connectedPeerId = null;
-    peerStore.connectedPeerInfo = null;
-    peerStore.connectingPeerId = null;
-    peerStore.connectedViaLan = false;
-    this.activeTargetPeerId = null;
-    this.pendingLan = false;
-
-    this.disposePeerConnection({ markHandled: true });
+    this.dropPeer();
 
     if (joinConnecting) {
       this.deps.codeJoin.fail("Falha na conexão");
@@ -236,5 +198,20 @@ export class PeerSessionCoordinator {
     this.deps.codeJoin.onPeerDisconnectCleanup();
     toastStore.showToast("Desconectado", "info");
     this.deps.signaling.resume(RESUME_AFTER_DISCONNECT_MS);
+  }
+
+  /** A pairing that never opens frees the session for the next peer. */
+  private armPairingTimeout() {
+    this.clearPairingTimeout();
+    this.pairingTimeout = setTimeout(() => {
+      this.pairingTimeout = null;
+      this.cleanupPeerConnection();
+    }, PAIRING_TIMEOUT_MS);
+  }
+
+  private clearPairingTimeout() {
+    if (!this.pairingTimeout) return;
+    clearTimeout(this.pairingTimeout);
+    this.pairingTimeout = null;
   }
 }

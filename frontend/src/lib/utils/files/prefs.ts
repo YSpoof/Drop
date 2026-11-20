@@ -10,7 +10,7 @@ export async function loadAutoDownload(): Promise<boolean> {
 }
 
 export async function saveAutoDownload(value: boolean): Promise<void> {
-  localForage.setItem(AUTO_DOWNLOAD_KEY, value);
+  await localForage.setItem(AUTO_DOWNLOAD_KEY, value);
 }
 
 export async function loadReceiveFolderPath(): Promise<string> {
@@ -19,5 +19,5 @@ export async function loadReceiveFolderPath(): Promise<string> {
 }
 
 export async function saveReceiveFolderPath(value: string): Promise<void> {
-  localForage.setItem(RECEIVE_FOLDER_KEY, value);
+  await localForage.setItem(RECEIVE_FOLDER_KEY, value);
 }

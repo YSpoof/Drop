@@ -55,11 +55,10 @@ dev-desktop:
 preview-desktop:
 	./$(DESKTOP_OUT)/Drop-linux_x64
 
+# Playwright starts the backend (8080) and Vite (4321) itself.
 test:
 	cargo test --workspace
-	cargo build -p drop-backend
-	PORT=8080 $(TARGET_DIR)/debug/drop-backend & BACKEND_PID=$$!; \
-	trap 'kill $$BACKEND_PID' EXIT; \
+	pnpm --dir frontend exec vitest run
 	pnpm --dir frontend exec playwright test
 
 clean:

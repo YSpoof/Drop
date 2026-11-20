@@ -1,9 +1,6 @@
 /** Digit count for the share PIN (OTP UI + signaling). */
 export const SHARE_CODE_DIGITS = 4;
 
-/** Exclusive upper bound for `randomInt` PIN allocation (`10 ** SHARE_CODE_DIGITS`). */
-export const SHARE_CODE_RANGE = 5 ** SHARE_CODE_DIGITS;
-
 /** Guest “Possuo um código”: retry join-code until this elapses, then “Código inválido”. */
 export const CODE_JOIN_WAIT_MS = 30_000;
 

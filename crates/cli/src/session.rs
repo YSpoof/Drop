@@ -16,7 +16,7 @@ use tokio::time::{Instant, sleep, sleep_until, timeout};
 use crate::args::Role;
 use crate::config::Store;
 use crate::device::Device;
-use crate::protocol::Ctrl;
+use crate::protocol::{Ctrl, FRAME_HEADER};
 use crate::rtc::{Inbound, Peer, RtcConfig};
 use crate::signaling::{self, Connection};
 use crate::state::{Command, Phase, RemotePeer, Shared, set_status};
@@ -440,7 +440,8 @@ impl Session {
             s.status = status.into();
         });
 
-        let (link, outbound) = Link::new(peer.chunk_size());
+        // A frame (header + chunk) must fit the negotiated SCTP max message size.
+        let (link, outbound) = Link::new(peer.chunk_size().saturating_sub(FRAME_HEADER));
         link.send(Ctrl::DownloadMode {
             manual: self.opts.manual,
         });

@@ -1,8 +1,4 @@
-export PNPM_HOME="/home/zero/.local/share/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME/bin:"*) ;;
-  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
-esac
+command -v pnpm >/dev/null || PATH="$HOME/.local/share/pnpm/bin:$HOME/.local/share/pnpm:$PATH"
 
 pushing_to_main=false
 

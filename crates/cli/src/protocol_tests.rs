@@ -40,9 +40,10 @@ fn every_control_message_has_the_exact_wire_shape() {
             Ctrl::Start {
                 file_id: id(),
                 chunk_size: 65_536,
+                stream_id: 7,
                 offset: None,
             },
-            json!({"type": "start", "fileId": "f-123", "chunkSize": 65536}),
+            json!({"type": "start", "fileId": "f-123", "chunkSize": 65536, "streamId": 7}),
         ),
         (
             Ctrl::Resume {
@@ -107,9 +108,11 @@ fn optional_fields_are_written_only_when_set() {
         Ctrl::Start {
             file_id: id(),
             chunk_size: 65_536,
+            stream_id: 1,
             offset: Some(4096),
         },
-        json!({"type": "start", "fileId": "f-123", "chunkSize": 65536, "offset": 4096}),
+        json!({"type": "start", "fileId": "f-123", "chunkSize": 65536, "streamId": 1,
+               "offset": 4096}),
     );
     assert_wire(
         Ctrl::Cancel {
@@ -135,15 +138,33 @@ fn decodes_browser_messages() {
             hash: None,
         }
     );
-    let start = Ctrl::decode(r#"{"type":"start","fileId":"a","chunkSize":262144,"extra":1}"#);
+    let start = Ctrl::decode(
+        r#"{"type":"start","fileId":"a","chunkSize":262144,"streamId":4294967295,"extra":1}"#,
+    );
     assert_eq!(
         start.unwrap(),
         Ctrl::Start {
             file_id: "a".into(),
             chunk_size: 262_144,
+            stream_id: u32::MAX,
             offset: None
         }
     );
+}
+
+#[test]
+fn start_requires_stream_id() {
+    assert!(Ctrl::decode(r#"{"type":"start","fileId":"a","chunkSize":1}"#).is_err());
+}
+
+#[test]
+fn split_frame_reads_big_endian_stream_id() {
+    let frame = Bytes::from_static(&[0x01, 0x02, 0x03, 0x04, b'h', b'i']);
+    let (stream_id, data) = split_frame(&frame).unwrap();
+    assert_eq!((stream_id, &data[..]), (0x0102_0304, &b"hi"[..]));
+    let empty = split_frame(&Bytes::from_static(&[0, 0, 0, 9])).unwrap();
+    assert_eq!((empty.0, empty.1.len()), (9, 0));
+    assert_eq!(split_frame(&Bytes::from_static(&[0, 0, 1])), None);
 }
 
 #[test]

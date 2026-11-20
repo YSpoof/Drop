@@ -35,8 +35,8 @@ RUN cargo build --release -p drop-cli -p drop-desktop --target "$LINUX_TARGET" -
 
 FROM node:alpine AS frontend
 WORKDIR /app/frontend
-RUN npm i -g pnpm@latest
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
+RUN npm i -g "$(node -p 'require("./package.json").packageManager')"
 RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm approve-builds --all
 COPY frontend ./
 RUN pnpm run build

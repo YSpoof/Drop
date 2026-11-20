@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+
   import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
   import {
     canDelete,
@@ -46,6 +48,9 @@
   let contextNode = $state<TreeNode<UnifiedItem> | null>(null);
   let contextActions = $state<FileTreeAction[]>([]);
   let contextMenuOpen = $state(false);
+  let resetTimer: ReturnType<typeof setTimeout> | undefined;
+
+  onDestroy(() => clearTimeout(resetTimer));
 
   const contextNodeName = $derived(contextNode?.name ?? "");
 
@@ -82,6 +87,7 @@
     if (!actions.length) return;
 
     event.preventDefault();
+    clearTimeout(resetTimer);
     contextNode = node;
     contextActions = actions;
     contextMenuOpen = true;
@@ -110,7 +116,8 @@
 
   function closeContextMenu() {
     contextMenuOpen = false;
-    setTimeout(() => {
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
       contextNode = null;
       contextActions = [];
     }, 300);

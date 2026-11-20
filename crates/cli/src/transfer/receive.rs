@@ -11,14 +11,12 @@ use tokio::time::Instant;
 use super::{Cx, Link, partial};
 use crate::config::Direction;
 use crate::device::random_hex;
-use crate::protocol::{CREDIT_BATCH, Ctrl, SEND_WINDOW};
+use crate::protocol::{CREDIT_BATCH, Ctrl, split_frame};
 use crate::state::{Offer, Transfer, TransferStatus, update_transfer};
-use crate::text;
+use crate::text::{self, SIZE_MISMATCH};
 
-/// How long chunks may still arrive after `done` before the size is checked.
+/// How long frames may still arrive after `done` before the size is checked.
 pub const DONE_GRACE: Duration = Duration::from_secs(5);
-/// Failure reason when the written length differs from `meta.size`.
-use crate::text::SIZE_MISMATCH;
 
 #[derive(Debug, Clone)]
 struct Meta {
@@ -28,8 +26,11 @@ struct Meta {
     hash: String,
 }
 
+/// The file being received; it exists only once its `resume` was sent.
 struct Active {
     meta: Meta,
+    /// Stream ID from `start`; only frames carrying it are written.
+    stream_id: u32,
     file: File,
     received: u64,
     credited: u64,
@@ -47,10 +48,6 @@ pub struct Inbox {
     /// Pulled, waiting for `start`.
     awaiting: Vec<Meta>,
     active: Option<Active>,
-    /// Chunks that arrived before `start` was handled.
-    early: Vec<Bytes>,
-    /// A receive was just stopped: chunks still in flight for it are dropped, not buffered.
-    stale: bool,
     completed_in_batch: usize,
 }
 
@@ -62,8 +59,6 @@ impl Inbox {
             pending: Vec::new(),
             awaiting: Vec::new(),
             active: None,
-            early: Vec::new(),
-            stale: false,
             completed_in_batch: 0,
         }
     }
@@ -79,8 +74,6 @@ impl Inbox {
         }
         self.pending.clear();
         self.awaiting.clear();
-        self.early.clear();
-        self.stale = false;
     }
 
     /// User cancel or a different peer: removes every partial in the download folder.
@@ -185,7 +178,14 @@ impl Inbox {
     /// Opens the partial at the chunk-aligned resume offset and always answers `resume`.
     /// A `start` for an unpulled offer is refused with `download-aborted`, an unknown one
     /// with `cancel`.
-    pub(super) async fn on_start(&mut self, link: &Link, cx: &Cx, id: &str, chunk_size: u32) {
+    pub(super) async fn on_start(
+        &mut self,
+        link: &Link,
+        cx: &Cx,
+        id: &str,
+        chunk_size: u32,
+        stream_id: u32,
+    ) {
         let Some(meta) = take(&mut self.awaiting, id) else {
             let file_id = id.to_string();
             link.send(match self.pending.iter().any(|m| m.id == id) {
@@ -220,26 +220,24 @@ impl Inbox {
             hash: meta.hash.clone(),
             bytes_offset: offset,
         });
-        self.stale = false;
         self.active = Some(Active {
             meta,
+            stream_id,
             file,
             received: offset,
             credited: offset,
             done_by: None,
         });
-        for chunk in std::mem::take(&mut self.early) {
-            self.write(link, cx, chunk).await;
-        }
     }
 
-    pub(super) async fn on_chunk(&mut self, link: &Link, cx: &Cx, chunk: Bytes) {
-        if self.active.is_some() {
-            return self.write(link, cx, chunk).await;
-        }
-        let buffered: usize = self.early.iter().map(Bytes::len).sum();
-        if !self.stale && (buffered + chunk.len()) as u64 <= SEND_WINDOW {
-            self.early.push(chunk);
+    /// Writes a `files` frame of the active stream. Frames of other streams, frames before
+    /// `resume` and frames shorter than the header are dropped uncounted.
+    pub(super) async fn on_frame(&mut self, link: &Link, cx: &Cx, frame: Bytes) {
+        let Some((stream_id, chunk)) = split_frame(&frame) else {
+            return;
+        };
+        if matches!(&self.active, Some(a) if a.stream_id == stream_id) {
+            self.write(link, cx, chunk).await;
         }
     }
 
@@ -267,7 +265,6 @@ impl Inbox {
         let Some(mut active) = self.active.take() else {
             return;
         };
-        self.stale = true;
         let flushed = active.file.flush().await;
         drop(active.file);
         let meta = active.meta;
@@ -302,7 +299,6 @@ impl Inbox {
         };
         if let Err(err) = active.file.write_all(&chunk).await {
             let meta = self.active.take().map(|a| a.meta).expect("active receive");
-            self.stale = true;
             partial::discard(&self.dir, &meta.hash).await;
             return fail(link, cx, &meta, err.to_string());
         }
@@ -324,7 +320,6 @@ impl Inbox {
     /// Drops `id` from every stage and returns its identity hash.
     fn forget(&mut self, id: &str) -> Option<String> {
         if self.active.as_ref().is_some_and(|a| a.meta.id == id) {
-            self.stale = true;
             return self.active.take().map(|a| a.meta.hash);
         }
         take(&mut self.pending, id)

@@ -1,4 +1,9 @@
-import { loadAutoDownload, loadReceiveFolderPath } from "#lib/utils/files/prefs.js";
+import {
+  loadAutoDownload,
+  loadReceiveFolderPath,
+  saveAutoDownload,
+  saveReceiveFolderPath,
+} from "#lib/utils/files/prefs.js";
 import { createQueuedFiles, type QueuedFile } from "#lib/utils/files/queue.js";
 import {
   flushTransferStats,
@@ -25,6 +30,20 @@ class TransferStore {
       (item) => !this.transfers.some((entry) => entry.id === item.id && entry.direction === "sent"),
     ),
   );
+
+  pendingReceived = $derived(
+    this.transfers.filter((item) => item.direction === "received" && item.status === "pending"),
+  );
+
+  setAutoDownload(value: boolean) {
+    this.autoDownload = value;
+    void saveAutoDownload(value);
+  }
+
+  async setReceiveFolderPath(path: string) {
+    this.receiveFolderPath = path;
+    await saveReceiveFolderPath(path);
+  }
 
   recordTransferStats(direction: "sent" | "received", bytes: number) {
     const next: TransferStats =
@@ -88,6 +107,11 @@ class TransferStore {
     this.transfers = this.transfers.filter((item) => !ids.has(item.id));
   }
 
+  /** Takes a sent file out of the send queue; its history row stays. */
+  dequeue(id: string) {
+    this.queue = this.queue.filter((item) => item.id !== id);
+  }
+
   removeTransfer(id: string | string[]) {
     const ids = Array.isArray(id) ? new Set(id) : new Set([id]);
     this.transfers = this.transfers.filter((item) => !ids.has(item.id));
@@ -95,18 +119,18 @@ class TransferStore {
 
   pendingReceivedIds(ids: string[]) {
     const idSet = new Set(ids);
-    return this.transfers
-      .filter(
-        (item) => idSet.has(item.id) && item.direction === "received" && item.status === "pending",
-      )
-      .map((item) => item.id);
+    return this.pendingReceived.filter((item) => idSet.has(item.id)).map((item) => item.id);
   }
 
+  /** Peer loss: drops received rows, keeps finished sent rows, and puts queued ones back to pending. */
   resetTransferState() {
     const queueIds = new Set(this.queue.map((item) => item.id));
-    this.transfers = this.transfers
-      .filter((item) => item.direction === "sent" && queueIds.has(item.id))
-      .map((item) => ({ ...item, status: "pending" as const, bytesTransferred: 0 }));
+    this.transfers = this.transfers.flatMap((item): TransferItem[] => {
+      if (item.direction !== "sent") return [];
+      if (item.status === "completed" || item.status === "failed") return [item];
+      if (!queueIds.has(item.id)) return [];
+      return [{ ...item, status: "pending", bytesTransferred: 0 }];
+    });
   }
 
   createAndQueue(files: FileList | File[] | { file: File; path: string }[]) {

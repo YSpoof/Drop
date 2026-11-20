@@ -5,8 +5,8 @@
   import { lazy } from "svelte-comp-lazyloader";
 
   import NavBar from "#lib/components/layout/NavBar.svelte";
+  import LazyModal from "#lib/components/ui/LazyModal.svelte";
   import { siteData } from "#lib/siteData.js";
-  import { lazyLoad } from "#lib/stores/lazyLoad.svelte.js";
   import { layoutModals } from "#lib/utils/layoutModals.js";
   import { abortOnPageClose, flushStatsOnHide } from "#lib/utils/pageUnload.js";
 
@@ -15,13 +15,6 @@
   const Fab = lazy(() => import("#lib/components/layout/Fab.svelte"));
 
   let { children } = $props();
-
-  $effect.pre(() => {
-    for (const modal of layoutModals) {
-      if (modal.isOpen()) lazyLoad.mark(modal.key);
-    }
-    if (updated.current) lazyLoad.mark("updateModal");
-  });
 
   $effect(() => {
     if (updated.current) {
@@ -65,12 +58,11 @@
 <ToastRenderer />
 
 {#each layoutModals as modal (modal.key)}
-  {#if lazyLoad.has(modal.key)}
-    {const Component = modal.Component}
-    <Component />
-  {/if}
+  <LazyModal open={modal.isOpen()}>
+    <modal.Component />
+  </LazyModal>
 {/each}
 
-{#if lazyLoad.has("updateModal")}
+<LazyModal open={updated.current}>
   <UpdateModal open={updated.current} />
-{/if}
+</LazyModal>

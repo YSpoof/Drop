@@ -4,15 +4,15 @@ import { FileReaderPort } from "#lib/ports/fileReader.js";
 import { FolderWatcher } from "#lib/services/folderWatcher.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
+import type { Engine } from "#lib/transfer/engine.js";
 import type { QueuedFile } from "#lib/utils/files/queue.js";
 import { logger } from "#lib/utils/logger.js";
-import type { TransferManager } from "#lib/utils/webrtc/transfer.js";
 
 export class QueueService {
   private readonly fileReader = inject(FileReaderPort);
   private readonly folderWatcher = inject(FolderWatcher);
   private notifyDelayTimeout: ReturnType<typeof setTimeout> | null = null;
-  private getTransferManager: () => TransferManager | null = () => null;
+  private getEngine: () => Engine | null = () => null;
   /** groupIds that are folder-watched */
   private watchedGroupIds = new Set<string>();
 
@@ -23,8 +23,8 @@ export class QueueService {
     );
   }
 
-  bind(getTransferManager: () => TransferManager | null) {
-    this.getTransferManager = getTransferManager;
+  bind(getEngine: () => Engine | null) {
+    this.getEngine = getEngine;
   }
 
   addFiles(files: FileList | File[] | { file: File; path: string }[]) {
@@ -79,7 +79,7 @@ export class QueueService {
   }
 
   notifyQueueChanged() {
-    this.getTransferManager()?.notifyQueueChanged();
+    this.getEngine()?.queueChanged();
   }
 
   clearQueue() {
@@ -90,7 +90,7 @@ export class QueueService {
         transfer.direction === "sent" &&
         (transfer.status === "pending" || transfer.status === "in-progress")
       ) {
-        this.getTransferManager()?.cancelFile(item.id);
+        this.getEngine()?.cancel(item.id);
       }
     }
     transferStore.queue = [];
@@ -107,7 +107,7 @@ export class QueueService {
 
   handleDeleteTransfer(fileId: string | string[]) {
     const ids = Array.isArray(fileId) ? fileId : [fileId];
-    const transferManager = this.getTransferManager();
+    const engine = this.getEngine();
 
     for (const id of ids) {
       const item = transferStore.transfers.find((entry) => entry.id === id);
@@ -118,18 +118,13 @@ export class QueueService {
       if (item.status === "completed" || item.status === "failed") continue;
 
       if (item.direction === "received") {
-        if (transferManager) {
-          transferManager.dismissReceivedFile(id);
-        }
+        engine?.dismiss(id);
         transferStore.removeTransfer(id);
         continue;
       }
 
-      if (transferManager) {
-        transferManager.cancelFile(id);
-      } else {
-        transferStore.removeFile(id);
-      }
+      if (engine) engine.cancel(id);
+      else transferStore.removeFile(id);
     }
   }
 
@@ -138,7 +133,7 @@ export class QueueService {
     if (!item || item.status !== "pending") return;
 
     this.markTransfersInProgress([fileId]);
-    this.getTransferManager()?.requestPull(fileId);
+    this.getEngine()?.pull(fileId);
   }
 
   handlePullBatch(fileIds: string[], zipFilename?: string) {
@@ -146,7 +141,7 @@ export class QueueService {
     if (!pendingIds.length) return;
 
     this.markTransfersInProgress(pendingIds);
-    this.getTransferManager()?.requestPullBatch(pendingIds, zipFilename);
+    this.getEngine()?.pullBatch(pendingIds, zipFilename);
   }
 
   reset() {
@@ -158,7 +153,7 @@ export class QueueService {
       void this.folderWatcher.unwatchGroup(groupId);
     }
     this.watchedGroupIds.clear();
-    this.getTransferManager = () => null;
+    this.getEngine = () => null;
   }
 
   private markTransfersInProgress(ids: string[]) {
@@ -172,7 +167,7 @@ export class QueueService {
   private scheduleNotify() {
     if (this.notifyDelayTimeout) clearTimeout(this.notifyDelayTimeout);
     this.notifyDelayTimeout = setTimeout(() => {
-      this.getTransferManager()?.notifyQueueChanged();
+      this.getEngine()?.queueChanged();
       this.notifyDelayTimeout = null;
     }, 500);
   }

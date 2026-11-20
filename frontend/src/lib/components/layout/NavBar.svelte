@@ -38,7 +38,7 @@
   };
 </script>
 
-<header class="bg-base-100 dark:bg-300 w-full">
+<header class="bg-base-100 dark:bg-base-300 w-full">
   <div class="container mx-auto">
     <div class="navbar">
       <div class="flex-1">

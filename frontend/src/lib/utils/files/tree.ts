@@ -54,13 +54,6 @@ export function buildTree<T>(items: T[], getPath: (item: T) => string): TreeNode
   return Array.from(root.children.values());
 }
 
-export function getTreeFileIds<T extends { id: string }>(node: TreeNode<T>): string[] {
-  if (!node.isDir && node.item) return [node.item.id];
-  return Array.from(node.children.values()).flatMap((child) =>
-    getTreeFileIds(child as TreeNode<T>),
-  );
-}
-
 // === Integrated from fileTreeHelpers.ts ===
 
 import type { QueuedFile } from "#lib/utils/files/queue.js";

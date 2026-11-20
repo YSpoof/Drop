@@ -1,15 +1,12 @@
 <script lang="ts">
-  import { inject } from "quick-di";
-  import { onDestroy } from "svelte";
   import CheckCircleIcon from "~icons/mdi/check-circle";
   import ContentCopyIcon from "~icons/mdi/content-copy";
   import LogoutIcon from "~icons/mdi/logout";
   import RadioTowerIcon from "~icons/mdi/radio-tower";
 
-  import { ClipboardPort } from "#lib/ports/clipboard.js";
+  import type { CodeJoinPhase } from "#lib/stores/peerStore.svelte.js";
+  import { createCopied } from "#lib/utils/copied.svelte.js";
   import { feedback } from "#lib/utils/feedback.js";
-
-  type CodeJoinPhase = "waiting" | "connecting" | "connected";
 
   interface Props {
     isHost: boolean;
@@ -35,9 +32,7 @@
     onDisconnect,
   }: Props = $props();
 
-  const clipboard = inject(ClipboardPort);
-  let copied = $state<"link" | "code" | null>(null);
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  const copied = createCopied<"link" | "code">();
 
   const title = $derived.by(() => {
     if (connected) return "Pronto para transferir";
@@ -53,10 +48,6 @@
     return "Esperando pelo host...";
   });
 
-  onDestroy(() => {
-    clearTimeout(copiedTimer);
-  });
-
   function handleDisconnect() {
     feedback.medium();
     onDisconnect();
@@ -67,19 +58,10 @@
     onLeave();
   }
 
-  async function copy(text: string | undefined, kind: "link" | "code") {
+  function copy(text: string | undefined, kind: "link" | "code") {
     if (!text) return;
     feedback.light();
-    try {
-      await clipboard.writeText(text);
-      copied = kind;
-      clearTimeout(copiedTimer);
-      copiedTimer = setTimeout(() => {
-        copied = null;
-      }, 2500);
-    } catch {
-      // ignore
-    }
+    void copied.copy(text, kind);
   }
 </script>
 
@@ -127,60 +109,55 @@
           Desconectar
           <LogoutIcon class="text-base" />
         </button>
-      {:else if isHost}
-        {#if code}
-          <p class="font-mono text-2xl tracking-widest tabular-nums max-lg:text-center lg:text-xl">
-            {code}
-          </p>
-        {:else}
-          <p class="text-base-content/60 skeleton skeleton-text text-sm max-lg:text-center">
-            Gerando código…
-          </p>
-        {/if}
-        <div class="grid w-full grid-cols-2 gap-2 lg:contents">
-          <button
-            type="button"
-            class={[
-              "btn lg:btn-sm w-full gap-2 lg:w-auto",
-              copied === "link" ? "btn-success" : "btn-primary",
-            ]}
-            disabled={!link || copied === "link"}
-            onclick={() => copy(link, "link")}>
-            {#if copied === "link"}
-              <CheckCircleIcon class="text-base" />
-            {:else}
-              <ContentCopyIcon class="text-base" />
-            {/if}
-            Copiar link
-          </button>
-          <button
-            type="button"
-            class={[
-              "btn lg:btn-sm w-full gap-2 lg:w-auto",
-              copied === "code" ? "btn-success" : "btn-primary",
-            ]}
-            disabled={!code || copied === "code"}
-            onclick={() => copy(code, "code")}>
-            {#if copied === "code"}
-              <CheckCircleIcon class="text-base" />
-            {:else}
-              <ContentCopyIcon class="text-base" />
-            {/if}
-            Copiar código
-          </button>
-        </div>
-        <div
-          class="bg-base-content/25 hidden h-6 w-px lg:block"
-          aria-hidden="true">
-        </div>
-        <button
-          type="button"
-          class="btn btn-outline btn-error lg:btn-sm w-full gap-2 lg:w-auto"
-          onclick={handleLeave}>
-          Sair
-          <LogoutIcon class="text-base" />
-        </button>
       {:else}
+        {#if isHost}
+          {#if code}
+            <p
+              class="font-mono text-2xl tracking-widest tabular-nums max-lg:text-center lg:text-xl">
+              {code}
+            </p>
+          {:else}
+            <p class="text-base-content/60 skeleton skeleton-text text-sm max-lg:text-center">
+              Gerando código…
+            </p>
+          {/if}
+          <div class="grid w-full grid-cols-2 gap-2 lg:contents">
+            <button
+              type="button"
+              class={[
+                "btn lg:btn-sm w-full gap-2 lg:w-auto",
+                copied.current === "link" ? "btn-success" : "btn-primary",
+              ]}
+              disabled={!link || copied.current === "link"}
+              onclick={() => copy(link, "link")}>
+              {#if copied.current === "link"}
+                <CheckCircleIcon class="text-base" />
+              {:else}
+                <ContentCopyIcon class="text-base" />
+              {/if}
+              Copiar link
+            </button>
+            <button
+              type="button"
+              class={[
+                "btn lg:btn-sm w-full gap-2 lg:w-auto",
+                copied.current === "code" ? "btn-success" : "btn-primary",
+              ]}
+              disabled={!code || copied.current === "code"}
+              onclick={() => copy(code, "code")}>
+              {#if copied.current === "code"}
+                <CheckCircleIcon class="text-base" />
+              {:else}
+                <ContentCopyIcon class="text-base" />
+              {/if}
+              Copiar código
+            </button>
+          </div>
+          <div
+            class="bg-base-content/25 hidden h-6 w-px lg:block"
+            aria-hidden="true">
+          </div>
+        {/if}
         <button
           type="button"
           class="btn btn-outline btn-error lg:btn-sm w-full gap-2 lg:w-auto"

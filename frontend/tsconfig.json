@@ -6,6 +6,6 @@
     "strict": true,
     "target": "esnext"
   },
-  "include": ["src"],
+  "include": ["src", "tests", "playwright.config.ts", "vitest.config.ts"],
   "exclude": ["src/service-worker"]
 }

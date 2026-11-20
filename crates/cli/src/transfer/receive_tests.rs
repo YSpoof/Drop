@@ -14,6 +14,8 @@ struct Harness {
     out: Outbound,
     cx: Cx,
     dir: TempDir,
+    /// Stream ID of the last `start`.
+    stream: u32,
 }
 
 fn harness(manual: bool) -> Harness {
@@ -31,6 +33,7 @@ fn harness(manual: bool) -> Harness {
         out,
         cx,
         dir,
+        stream: 0,
     }
 }
 
@@ -51,13 +54,30 @@ impl Harness {
             .await;
     }
 
+    /// `start` with the next stream ID.
     async fn start(&mut self, id: &str, chunk: u32) {
-        self.inbox.on_start(&self.link, &self.cx, id, chunk).await;
+        self.stream += 1;
+        let (link, cx) = (&self.link, &self.cx);
+        self.inbox.on_start(link, cx, id, chunk, self.stream).await;
     }
 
+    /// A frame of the last started stream.
     async fn chunk(&mut self, data: &[u8]) {
-        let chunk = Bytes::copy_from_slice(data);
-        self.inbox.on_chunk(&self.link, &self.cx, chunk).await;
+        self.frame(self.stream, data).await;
+    }
+
+    async fn frame(&mut self, stream: u32, data: &[u8]) {
+        let frame = [&stream.to_be_bytes()[..], data].concat();
+        self.raw(&frame).await;
+    }
+
+    async fn raw(&mut self, frame: &[u8]) {
+        let frame = Bytes::copy_from_slice(frame);
+        self.inbox.on_frame(&self.link, &self.cx, frame).await;
+    }
+
+    async fn saved(&self, name: &str) -> Vec<u8> {
+        tokio::fs::read(self.downloads().join(name)).await.unwrap()
     }
 
     async fn done(&mut self, id: &str) {
@@ -87,6 +107,10 @@ impl Harness {
 
 fn pull(id: &str) -> Ctrl {
     Ctrl::Pull { file_id: id.into() }
+}
+
+fn ack(id: &str) -> Ctrl {
+    Ctrl::Ack { file_id: id.into() }
 }
 
 #[test]
@@ -262,21 +286,62 @@ async fn start_without_pull_is_refused() {
 }
 
 #[tokio::test]
-async fn chunks_before_start_are_buffered() {
+async fn frame_before_resume_is_dropped() {
     let mut h = harness(false);
     h.meta("f", "early.bin", 6, "h").await;
-    h.chunk(b"abc").await;
+    h.frame(1, b"abc").await; // the stream ID the next `start` carries
     h.start("f", 3).await;
-    h.chunk(b"def").await;
+    assert_eq!(h.stream, 1);
+    h.chunk(b"abcdef").await;
     h.done("f").await;
-    assert_eq!(
-        h.sent().last(),
-        Some(&Ctrl::Ack {
-            file_id: "f".into()
-        })
-    );
-    let saved = tokio::fs::read(h.downloads().join("early.bin")).await;
-    assert_eq!(saved.unwrap(), b"abcdef");
+    assert_eq!(h.sent().last(), Some(&ack("f")));
+    assert_eq!(h.saved("early.bin").await, b"abcdef");
+}
+
+#[tokio::test]
+async fn late_frames_of_an_aborted_file_are_dropped() {
+    let mut h = harness(false);
+    h.meta("a", "a.bin", 100, "ha").await;
+    h.meta("b", "b.bin", 6, "hb").await;
+    h.start("a", 10).await;
+    let stream_a = h.stream;
+    h.chunk(&[1; 10]).await;
+    let (link, cx) = (&h.link, &h.cx);
+    h.inbox.dismiss(link, cx, &["a".into()]).await;
+
+    h.start("b", 3).await;
+    h.frame(stream_a, &[1; 10]).await;
+    h.chunk(b"abc").await;
+    h.frame(stream_a, &[1; 10]).await;
+    h.chunk(b"def").await;
+    h.done("b").await;
+
+    let credits: Vec<_> = h
+        .sent()
+        .into_iter()
+        .filter(|m| matches!(m, Ctrl::Credit { .. } | Ctrl::Ack { .. }))
+        .collect();
+    let credit = Ctrl::Credit {
+        file_id: "b".into(),
+        bytes_written: 6,
+    };
+    assert_eq!(credits, [credit, ack("b")]);
+    assert_eq!(h.saved("b.bin").await, b"abcdef");
+    assert!(!h.drop_exists("ha"));
+}
+
+#[tokio::test]
+async fn short_frame_is_dropped() {
+    let mut h = harness(false);
+    h.meta("f", "s.bin", 3, "h").await;
+    h.start("f", 3).await;
+    h.raw(&[0, 0, 1]).await;
+    h.raw(&[]).await;
+    assert_eq!(h.row("f").unwrap().bytes, 0);
+    h.chunk(b"xyz").await;
+    h.done("f").await;
+    assert_eq!(h.sent().last(), Some(&ack("f")));
+    assert_eq!(h.saved("s.bin").await, b"xyz");
 }
 
 #[tokio::test]
@@ -340,7 +405,7 @@ async fn remote_cancel_discards_partial() {
     assert!(!h.drop_exists("h"));
     assert_eq!(h.row("f").unwrap().status, TransferStatus::Cancelled);
     h.chunk(&[1; 10]).await; // still in flight for the cancelled file
-    assert!(h.inbox.early.is_empty());
+    assert!(!h.drop_exists("h"));
 }
 
 #[tokio::test]

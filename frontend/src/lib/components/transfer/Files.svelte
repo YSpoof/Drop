@@ -7,6 +7,7 @@
   import PlusIcon from "~icons/mdi/plus";
 
   import { PickerPort } from "#lib/ports/picker.js";
+  import { transferStore } from "#lib/stores/transferStore.svelte.js";
   import { feedback } from "#lib/utils/feedback.js";
   import type { QueuedFile } from "#lib/utils/files/queue.js";
   import type { TransferItem } from "#lib/utils/files/transferTypes.js";
@@ -42,10 +43,11 @@
 
   const picker = inject(PickerPort);
 
-  let pathStack = $state<string[]>([]);
+  let navStack = $state<string[]>([]);
 
   let filePicker!: HTMLInputElement;
   let folderPicker!: HTMLInputElement;
+  let addMenu!: HTMLUListElement;
 
   const unifiedList = $derived([
     ...queue.map((q) => ({ type: "queue" as const, item: q, path: q.path })),
@@ -54,35 +56,23 @@
 
   const tree = $derived(buildTree(unifiedList, (item) => item.path));
 
-  function resolveNodes(stack: string[]) {
-    let current = tree;
-    for (const segment of stack) {
-      const found = current.find((n) => n.isDir && n.name === segment);
-      if (found) current = Array.from(found.children.values());
-      else return null;
+  // The deepest folder of navStack that still exists, so removed folders fall back to a parent.
+  const view = $derived.by(() => {
+    let nodes = tree;
+    for (const [index, segment] of navStack.entries()) {
+      const dir = nodes.find((n) => n.isDir && n.name === segment);
+      if (!dir) return { pathStack: navStack.slice(0, index), nodes };
+      nodes = Array.from(dir.children.values());
     }
-    return current;
-  }
-
-  const currentNodes = $derived(resolveNodes(pathStack) ?? []);
-
-  $effect(() => {
-    if (pathStack.length > 0 && resolveNodes(pathStack) === null) {
-      pathStack = pathStack.slice(0, -1);
-    }
+    return { pathStack: navStack, nodes };
   });
+
+  const pathStack = $derived(view.pathStack);
+  const currentNodes = $derived(view.nodes);
 
   const activeDownload = $derived(activeDownloadId(history));
 
-  const pendingReceivedCount = $derived(
-    history.filter((item) => item.direction === "received" && item.status === "pending").length,
-  );
-
-  const pendingReceivedIds = $derived(
-    history
-      .filter((item) => item.direction === "received" && item.status === "pending")
-      .map((item) => item.id),
-  );
+  const pendingReceivedIds = $derived(transferStore.pendingReceived.map((item) => item.id));
 
   function handleFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -94,6 +84,7 @@
   }
 
   async function add(kind: "files" | "folder") {
+    addMenu.hidePopover();
     if (!picker.canPick) {
       (kind === "files" ? filePicker : folderPicker).click();
       return;
@@ -119,14 +110,14 @@
             type="button"
             class="btn btn-ghost btn-xs text-base-content/70 hover:text-primary gap-1"
             onclick={() => {
-              pathStack = pathStack.slice(0, -1);
+              navStack = pathStack.slice(0, -1);
             }}>
             ← Voltar
           </button>
         {/if}
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        {#if !autoDownload && pendingReceivedCount > 0}
+        {#if !autoDownload && pendingReceivedIds.length > 0}
           <button
             type="button"
             class="btn btn-ghost btn-accent btn-sm gap-1"
@@ -149,6 +140,7 @@
           Adicionar
         </button>
         <ul
+          bind:this={addMenu}
           class="dropdown dropdown-end menu bg-base-100 rounded-box z-10 mt-2 w-52 p-2 shadow"
           popover
           id="add-files-menu"
@@ -210,7 +202,7 @@
         {onDeleteHistory}
         {onremoveQueue}
         onNavigate={(newStack) => {
-          pathStack = newStack;
+          navStack = newStack;
         }} />
     {/if}
   </div>

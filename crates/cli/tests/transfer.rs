@@ -284,7 +284,8 @@ async fn chunk_sizing() {
     assert_eq!(a.chunk_size(), MAX_CHUNK, "negotiated size is capped");
     assert_eq!(b.chunk_size(), a.chunk_size());
 
-    // A file that is not a multiple of the chunk size crosses intact.
+    // A file that is not a multiple of the chunk size crosses intact, and full frames
+    // (stream header + chunk) fit the negotiated max message size.
     let send = tempfile::tempdir().unwrap();
     let recv = tempfile::tempdir().unwrap();
     let (path, data) = random_file(send.path(), "odd.bin", 3 * MAX_CHUNK + 7);

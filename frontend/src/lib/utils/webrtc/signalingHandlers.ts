@@ -27,8 +27,12 @@ export function createSignalingHandlers(deps: SignalingHandlerDeps) {
       const requesterId = message.requester.peerId;
       logger.log(`(Share) peer-joining ← ${requesterId}`);
 
-      if (peerStore.connectedPeerId || peerStore.connectingPeerId) return;
+      // Only the current peer may re-pair (e.g. after a reload); another PIN holder must not
+      // take over a pairing in progress or an open connection.
+      const current = peerStore.connectedPeerId ?? peerStore.connectingPeerId;
+      if (current && current !== requesterId) return;
 
+      // `connectPeer` marks the requester as the connecting peer.
       peerStore.connectedPeerInfo = message.requester;
       deps.peerSession.connectPeer(requesterId, !!message.lan);
     },
@@ -43,8 +47,8 @@ export function createSignalingHandlers(deps: SignalingHandlerDeps) {
     onSignal: (message: Extract<ServerMessage, { type: "signal" }>) => {
       deps.peerSession.handleSignal(message.fromPeerId, message.payload);
     },
-    onClose: (intentional: boolean) => {
-      if (intentional || peerStore.connectedPeerId || disconnectNotified) return;
+    onClose: () => {
+      if (peerStore.connectedPeerId || disconnectNotified) return;
       disconnectNotified = true;
       toastStore.showToast("Desconectado do servidor de emparelhamento", "warning");
     },

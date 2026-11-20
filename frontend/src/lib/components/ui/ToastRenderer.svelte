@@ -50,7 +50,7 @@
       <Icon class="shrink-0 text-2xl" />
       <span>{toast.message}</span>
       <button
-        class="btn btn-xs btn-ghost btn-circle gelatin"
+        class="btn btn-xs btn-ghost btn-circle"
         onclick={() => {
           handleRemoveToast(toast);
         }}
