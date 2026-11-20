@@ -19,8 +19,8 @@ drizzle.config.ts
 README.md
 bin
 
-# Native / Electron
+# Build output
 /dist/
 /static/downloads/
-/native/out/
-/release/
+# Rust
+target

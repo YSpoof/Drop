@@ -36,7 +36,7 @@ export class FolderWatcher {
   async watchGroup(groupId: string, folderPath: string, initial: QueuedFile[]) {
     const fileMap = new Map<string, string>();
     for (const qf of initial) {
-      const absPath = this.fileReader.nativePath(qf.file);
+      const absPath = this.fileReader.desktopPath(qf.file);
       if (absPath) fileMap.set(absPath, qf.id);
     }
     this.watched.set(groupId, { folderPath, fileMap });

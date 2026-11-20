@@ -124,7 +124,7 @@ export class TransferService {
       onDownloadError: (message) => {
         toastStore.showToast(message, "error");
       },
-      readFileChunk: this.environment.hasNativeFs
+      readFileChunk: this.environment.hasDesktopFs
         ? (file, start, length, signal) =>
             this.fileReader.readChunk(file.file, start, length, signal)
         : undefined,

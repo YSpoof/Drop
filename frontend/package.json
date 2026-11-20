@@ -19,11 +19,7 @@
     "start": "node build/server.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report",
-    "cli:build": "sh scripts/build-cli.sh",
-    "native:dev": "sh scripts/native-dev.sh",
-    "native:build": "sh scripts/build-desktop.sh",
-    "native:preview": "./dist/Drop-linux_x64"
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "desfetch": "^1.2.1",

@@ -39,15 +39,6 @@ The sender SHALL NOT have more than 8 MiB of file bytes sent and not yet confirm
 - **WHEN** a confirmation names a file the sender is not currently sending
 - **THEN** the sender does not move the current file's confirmed offset
 
-### Requirement: Receiver memory stays bounded
-
-For a file larger than 8 MiB, the receiver SHALL NOT retain the whole file in memory. Unconfirmed file bytes held by the receiver MUST stay within the 8 MiB window. A native receive MUST NOT accumulate an append batch: bytes the download stream has already accepted stay limited to the chunk being pushed into that file's write body.
-
-#### Scenario: Large native receive does not hold the file
-
-- **WHEN** a native receiver is taking a file larger than 8 MiB and the disk write is slower than the network
-- **THEN** the receiver's unconfirmed file bytes stay within 8 MiB, and already-accepted bytes are not held in a multi-megabyte append batch
-
 ### Requirement: Sender progress follows confirmations
 
 While a send of a non-empty file is in progress, the sender's reported transferred bytes SHALL be the highest confirmed offset and SHALL be less than the file size. The sender SHALL report that file completed, with transferred bytes equal to the file size, only after the receiver's completion acknowledgement. That acknowledgement happens after the download stream has closed.
@@ -88,3 +79,12 @@ When the sender receives a `download-aborted` notification because the receiver 
 
 - **WHEN** the sender receives `download-aborted` for an in-flight or partial file transfer
 - **THEN** the sender resets that file's progress to 0 and status to pending in the sender's view, remaining visible in the sender's transfer list
+
+### Requirement: Receiver memory stays within the window
+
+For a file larger than 8 MiB, the receiver SHALL NOT retain the whole file in memory. Unconfirmed file bytes held by the receiver MUST stay within the 8 MiB window. A desktop receive MUST NOT accumulate an append batch: bytes the download stream has already accepted stay limited to the chunk being pushed into that file's write body.
+
+#### Scenario: Large desktop receive does not hold the file
+
+- **WHEN** a desktop receiver is taking a file larger than 8 MiB and the disk write is slower than the network
+- **THEN** the receiver's unconfirmed file bytes stay within 8 MiB, and already-accepted bytes are not held in a multi-megabyte append batch

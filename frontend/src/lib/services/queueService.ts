@@ -46,9 +46,9 @@ export class QueueService {
       const isFolder = newItems.length > 1 && newItems.some((qf) => qf.path.includes("/"));
 
       if (isFolder) {
-        const firstWithPath = newItems.find((qf) => !!this.fileReader.nativePath(qf.file));
+        const firstWithPath = newItems.find((qf) => !!this.fileReader.desktopPath(qf.file));
         if (firstWithPath) {
-          const absFile = this.fileReader.nativePath(firstWithPath.file);
+          const absFile = this.fileReader.desktopPath(firstWithPath.file);
           const folderRoot = firstWithPath.path.split("/")[0]!;
           const rootIdx = absFile.lastIndexOf(folderRoot);
           const folderPath = absFile.slice(0, rootIdx + folderRoot.length);

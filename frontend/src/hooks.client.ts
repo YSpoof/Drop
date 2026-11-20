@@ -1,8 +1,8 @@
 import type { ClientInit } from "@sveltejs/kit/hooks";
 import { configure } from "quick-di";
 
-import { startGoNative } from "#lib/adapters/native/goNativeClient.js";
-import { nativeProviders } from "#lib/adapters/native/nativeProviders.js";
+import { startDesktop } from "#lib/adapters/desktop/desktopClient.js";
+import { desktopProviders } from "#lib/adapters/desktop/desktopProviders.js";
 import { webProviders } from "#lib/adapters/web/webProviders.js";
 
 function dismissBootSplash() {
@@ -11,8 +11,8 @@ function dismissBootSplash() {
 
 export const init: ClientInit = async () => {
   try {
-    await startGoNative(2000);
-    configure(nativeProviders);
+    await startDesktop(2000);
+    configure(desktopProviders);
   } catch {
     configure(webProviders);
   } finally {

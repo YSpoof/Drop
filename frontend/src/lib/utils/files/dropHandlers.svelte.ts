@@ -12,8 +12,8 @@ export function createDropHandlers(getOnDrop: () => FileDropHandler) {
   async function handleDrop(event: DragEvent) {
     event.preventDefault();
     dragOver = false;
-    // Dropped files carry no real disk path in the native shell, so the queue can't read them.
-    if (inject(EnvironmentPort).isNative) return;
+    // Dropped files carry no real disk path in the desktop shell, so the queue can't read them.
+    if (inject(EnvironmentPort).isDesktop) return;
     if (event.dataTransfer?.items) {
       feedback.light();
       const files = await getFilesFromDataTransfer(event.dataTransfer.items);

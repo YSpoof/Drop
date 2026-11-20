@@ -31,7 +31,7 @@ export class TransferReceiver {
   ) {}
 
   private usesZip(meta: FileMeta): boolean {
-    if (this.environment.hasNativeFs) return false;
+    if (this.environment.hasDesktopFs) return false;
 
     const { session } = this;
     const receiver = session.receiver;
@@ -47,7 +47,7 @@ export class TransferReceiver {
   }
 
   private downloadFilename(meta: FileMeta): string {
-    if (this.environment.hasNativeFs) return meta.name;
+    if (this.environment.hasDesktopFs) return meta.name;
     return meta.name.split("/").pop() || meta.name;
   }
 

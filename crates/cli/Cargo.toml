@@ -1,0 +1,31 @@
+[package]
+name = "drop-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+drop-core = { workspace = true, features = ["watch"] }
+async-trait.workspace = true
+bytes.workspace = true
+clap.workspace = true
+crossterm.workspace = true
+dirs.workspace = true
+futures-util.workspace = true
+getrandom.workspace = true
+ratatui.workspace = true
+rtc.workspace = true
+# Enables the ring provider that tokio-tungstenite's rustls client picks up.
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+unicode-width.workspace = true
+url.workspace = true
+webrtc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

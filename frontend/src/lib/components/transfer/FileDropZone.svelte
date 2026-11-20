@@ -22,7 +22,7 @@
   ondrop={dropZone.handleDrop} />
 
 {#if dropZone.dragOver}
-  {#if environment.isNative}
+  {#if environment.isDesktop}
     <div
       class="bg-base-100/80 border-error fixed inset-0 z-1000 flex items-center justify-center border-8 border-dashed backdrop-blur-sm">
       <div class="pointer-events-none text-center">

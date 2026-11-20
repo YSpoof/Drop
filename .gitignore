@@ -31,5 +31,5 @@ frontend/playwright-report/
 
 # Misc
 /.tmp/
-/chromedata/
-/neutralinojs.log
+# Rust
+target/

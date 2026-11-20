@@ -57,7 +57,7 @@ When joining, the client SHALL send an announce message followed by a `join-code
 - **THEN** the server responds with `join-rejected` and the client reports a pairing error
 
 ### Requirement: WebRTC signal relaying
-The client SHALL relay WebRTC session descriptions and ICE candidates to the remote peer using `signal` messages over the WebSocket connection. The `payload` field SHALL use the FastRTC `SignalPayload` envelope: session descriptions as `{ "type": "description", "description": <RTCSessionDescriptionInit> }` and ICE candidates as `{ "type": "candidate", "candidate": <RTCIceCandidateInit> }`. The client SHALL NOT send raw Pion SDP or bare ICECandidateInit objects as the signal payload.
+The client SHALL relay WebRTC session descriptions and ICE candidates to the remote peer using `signal` messages over the WebSocket connection. The `payload` field SHALL use the FastRTC `SignalPayload` envelope: session descriptions as `{ "type": "description", "description": <RTCSessionDescriptionInit> }` and ICE candidates as `{ "type": "candidate", "candidate": <RTCIceCandidateInit> }`. The client SHALL NOT send a raw SDP string or bare ICECandidateInit objects as the signal payload.
 
 #### Scenario: Relaying session description
 - **WHEN** the local WebRTC stack produces an offer or answer description

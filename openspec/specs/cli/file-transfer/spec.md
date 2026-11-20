@@ -18,15 +18,19 @@ The system SHALL establish two ordered WebRTC data channels named `ctrl` and `fi
 - **THEN** the local peer waits for remote data channels and answers FastRTC-wrapped offers
 
 ### Requirement: Dynamic SCTP chunk size negotiation
-The system SHALL query the peer connection's SCTP transport to determine the negotiated maximum message size, advertising this size in `start` control messages and using it as the transmission chunk size.
+The system SHALL query the peer connection's SCTP transport to determine the negotiated maximum message size, advertising the chosen size in `start` control messages and using it as the transmission chunk size. The chosen size SHALL be the negotiated size capped at 262,144 bytes (256 KiB).
 
 #### Scenario: Negotiated SCTP max message size detected
-- **WHEN** the SCTP transport provides a finite negotiated maximum message size
+- **WHEN** the SCTP transport provides a finite negotiated maximum message size of at most 262,144 bytes
 - **THEN** the sender sets the data channel chunk size to that value and transmits it in the `start` control message
 
 #### Scenario: SCTP max message size fallback
 - **WHEN** the SCTP transport reports zero, infinite, or an unnegotiated size
 - **THEN** the sender defaults to 65,536 bytes (64 KiB) as the fallback chunk size
+
+#### Scenario: Oversized negotiated size is capped
+- **WHEN** the SCTP transport reports a negotiated maximum message size above 262,144 bytes
+- **THEN** the sender uses 262,144 bytes as the chunk size and transmits that value in the `start` control message
 
 ### Requirement: File metadata announcement
 Before streaming a file, the sender SHALL send a JSON control message of type `meta` on the `ctrl` channel specifying `fileId`, `name`, `size`, `mime`, and Drop-compatible `hash` (`name|size|mtimeMs` file identity).
@@ -55,7 +59,7 @@ The sender SHALL emit a `done` message on `ctrl` upon sending the final chunk of
 - **THEN** the receiver sends `ack` on `ctrl` and the sender marks the file completed
 
 ### Requirement: Folder watching and dynamic broadcast
-The system SHALL recursively watch a configured directory tree for file creations and modifications, including files under newly created subdirectories, and automatically announce those files to connected peers using relative `meta.name` paths per the relative-path requirement. Watching only the top-level directory without descending into subdirectories does not satisfy this requirement.
+The system SHALL recursively watch a configured directory tree for file creations and modifications, including files under newly created subdirectories, and automatically announce those files to connected peers using relative `meta.name` paths per the relative-path requirement. Watching only the top-level directory without descending into subdirectories does not satisfy this requirement. A file SHALL be queued only after its size has stopped changing: two equal size readings 50 ms apart, or after 2 seconds of polling at the latest. Files and directories whose name starts with `.` SHALL be ignored, together with everything beneath a dot-prefixed directory; the watched root itself is exempt.
 
 #### Scenario: New file added to watched directory
 - **WHEN** a new file is created within the watched folder tree
@@ -69,6 +73,15 @@ The system SHALL recursively watch a configured directory tree for file creation
 #### Scenario: New subdirectory then file
 - **WHEN** a new subdirectory appears under the watched root and a file is later created inside it
 - **THEN** the watcher detects that file and queues it for announcement
+
+#### Scenario: File still being written is not sent early
+- **WHEN** a file is being copied into the watched tree and its size is still growing
+- **THEN** the watcher does not queue it until its size has stopped changing
+- **AND** the file is queued once for that write, not once per write event
+
+#### Scenario: Hidden entries are ignored
+- **WHEN** `.hidden.txt` or `.cache/tmp.bin` is created under the watched root
+- **THEN** the watcher does not queue either file
 
 ### Requirement: Relative path in outbound meta name
 When announcing a file that belongs to a watched folder (or any send rooted at a directory tree), the sender SHALL set `meta.name` to a Drop-compatible relative path using forward slashes, including the watched folder’s basename as the first path segment (e.g. watching `/tmp/photos` yields `photos/a.jpg`, not `a.jpg`). Single-file or multi-file positional sends (regular files, not a watched directory) MAY keep a basename-only `name`. The Drop identity `hash` SHALL be computed from that same `name` string plus size and mtime.

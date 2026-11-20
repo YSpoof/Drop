@@ -81,6 +81,28 @@ A versão desktop traz recursos extras:
 
 [Baixar para Linux](https://drop.lzart.com.br/downloads/Drop-linux_x64)
 
+A versão desktop abre o Drop em uma janela do Chrome, Chromium ou Edge (no Windows) instalado no sistema. Para apontar para outro endereço, defina `DROP_URL` (padrão `https://drop.lzart.com.br`).
+
+---
+
+### ⌨️ Linha de comando (Windows e Linux)
+
+O `dropcli` envia e recebe arquivos pelo terminal, conectando-se a navegadores, à versão desktop ou a outro `dropcli`.
+
+[Baixar para Windows](https://drop.lzart.com.br/downloads/Drop-cli-win_x64.exe)
+
+[Baixar para Linux](https://drop.lzart.com.br/downloads/Drop-cli-linux_x64)
+
+Sem argumentos, abre o menu interativo (**Gerar um código**, **Possuo um código**, **Configurações**). Opções (somente na forma longa, antes ou depois dos caminhos):
+
+- `--host` — gera um código e aguarda a conexão
+- `--code <pin>` — conecta-se a um código de 4 dígitos
+- `--quick` — modo rápido, com saída em linhas (requer `--host` ou `--code`)
+- `--out <pasta>` — pasta de download apenas desta execução
+- `--help` — mostra a ajuda
+
+Exemplo: `./Drop-cli-linux_x64 --quick --host ./arquivo.zip ./pasta`
+
 ---
 
 ### 📱 Progressive Web App (PWA)
@@ -128,7 +150,7 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 - [WebRTC](https://developer.mozilla.org/en-US/docs/Glossary/WebRTC)
 - [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
 - [Progressive Web App (PWA)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
-- [Neutralinojs](https://neutralino.js.org/)
+- [Rust](https://www.rust-lang.org/) (backend, versão desktop e linha de comando)
 - [Streaming de arquivos](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API)
 - [SvelteKit](https://svelte.dev/docs/kit/introduction)
 
@@ -165,10 +187,17 @@ O servidor **não armazena** e **não vê** os arquivos enviados.
 
 Use o `Makefile` na raiz:
 
-- `make build` — compila o frontend (adapter-static) e embute no binário Go
-- `make dev` — sobe o backend Go e o Vite dev server
-- `make test` — roda testes Go e Playwright
+- `make build` — roda `build-cli`, `build-desktop` e `build-backend`, nessa ordem
+- `make build-backend` — compila o frontend (adapter-static) e o backend em Rust, que embute o frontend e os binários em `downloads/` (`bin/backend`)
+- `make build-cli` — gera `Drop-cli-linux_x64` e `Drop-cli-win_x64.exe` em `downloads/` (altere com `CLI_OUT=…`)
+- `make build-desktop` — gera `Drop-linux_x64` e `Drop-win_x64.exe` em `dist/` (altere com `DESKTOP_OUT=…`)
+- `make dev` — sobe o backend na porta 8080 e o Vite dev server na 4321
+- `make dev-desktop` — sobe backend, Vite e a janela desktop com `DROP_URL=http://localhost:4321`
+- `make preview-desktop` — abre o binário desktop gerado em `dist/`
+- `make test` — roda `cargo test --workspace` e os testes Playwright
 - `make clean` — remove artefatos de build
+
+Os binários de cliente (Linux musl e Windows) exigem os alvos `x86_64-unknown-linux-musl` e `x86_64-pc-windows-gnu` do Rust e o `mingw-w64-gcc`.
 
 ## 📜 Licença
 

@@ -31,7 +31,9 @@
 
   let modalOpen = $state(false);
   let productChoice = $state<ProductChoice>(null);
-  const showButton = $derived(!environment.isNative && (desktopOs || !!installPromptStore.current));
+  const showButton = $derived(
+    !environment.isDesktop && (desktopOs || !!installPromptStore.current),
+  );
 
   const closeModal = () => {
     modalOpen = false;

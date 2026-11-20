@@ -5,6 +5,6 @@ export abstract class FileReaderPort {
     length: number,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer | undefined>;
-  /** Returns absolute disk path for a native File, or empty string in web. */
-  abstract nativePath(file: File): string;
+  /** Returns absolute disk path for a desktop File, or empty string in web. */
+  abstract desktopPath(file: File): string;
 }

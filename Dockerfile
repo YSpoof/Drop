@@ -1,69 +1,63 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.27.3-alpine AS go-base
+ARG LINUX_TARGET=x86_64-unknown-linux-musl
+ARG WINDOWS_TARGET=x86_64-pc-windows-gnu
+
+FROM rust:alpine AS chef
+ARG WINDOWS_TARGET
+RUN apk add --no-cache musl-dev mingw-w64-gcc \
+  && rustup target add "$WINDOWS_TARGET" \
+  && cargo install cargo-chef --locked
 WORKDIR /src
 
-# Download Go modules once and reuse across Go build stages.
-COPY go.mod go.sum ./
-RUN go mod download
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo chef prepare --recipe-path recipe.json
 
-FROM go-base AS go-clients
-COPY cmd ./cmd
-COPY internal ./internal
+# CLI and desktop for both targets. Depends only on Rust sources, so a
+# frontend-only change keeps this stage cached.
+FROM chef AS clients
+ARG LINUX_TARGET
+ARG WINDOWS_TARGET
+COPY .cargo ./.cargo
+COPY --from=planner /src/recipe.json recipe.json
+RUN cargo chef cook --release -p drop-cli -p drop-desktop \
+  --target "$LINUX_TARGET" --target "$WINDOWS_TARGET" --recipe-path recipe.json
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo build --release -p drop-cli -p drop-desktop --target "$LINUX_TARGET" --target "$WINDOWS_TARGET" \
+  && mkdir -p /out/downloads \
+  && cp "target/$LINUX_TARGET/release/drop-cli" /out/downloads/Drop-cli-linux_x64 \
+  && cp "target/$LINUX_TARGET/release/drop-desktop" /out/downloads/Drop-linux_x64 \
+  && cp "target/$WINDOWS_TARGET/release/drop-cli.exe" /out/downloads/Drop-cli-win_x64.exe \
+  && cp "target/$WINDOWS_TARGET/release/drop-desktop.exe" /out/downloads/Drop-win_x64.exe
 
-# Build one platform per job, two jobs in parallel. Building both binaries of a
-# platform in a single `go build` invocation compiles their shared dependencies
-# once; four independent builds would each recompile them from a cold cache and
-# end up slower than building sequentially.
-RUN set -eu; \
-  mkdir -p /out/downloads /out/linux_amd64 /out/windows_amd64; \
-  export CGO_ENABLED=0; \
-  ( GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/linux_amd64/ ./cmd/cli ./cmd/desktop ) & linux_pid=$!; \
-  ( GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /out/windows_amd64/ ./cmd/cli ./cmd/desktop ) & windows_pid=$!; \
-  status=0; \
-  wait "$linux_pid" || status=1; \
-  wait "$windows_pid" || status=1; \
-  test "$status" -eq 0; \
-  mv /out/linux_amd64/cli /out/downloads/Drop-cli-linux_x64; \
-  mv /out/linux_amd64/desktop /out/downloads/Drop-linux_x64; \
-  mv /out/windows_amd64/cli.exe /out/downloads/Drop-cli-win_x64.exe; \
-  mv /out/windows_amd64/desktop.exe /out/downloads/Drop-win_x64.exe; \
-  rmdir /out/linux_amd64 /out/windows_amd64
-
-FROM node:alpine AS frontend-build
+FROM node:alpine AS frontend
 WORKDIR /app/frontend
-
-# Install dependencies first for better layer caching.
 RUN npm i -g pnpm@latest
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm approve-builds --all
-
 COPY frontend ./
 RUN pnpm run build
 
-FROM go-base AS backend-build
-WORKDIR /src
-
-# Commit SHA reported by /health.
-ARG BUILD_SHA=dev
-
-COPY cmd ./cmd
-COPY internal ./internal
-COPY embed.go ./
+# Backend embeds the frontend build and the four client binaries.
+FROM chef AS backend
+ARG LINUX_TARGET
+COPY --from=planner /src/recipe.json recipe.json
+RUN cargo chef cook --release -p drop-backend --target "$LINUX_TARGET" --recipe-path recipe.json
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
 COPY downloads/README.txt ./downloads/README.txt
+COPY --from=frontend /app/frontend/build ./frontend/build
+COPY --from=clients /out/downloads/ ./downloads/
+# Commit SHA reported by /health. Declared late so it does not bust the cook cache.
+ARG BUILD_SHA=dev
+RUN BUILD_SHA="$BUILD_SHA" cargo build --release -p drop-backend --target "$LINUX_TARGET" \
+  && cp "target/$LINUX_TARGET/release/drop-backend" /backend
 
-# Bring in the built frontend and downloaded client binaries.
-COPY --from=frontend-build /app/frontend/build ./frontend/build
-COPY --from=go-clients /out/downloads/ ./downloads/
-
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.buildSHA=${BUILD_SHA}" -o /out/backend ./cmd/backend
-
-FROM scratch AS final
-
-COPY --from=backend-build /out/backend /backend
-
+FROM scratch
+COPY --from=backend /backend /backend
 ENV PORT=4321
-
 EXPOSE 4321
-
 CMD ["/backend"]

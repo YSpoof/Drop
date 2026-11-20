@@ -12,12 +12,12 @@ The CLI SHALL count one visit for each process start on that device (interactive
 
 #### Scenario: Interactive start increments
 
-- **WHEN** the user starts the CLI without `-q`
+- **WHEN** the user starts the CLI without `--quick`
 - **THEN** the stored CLI visit count for that device increases by one
 
 #### Scenario: Quick mode start increments
 
-- **WHEN** the user starts the CLI with `-q`
+- **WHEN** the user starts the CLI with `--quick`
 - **THEN** the stored CLI visit count for that device increases by one
 
 #### Scenario: Count survives a later run
@@ -51,7 +51,7 @@ The CLI SHALL mark a donation reminder due when the CLI visit count reaches 25 a
 
 ### Requirement: Reminder appears only on the interactive mode menu
 
-The CLI SHALL show the due donation reminder only when presenting the interactive mode menu (role selection: `Gerar um código` / `Possuo um código`, and `Configurações` when that option is offered). The CLI MUST NOT show the reminder in quick mode (`-q`), during an active host/join session, on the PIN wait surface, in the receive inbox, or on wait-to-reconnect. When the reminder is due but the mode menu is not shown (including `-q`, or interactive launch that skips the mode menu via `-s`/`-c`), the CLI MUST keep the reminder due and MUST NOT show it. The CLI SHALL show it the next time that mode menu is presented while the reminder remains due.
+The CLI SHALL show the due donation reminder only when presenting the interactive mode menu (role selection: `Gerar um código` / `Possuo um código`, and `Configurações`). The CLI MUST NOT show the reminder in quick mode (`--quick`), during an active host/join session, on the PIN wait surface, in the receive inbox, or on wait-to-reconnect. When the reminder is due but the mode menu is not shown (including `--quick`, or interactive launch that skips the mode menu via `--host`/`--code`), the CLI MUST keep the reminder due and MUST NOT show it. The CLI SHALL show it the next time that mode menu is presented while the reminder remains due.
 
 #### Scenario: Mode menu shows the reminder
 
@@ -60,12 +60,12 @@ The CLI SHALL show the due donation reminder only when presenting the interactiv
 
 #### Scenario: Quick mode defers the reminder
 
-- **WHEN** the reminder becomes due (or is already due) during a `-q` run
+- **WHEN** the reminder becomes due (or is already due) during a `--quick` run
 - **THEN** the donation reminder prompt is not shown and the reminder stays due
 
 #### Scenario: Role flags skip the menu and defer
 
-- **WHEN** the reminder is due and the user launches interactive mode with `-s` or `-c` (mode menu skipped)
+- **WHEN** the reminder is due and the user launches interactive mode with `--host` or `--code` (mode menu skipped)
 - **THEN** the donation reminder prompt is not shown and the reminder stays due
 
 #### Scenario: Active session does not show the reminder

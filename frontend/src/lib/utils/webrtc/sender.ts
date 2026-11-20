@@ -3,7 +3,7 @@ import type { QueuedFile } from "#lib/utils/files/queue.js";
 import { fileIdentity } from "./protocol";
 import type { TransferSession } from "./session";
 
-/** Unconfirmed bytes the sender may keep in flight. Twice the native 4 MiB flush. */
+/** Unconfirmed bytes the sender may keep in flight. Twice the desktop host's 4 MiB flush. */
 const SEND_WINDOW = 8 * 1024 * 1024;
 
 export class TransferSender {

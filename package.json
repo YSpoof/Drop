@@ -8,10 +8,6 @@
     "build": "pnpm --dir frontend run build",
     "preview": "pnpm --dir frontend run preview",
     "check": "pnpm --dir frontend run check",
-    "test:e2e": "pnpm --dir frontend exec playwright test",
-    "cli:build": "sh scripts/build-cli.sh",
-    "native:dev": "sh scripts/native-dev.sh",
-    "native:build": "sh scripts/build-desktop.sh",
-    "native:preview": "./dist/Drop-linux_x64"
+    "test:e2e": "pnpm --dir frontend exec playwright test"
   }
 }

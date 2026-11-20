@@ -5,7 +5,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
-// vite-plugin-sveltekit-ws removed: signaling is handled by the Go backend.
+// vite-plugin-sveltekit-ws removed: signaling is handled by the backend.
 
 export default defineConfig({
   plugins: [
@@ -37,7 +37,7 @@ export default defineConfig({
       },
     }),
     Icons({ compiler: "svelte" }),
-    // signaling handled by Go backend; no SvelteKit WebSocket plugin needed.
+    // signaling handled by the backend; no SvelteKit WebSocket plugin needed.
   ],
   build: {
     target: "esnext",
@@ -60,7 +60,6 @@ export default defineConfig({
         "**/fixtures/**",
         "**/playwright-report/**",
         "**/dist/**",
-        "**/native/**",
         "**/bin/**",
       ],
     },
