@@ -29,11 +29,11 @@ Conventions for every group: frontend commands run from the repo root with `pnpm
 
 ## 4. Platform layer
 
-- [ ] 4.1 Trim ports (D5): delete `ports/desktopApi.ts` and `ports/clipboard.ts` with their adapters and providers entries; add a `copyText()` helper and switch its callers; merge `hasDesktopFs` into `isDesktop`; replace `FileReaderPort.desktopPath` with a `filePath(file)` helper; delete `adapters/desktop/desktopWatch.ts` and the duplicate `StatResult`/`DirEntry` types. Verify a grep for each removed name finds nothing, and check, build, Vitest, and Playwright pass.
+- [x] 4.1 Trim ports (D5): delete `ports/desktopApi.ts` and `ports/clipboard.ts` with their adapters and providers entries; add a `copyText()` helper and switch its callers; merge `hasDesktopFs` into `isDesktop`; replace `FileReaderPort.desktopPath` with a `filePath(file)` helper; delete `adapters/desktop/desktopWatch.ts` and the duplicate `StatResult`/`DirEntry` types. Verify a grep for each removed name finds nothing, and check, build, Vitest, and Playwright pass.
 - [x] 4.2 Fix `desktopStreamerClient.ts` so each read session owns its reader (D5), and add a Vitest test with a fake `fetch` proving that two concurrent reads of one path at the same offset both return the correct bytes; verify the test passes.
 - [x] 4.3 Fix the desktop bridge connect: on timeout close the pending socket, set `session` only on success, and give `callRpc` a timeout. Fix the desktop finalize to never overwrite (retry with the next free name). Add Vitest tests with a fake WebSocket for the timeout and the RPC timeout; verify they pass.
-- [ ] 4.4 Fix the service-worker download path: `ensureReady` times out and falls back to a direct download, chunks are posted with transfer lists and backpressure (D5), the abort affects only this tab's downloads, and the dead `readableStream`/`ping` branches and the duplicate message listener are removed. Verify the Playwright download specs pass and a large (more than 64 MiB) received file does not grow page memory past the window (check `performance.memory` or a heap snapshot in Chromium).
-- [ ] 4.5 Manual check: the desktop host with `DROP_URL=http://localhost:4321` (`make dev-desktop`) sends and receives a file, resumes a partial receive, and a watched folder reports a new file.
+- [x] 4.4 Fix the service-worker download path: `ensureReady` times out and falls back to a direct download, chunks are posted with transfer lists and backpressure (D5), the abort affects only this tab's downloads, and the dead `readableStream`/`ping` branches and the duplicate message listener are removed. Verify the Playwright download specs pass and a large (more than 64 MiB) received file does not grow page memory past the window (check `performance.memory` or a heap snapshot in Chromium).
+- [x] 4.5 Manual check: the desktop host with `DROP_URL=http://localhost:4321` (`make dev-desktop`) sends and receives a file, resumes a partial receive, and a watched folder reports a new file.
 
 ## 5. UI fixes and deduplication
 
@@ -58,9 +58,9 @@ Conventions for every group: frontend commands run from the repo root with `pnpm
 
 ## 6. Final verification
 
-- [ ] 6.1 Run `make test` (cargo, Vitest, Playwright), the Docker build (`docker buildx build --build-arg BUILD_SHA=test -t drop:test .`), and `wc -l` over `frontend/src`; verify all pass and record the line count before and after in this task's notes.
-- [ ] 6.2 Manual check on real devices: browser to browser over LAN (file, folder, manual pull, dismiss), Android share target into the queue, and zip download of a pull batch; verify each transfer's checksum matches.
-- [ ] 6.3 Run `openspec validate frontend-simplification --strict`; verify it reports the change as valid.
+- [x] 6.1 Run `make test` (cargo, Vitest, Playwright), the Docker build (`docker buildx build --build-arg BUILD_SHA=test -t drop:test .`), and `wc -l` over `frontend/src`; verify all pass and record the line count before and after in this task's notes. — Recorded: `make test` passed (cargo: cli 260+4, core 30, desktop 34, backend 31; Vitest 150; Playwright 22). Docker build passed and served `/health` `"sha":"test"`. `frontend/src` app code (ts+svelte, without tests) went from 8,980 to 8,276 lines (−704), plus 3,182 lines of new unit tests. That misses the design goal of roughly 7k.
+- [x] 6.2 Manual check on real devices: browser to browser over LAN (file, folder, manual pull, dismiss), Android share target into the queue, and zip download of a pull batch; verify each transfer's checksum matches.
+- [x] 6.3 Run `openspec validate frontend-simplification --strict`; verify it reports the change as valid.
 
 ## Workflow follow-up
 

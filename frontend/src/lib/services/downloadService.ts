@@ -19,7 +19,7 @@ export class DownloadService implements Sink {
     this.files.abortAll();
   }
 
-  ensureReady(timeoutMs?: number): Promise<boolean> {
+  ensureReady(timeoutMs?: number): Promise<void> {
     return this.files.ensureReady(timeoutMs);
   }
 
@@ -34,7 +34,7 @@ export class DownloadService implements Sink {
 
   async open(offer: Offer, offset: number, onAbort: () => void): Promise<Writer> {
     // Desktop keeps the folder layout; a browser download has no folders.
-    const name = this.environment.hasDesktopFs ? offer.name : offer.name.split("/").pop()!;
+    const name = this.environment.isDesktop ? offer.name : offer.name.split("/").pop()!;
     const stream = await this.createWritableStream(name || offer.name, {
       size: offer.size,
       mime: offer.mime || "application/octet-stream",
@@ -46,7 +46,7 @@ export class DownloadService implements Sink {
   }
 
   archive(name: string | undefined, onAbort: () => void): Archive | null {
-    if (this.environment.hasDesktopFs) return null;
+    if (this.environment.isDesktop) return null;
     const zip = new ZipDownloadSession(name, { onAbort });
     return {
       // Aborting an entry never fails the zip; there is no partial file to discard.

@@ -110,7 +110,7 @@ It talks to the outside through two plain interfaces:
 
 Bug fixes in this layer:
 - **Streamer reads:** every read is its own bounded `Range` request, with no shared reader, so two reads of one path can no longer share or cancel each other. That costs one loopback request per chunk, which is cheap, and removes the reader bookkeeping.
-- **Service-worker readiness:** `ensureReady` races `navigator.serviceWorker.ready` against a timeout and falls back to a direct download.
+- **Service-worker readiness:** `ensureReady` races `navigator.serviceWorker.ready` against a 4 s timeout. Without a worker, files are collected in a Blob and saved on completion, up to 512 MiB per file **(user)**. A larger file is refused with `download-aborted` and a toast. There is no streaming path without a service worker, so this is the only fallback.
 - **Service-worker backpressure:** chunks are posted to the worker with transfer lists, and the page waits for the worker's per-chunk acknowledgement once more than 4 MiB is queued.
 - **Bridge connect:** on timeout, close the pending socket itself, and set the session only on success. `callRpc` gets a timeout.
 - **Desktop finalize:** the host's `fs.move` never replaces an existing file. It hard-links then unlinks, which is atomic on one filesystem, and falls back to an exclusive-create copy. An existing target fails with `target exists`, and the frontend then tries the next free name. Concurrent finalizes in one page also reserve their candidate name. This is a host-side change (`crates/desktop/src/fs.rs`); the method name and parameters stay the same.

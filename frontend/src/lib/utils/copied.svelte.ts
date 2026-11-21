@@ -1,7 +1,6 @@
-import { inject } from "quick-di";
 import { onDestroy } from "svelte";
 
-import { ClipboardPort } from "#lib/ports/clipboard.js";
+import { copyText } from "#lib/utils/clipboard.js";
 
 const COPIED_MS = 2500;
 
@@ -10,7 +9,6 @@ const COPIED_MS = 2500;
  * Call during component init: the reset timer is cleared on destroy.
  */
 export function createCopied<K extends string = "copied">() {
-  const clipboard = inject(ClipboardPort);
   let current = $state<K | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -22,7 +20,7 @@ export function createCopied<K extends string = "copied">() {
     },
     async copy(text: string, key: K): Promise<boolean> {
       try {
-        await clipboard.writeText(text);
+        await copyText(text);
       } catch {
         return false;
       }

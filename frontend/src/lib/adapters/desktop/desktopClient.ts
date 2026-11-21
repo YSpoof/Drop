@@ -81,89 +81,110 @@ export function onBridgeNotification(event: string, callback: (data: unknown) =>
   };
 }
 
-export function callRpc<T = unknown>(method: string, params?: unknown): Promise<T> {
+/** Default RPC timeout. Host liveness is covered by the socket close; this guards a lost reply. */
+export const RPC_TIMEOUT_MS = 30_000;
+
+/** Dialogs wait on the user and `fs.move` may copy a large file across devices: no timeout. */
+function rpcTimeout(method: string): number {
+  return method.startsWith("dialog.") || method === "fs.move" ? 0 : RPC_TIMEOUT_MS;
+}
+
+function rejectPending(error: Error) {
+  for (const pending of pendingCalls.values()) pending.reject(error);
+  pendingCalls.clear();
+}
+
+/** Calls a bridge method; `timeoutMs` 0 waits until the reply or the socket closes. */
+export function callRpc<T = unknown>(
+  method: string,
+  params?: unknown,
+  timeoutMs = rpcTimeout(method),
+): Promise<T> {
   if (!bridgeSocket || bridgeSocket.readyState !== WebSocket.OPEN) {
     return Promise.reject(new Error("Bridge WebSocket is not open"));
   }
 
   const id = crypto.randomUUID();
-  const promise = new Promise<T>((resolve, reject) => {
-    pendingCalls.set(id, {
-      resolve: (res) => resolve(res as T),
-      reject,
-    });
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const timer =
+    timeoutMs > 0
+      ? setTimeout(() => {
+          pendingCalls.delete(id);
+          reject(new Error(`RPC ${method} timed out after ${timeoutMs} ms`));
+        }, timeoutMs)
+      : undefined;
+  pendingCalls.set(id, {
+    resolve: (value) => {
+      clearTimeout(timer);
+      resolve(value as T);
+    },
+    reject: (reason) => {
+      clearTimeout(timer);
+      reject(reason);
+    },
   });
 
-  const payload = JSON.stringify({ id, method, params });
-  bridgeSocket.send(payload);
-
+  bridgeSocket.send(JSON.stringify({ id, method, params }));
   return promise;
 }
 
-export async function startDesktop(timeoutMs = 2000): Promise<void> {
-  const credentials = resolveCredentials();
-  if (!credentials) {
-    throw new Error("No desktop host credentials found in URL or session");
+function onBridgeMessage(event: MessageEvent) {
+  let raw: (RpcResponse & Partial<BridgeNotification>) | null = null;
+  try {
+    raw = JSON.parse(event.data);
+  } catch {
+    return; // Ignore unparseable frames
+  }
+  if (!raw) return;
+
+  if (raw.event) {
+    for (const listener of notificationListeners.get(raw.event) ?? []) listener(raw.data);
+    return;
   }
 
-  session = credentials;
+  const pending = pendingCalls.get(raw.id);
+  if (!pending) return;
+  pendingCalls.delete(raw.id);
+  if (raw.error) pending.reject(new Error(raw.error));
+  else pending.resolve(raw.result);
+}
 
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      bridgeSocket?.close();
-      bridgeSocket = null;
-      reject(new Error("Timeout connecting to desktop host bridge"));
-    }, timeoutMs);
+export function startDesktop(timeoutMs = 2000): Promise<void> {
+  const credentials = resolveCredentials();
+  if (!credentials) {
+    return Promise.reject(new Error("No desktop host credentials found in URL or session"));
+  }
 
-    const wsUrl = `ws://127.0.0.1:${credentials.port}/bridge?token=${encodeURIComponent(credentials.token)}`;
-    const ws = new WebSocket(wsUrl);
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${credentials.port}/bridge?token=${encodeURIComponent(credentials.token)}`,
+  );
 
-    ws.onopen = () => {
-      clearTimeout(timer);
-      bridgeSocket = ws;
-      resolve();
-    };
+  const fail = (error: Error) => {
+    clearTimeout(timer);
+    ws.onopen = ws.onerror = ws.onclose = ws.onmessage = null;
+    ws.close();
+    reject(error);
+  };
+  const timer = setTimeout(
+    () => fail(new Error("Timeout connecting to desktop host bridge")),
+    timeoutMs,
+  );
 
-    ws.onerror = (err) => {
-      clearTimeout(timer);
-      reject(err);
-    };
-
+  ws.onerror = ws.onclose = () => fail(new Error("Desktop host bridge connection failed"));
+  ws.onopen = () => {
+    clearTimeout(timer);
+    ws.onerror = null;
     ws.onclose = () => {
+      if (bridgeSocket !== ws) return;
       bridgeSocket = null;
-      for (const [id, pending] of pendingCalls.entries()) {
-        pending.reject(new Error("Bridge socket closed"));
-        pendingCalls.delete(id);
-      }
+      rejectPending(new Error("Bridge socket closed"));
     };
+    ws.onmessage = onBridgeMessage;
+    bridgeSocket = ws;
+    session = credentials;
+    resolve();
+  };
 
-    ws.onmessage = (event) => {
-      try {
-        const raw = JSON.parse(event.data);
-        if ("event" in raw) {
-          const notif = raw as BridgeNotification;
-          const listeners = notificationListeners.get(notif.event);
-          if (listeners) {
-            for (const listener of listeners) {
-              listener(notif.data);
-            }
-          }
-          return;
-        }
-
-        const resp = raw as RpcResponse;
-        if (resp.id && pendingCalls.has(resp.id)) {
-          const pending = pendingCalls.get(resp.id)!;
-          pendingCalls.delete(resp.id);
-          if (resp.error) {
-            pending.reject(new Error(resp.error));
-          } else {
-            pending.resolve(resp.result);
-          }
-        }
-      } catch {
-        // Ignore unparseable frames
-      }
-    };
-  });
+  return promise;
 }

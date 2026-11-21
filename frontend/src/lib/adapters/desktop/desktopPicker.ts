@@ -1,21 +1,6 @@
+import type { DirEntry, StatResult } from "#lib/adapters/desktop/desktopApi.js";
 import { callRpc } from "#lib/adapters/desktop/desktopClient.js";
 import { PickerPort, type PickedFile } from "#lib/ports/picker.js";
-
-type StatResult = {
-  exists: boolean;
-  path: string;
-  size: number;
-  isDirectory: boolean;
-  modifiedAt: number;
-};
-
-type DirEntry = {
-  entry: string;
-  path: string;
-  type: string;
-  size: number;
-  modifiedAt: number;
-};
 
 function leafOf(path: string): string {
   const trimmed = path.replace(/[/\\]+$/, "");

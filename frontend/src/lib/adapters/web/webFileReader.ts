@@ -10,8 +10,4 @@ export class WebFileReader extends FileReaderPort {
   ): Promise<undefined> {
     return undefined;
   }
-
-  desktopPath(): string {
-    return "";
-  }
 }

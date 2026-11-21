@@ -6,7 +6,8 @@ export abstract class FileAdapterPort {
     opts?: CreateDownloadStreamOptions,
   ): Promise<WritableStream<Uint8Array>>;
   abstract abortAll(): void;
-  abstract ensureReady(timeoutMs?: number): Promise<boolean>;
+  /** Prepares downloads (e.g. waits briefly for the service worker); never fails. */
+  abstract ensureReady(timeoutMs?: number): Promise<void>;
 
   getResumeOffset(_hash: string, _size: number): Promise<number> {
     return Promise.resolve(0);

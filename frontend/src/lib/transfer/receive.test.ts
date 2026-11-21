@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { Engine } from "./engine";
+import { FileTooLargeError } from "./errors";
 import { MemorySink, MemorySource, RecordingHooks, TestLink, bytesOf, settle } from "./fixtures";
 import { CREDIT_BATCH, fileIdentity, packFrame, type ControlMessage } from "./protocol";
 import { DONE_GRACE } from "./receive";
@@ -298,6 +299,35 @@ describe("write failures", () => {
     expect(t.link.sent("cancel")[0]).toMatchObject({ fileId: "a", reason: "No space" });
     await t.receive("b", 2, bytesOf(4));
     expect(t.link.sent("ack").map((m) => m.fileId)).toStrictEqual(["b"]);
+  });
+});
+
+describe("file too large for the sink", () => {
+  test("a refused open answers download-aborted, keeps the offer pending and toasts", async () => {
+    const t = setup();
+    t.sink.beforeOpen = (offer) => {
+      if (offer.fileId === "a") throw new FileTooLargeError(16);
+    };
+    await t.meta("a", 4);
+    await t.start("a", 1);
+
+    expect(t.link.sent("cancel")).toStrictEqual([]);
+    expect(t.link.sent("download-aborted")).toStrictEqual([
+      { type: "download-aborted", fileId: "a" },
+    ]);
+    expect(t.hooks.of("error").map((e) => e.message)).toStrictEqual([
+      new FileTooLargeError(16).message,
+    ]);
+    expect(t.hooks.finishedOf("a")).toBeUndefined();
+    expect(t.hooks.row("a")?.status).toBe("pending");
+
+    await t.receive("b", 2, bytesOf(4));
+    expect(t.link.sent("ack").map((m) => m.fileId)).toStrictEqual(["b"]);
+
+    // The offer is still known: a later start for it is answered with resume.
+    t.sink.beforeOpen = null;
+    await t.start("a", 3);
+    expect(t.link.sent("resume").map((m) => m.fileId)).toStrictEqual(["b", "a"]);
   });
 });
 

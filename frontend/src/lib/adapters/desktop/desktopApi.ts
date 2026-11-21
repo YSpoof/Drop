@@ -4,9 +4,8 @@ import {
   readViaStreamer,
   type HttpWrite,
 } from "#lib/adapters/desktop/desktopStreamerClient.js";
-import type { DesktopApi } from "#lib/ports/desktopApi.js";
 
-type StatResult = {
+export type StatResult = {
   exists: boolean;
   path: string;
   size: number;
@@ -14,21 +13,18 @@ type StatResult = {
   modifiedAt: number;
 };
 
-type DirEntry = {
+export type DirEntry = {
   entry: string;
   path: string;
   type: string;
+  size: number;
+  modifiedAt: number;
 };
 
 const openStreams = new Map<string, HttpWrite>();
 
-export const desktopApi: DesktopApi = {
-  async writeClipboardText(text: string): Promise<void> {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
-    }
-  },
-
+/** Typed RPC helpers over the desktop host bridge. */
+export const desktopApi = {
   getDownloadsPath(): Promise<string> {
     return callRpc<string>("fs.getDownloadsPath");
   },
@@ -128,3 +124,5 @@ export const desktopApi: DesktopApi = {
     return readViaStreamer(filePath, start, length, signal);
   },
 };
+
+export type DesktopApi = typeof desktopApi;

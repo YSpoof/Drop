@@ -1,6 +1,6 @@
 import { inject } from "quick-di";
 
-import { FileReaderPort } from "#lib/ports/fileReader.js";
+import { filePath } from "#lib/ports/fileReader.js";
 import { WatcherPort, type WatcherEvent } from "#lib/ports/watcher.js";
 import { createQueuedFile, type QueuedFile } from "#lib/utils/files/queue.js";
 
@@ -17,7 +17,6 @@ type WatchedGroupEntry = {
 
 export class FolderWatcher {
   private readonly watcher = inject(WatcherPort);
-  private readonly fileReader = inject(FileReaderPort);
   private watched = new Map<string, WatchedGroupEntry>();
   private unsub: (() => void) | null = null;
   private callbacks: Callbacks | null = null;
@@ -36,7 +35,7 @@ export class FolderWatcher {
   async watchGroup(groupId: string, folderPath: string, initial: QueuedFile[]) {
     const fileMap = new Map<string, string>();
     for (const qf of initial) {
-      const absPath = this.fileReader.desktopPath(qf.file);
+      const absPath = filePath(qf.file);
       if (absPath) fileMap.set(absPath, qf.id);
     }
     this.watched.set(groupId, { folderPath, fileMap });

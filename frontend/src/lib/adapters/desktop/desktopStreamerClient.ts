@@ -1,18 +1,11 @@
 import desfetch, { type DesFetchOptions } from "desfetch";
 
-import { getDesktopSession, type DesktopSession } from "#lib/adapters/desktop/desktopClient.js";
+import { getDesktopSession } from "#lib/adapters/desktop/desktopClient.js";
 
 const TOKEN_HEADER = "X-Drop-Token";
 
 type LoopbackOptions<T, E = unknown> = DesFetchOptions<T, E> & {
   targetAddressSpace?: "loopback";
-};
-
-type OpenRead = {
-  offset: number;
-  reader: ReadableStreamDefaultReader<Uint8Array>;
-  pending: Uint8Array | null;
-  abort: AbortController;
 };
 
 export type HttpWrite = {
@@ -21,121 +14,40 @@ export type HttpWrite = {
   abort(): Promise<void>;
 };
 
-const openReads = new Map<string, OpenRead>();
+const abortError = () => new DOMException("Aborted", "AbortError");
 
-function abortRead(read: OpenRead) {
-  read.abort.abort();
-  void read.reader.cancel().catch(() => undefined);
-}
-
-async function openRead(
-  session: DesktopSession,
-  path: string,
-  start: number,
-): Promise<OpenRead | null> {
-  const abort = new AbortController();
-  const url = new URL(`http://127.0.0.1:${session.port}/read`);
-  url.searchParams.set("path", path);
-
-  const options: LoopbackOptions<Response> = {
-    headers: {
-      [TOKEN_HEADER]: session.token,
-      Range: `bytes=${start}-`,
-    },
-    signal: abort.signal,
-    targetAddressSpace: "loopback",
-    parse: async (response) => response,
-  };
-
-  const { data, error } = await desfetch(url, options);
-  if (error || !data.body) {
-    abort.abort();
-    return null;
-  }
-  if (start > 0 && data.status === 200) {
-    abort.abort();
-    await data.body.cancel();
-    return null;
-  }
-
-  return {
-    offset: start,
-    reader: data.body.getReader(),
-    pending: null,
-    abort,
-  };
-}
-
-async function pull(read: OpenRead, length: number, signal?: AbortSignal): Promise<ArrayBuffer> {
-  if (length === 0) return new ArrayBuffer(0);
-  const out = new Uint8Array(length);
-  let filled = 0;
-
-  while (filled < length) {
-    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    if (!read.pending || read.pending.byteLength === 0) {
-      const next = await read.reader.read();
-      if (next.done) {
-        read.offset += filled;
-        return out.buffer.slice(0, filled);
-      }
-      read.pending = next.value;
-    }
-
-    const pending = read.pending;
-    const take = Math.min(pending.byteLength, length - filled);
-    out.set(pending.subarray(0, take), filled);
-    filled += take;
-    read.pending = take === pending.byteLength ? null : pending.subarray(take);
-  }
-
-  read.offset += filled;
-  return out.buffer;
-}
-
+/** Reads one chunk with its own bounded Range request, so concurrent reads never share state. */
 export async function readViaStreamer(
   path: string,
   start: number,
   length: number,
   signal?: AbortSignal,
 ): Promise<ArrayBuffer> {
+  if (signal?.aborted) throw abortError();
+  if (length <= 0) return new ArrayBuffer(0);
   const session = getDesktopSession();
-  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  const url = new URL(`http://127.0.0.1:${session.port}/read`);
+  url.searchParams.set("path", path);
 
-  let current = openReads.get(path);
-  if (current && current.offset !== start) {
-    abortRead(current);
-    openReads.delete(path);
-    current = undefined;
-  }
-
-  if (!current) {
-    for (const [otherPath, other] of openReads) {
-      if (otherPath === path) continue;
-      abortRead(other);
-      openReads.delete(otherPath);
-    }
-    const opened = await openRead(session, path, start);
-    if (!opened) throw new Error("File streamer read failed");
-    current = opened;
-    openReads.set(path, current);
-  }
-
-  const active = current;
-  const onAbort = () => {
-    abortRead(active);
+  const options: LoopbackOptions<ArrayBuffer> = {
+    headers: {
+      [TOKEN_HEADER]: session.token,
+      Range: `bytes=${start}-${start + length - 1}`,
+    },
+    signal,
+    targetAddressSpace: "loopback",
+    parse: async (response) => {
+      if (start > 0 && response.status !== 206) throw new Error("Range not honored");
+      return response.arrayBuffer();
+    },
   };
-  signal?.addEventListener("abort", onAbort, { once: true });
 
-  try {
-    return await pull(active, length, signal);
-  } catch (error) {
-    abortRead(active);
-    openReads.delete(path);
-    throw error;
-  } finally {
-    signal?.removeEventListener("abort", onAbort);
-  }
+  const { data, error } = await desfetch(url, options);
+  if (signal?.aborted) throw abortError();
+  // 416: the offset is at or past the end of the file.
+  if (error?.status === 416) return new ArrayBuffer(0);
+  if (error) throw new Error(`File streamer read failed: ${error.message}`);
+  return data;
 }
 
 export async function openHttpWrite(path: string, start: number): Promise<HttpWrite> {
@@ -145,7 +57,7 @@ export async function openHttpWrite(path: string, start: number): Promise<HttpWr
   let opened = false;
 
   const post = async (chunk: Uint8Array) => {
-    if (abort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    if (abort.signal.aborted) throw abortError();
     const url = new URL(`http://127.0.0.1:${session.port}/write`);
     url.searchParams.set("path", path);
     if (append) url.searchParams.set("append", "1");
@@ -162,7 +74,7 @@ export async function openHttpWrite(path: string, start: number): Promise<HttpWr
 
     const { error } = await desfetch(url, options);
     if (error) {
-      if (abort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      if (abort.signal.aborted) throw abortError();
       throw new Error(error.message);
     }
     append = true;

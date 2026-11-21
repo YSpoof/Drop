@@ -3,7 +3,6 @@ import { page } from "$app/state";
 import { inject } from "quick-di";
 import { untrack } from "svelte";
 
-import { ClipboardPort } from "#lib/ports/clipboard.js";
 import { NotificationsPort } from "#lib/ports/notifications.js";
 import { DownloadService } from "#lib/services/downloadService.js";
 import { QueueService } from "#lib/services/queueService.js";
@@ -11,7 +10,7 @@ import { deviceStore } from "#lib/stores/deviceStore.svelte.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { toastStore } from "#lib/stores/toast.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
-import { uiStore } from "#lib/stores/uiStore.svelte.js";
+import { copyText } from "#lib/utils/clipboard.js";
 import { releaseWakeLock, requestWakeLock } from "#lib/utils/device/wakelock.js";
 import { feedback } from "#lib/utils/feedback.js";
 import { createQueuedFile } from "#lib/utils/files/queue.js";
@@ -25,7 +24,7 @@ export async function applyAssignedCode(code: string) {
   await goto(`${url.pathname}${url.search}`, { replace: true, reset: false });
 
   try {
-    await inject(ClipboardPort).writeText(url.href);
+    await copyText(url.href);
     toastStore.showToast("Link copiado", "success");
   } catch {
     // ignore clipboard errors
@@ -68,10 +67,7 @@ export async function recoverSharedFiles() {
 export async function initSessionPage(session: SessionManager): Promise<string | null> {
   void requestWakeLock();
 
-  const ready = await inject(DownloadService).ensureReady();
-  if (!ready) {
-    uiStore.unsupportedBrowserModalOpen = true;
-  }
+  await inject(DownloadService).ensureReady();
 
   session.connect();
   await recoverSharedFiles();

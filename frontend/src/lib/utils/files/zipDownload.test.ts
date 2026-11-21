@@ -253,7 +253,7 @@ describe("receiver archive through DownloadService", () => {
     const files = { createWritableStream: vi.fn().mockResolvedValue(target.stream) };
     configure([
       { provide: FileAdapterPort, useValue: files as Partial<FileAdapterPort> as FileAdapterPort },
-      { provide: EnvironmentPort, useValue: { isDesktop: false, hasDesktopFs: false } },
+      { provide: EnvironmentPort, useValue: { isDesktop: false } },
     ]);
     const downloads = new DownloadService();
     configure([{ provide: DownloadService, useValue: downloads }]);

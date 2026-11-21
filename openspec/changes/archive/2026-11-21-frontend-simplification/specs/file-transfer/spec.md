@@ -112,3 +112,17 @@ When a browser receiver pulls files with `pull-batch` and saves them as one arch
 
 - **WHEN** the receiver pulls one file with `pull-batch`
 - **THEN** that download is finalized when the file finishes and the next pulled file is not appended to it
+
+### Requirement: Receiving without streaming downloads is size-limited
+
+When a browser receiver cannot stream downloads to disk (no service worker), it SHALL hold each received file in browser storage until it completes, which is an exception to the receiver memory window. To bound that memory it SHALL accept such files only up to 536,870,912 bytes (512 MiB) each. For a larger file it SHALL send `download-aborted` for that `fileId`, keep the offer pending, show the user that the file is too large for this browser, and continue with other files.
+
+#### Scenario: Small file without a service worker
+
+- **WHEN** a browser without a service worker receives a file of at most 512 MiB
+- **THEN** the file is saved as one download when it completes, with exact bytes
+
+#### Scenario: Large file without a service worker
+
+- **WHEN** a browser without a service worker is offered a file larger than 512 MiB and the transfer starts
+- **THEN** the receiver sends `download-aborted` for that file, shows that the file is too large for this browser, and the next file is received normally

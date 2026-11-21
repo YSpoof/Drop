@@ -1,6 +1,6 @@
 import { inject } from "quick-di";
 
-import { DesktopApi } from "#lib/ports/desktopApi.js";
+import { desktopApi, type DesktopApi } from "#lib/adapters/desktop/desktopApi.js";
 import { FileAdapterPort } from "#lib/ports/fileAdapter.js";
 import { ReceiveFolderPort } from "#lib/ports/receiveFolder.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
@@ -43,10 +43,39 @@ function dropName(id: string): string {
   return `${id.replaceAll(/[<>:"/\\|?*]/g, "_")}${DROP_SUFFIX}`;
 }
 
-async function uniqueAvailableName(api: DesktopApi, dir: string, name: string): Promise<string> {
+/** Targets being finalized in this page, so two concurrent finalizes never pick one name. */
+const reservedTargets = new Set<string>();
+
+/** Matches the host's `fs.move` error for an existing target (crates/desktop `TARGET_EXISTS`). */
+const TARGET_EXISTS = "target exists";
+
+function isTargetExists(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(TARGET_EXISTS);
+}
+
+/**
+ * Moves `from` to the first free variant of `name` in `dir`. The host's `fs.move` never
+ * replaces an existing file and fails with `target exists`, so a taken name moves on to the
+ * next variant; names reserved by a concurrent finalize in this page are skipped up front.
+ */
+export async function moveToFreeName(
+  api: DesktopApi,
+  from: string,
+  dir: string,
+  name: string,
+): Promise<string> {
   for (let index = 0; ; index += 1) {
-    const candidate = uniqueNameAt(name, index);
-    if (!(await api.pathExists(await api.joinPath(dir, candidate)))) return candidate;
+    const target = await api.joinPath(dir, uniqueNameAt(name, index));
+    if (reservedTargets.has(target)) continue;
+    reservedTargets.add(target);
+    try {
+      await api.move(from, target);
+      return target;
+    } catch (error) {
+      if (!isTargetExists(error)) throw error;
+    } finally {
+      reservedTargets.delete(target);
+    }
   }
 }
 
@@ -57,14 +86,12 @@ async function ensureParentDir(api: DesktopApi, dir: string, relative: string) {
 
 export class DesktopFsFileAdapter extends FileAdapterPort {
   #active = new Set<DownloadHandle>();
-  private readonly api = inject(DesktopApi);
+  private readonly api = desktopApi;
   private readonly receiveFolder = inject(ReceiveFolderPort);
   private readonly getDir = async (): Promise<string> =>
     transferStore.receiveFolderPath || (await this.receiveFolder.defaultPath()) || "";
 
-  async ensureReady(): Promise<boolean> {
-    return true;
-  }
+  async ensureReady(): Promise<void> {}
 
   abortAll(): void {
     for (const handle of [...this.#active]) handle.abort();
@@ -128,10 +155,7 @@ export class DesktopFsFileAdapter extends FileAdapterPort {
         try {
           await api.closeWriteStream(streamId);
           await ensureParentDir(api, dir, relativePath);
-          await api.move(
-            dropPath,
-            await api.joinPath(dir, await uniqueAvailableName(api, dir, relativePath)),
-          );
+          await moveToFreeName(api, dropPath, dir, relativePath);
         } catch (error) {
           await api.abortWriteStream(streamId).catch(() => undefined);
           throw error;

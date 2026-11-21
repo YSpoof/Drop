@@ -4,7 +4,6 @@ const setupWizardViewed = await localForage.getItem<boolean>("setupWizardViewed"
 const initialDevMode = (await localForage.getItem<boolean>("devMode")) ?? false;
 
 class UiStore {
-  unsupportedBrowserModalOpen = $state(false);
   codeJoinOpen = $state(false);
   setupWizardOpen = $state(!setupWizardViewed);
   infoModalOpen = $state(false);
@@ -16,8 +15,7 @@ class UiStore {
   devMode = $state(initialDevMode);
 
   anyModalOpen = $derived(
-    this.unsupportedBrowserModalOpen ||
-      this.codeJoinOpen ||
+    this.codeJoinOpen ||
       this.setupWizardOpen ||
       this.infoModalOpen ||
       this.statsModalOpen ||

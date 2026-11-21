@@ -5,6 +5,9 @@ export abstract class FileReaderPort {
     length: number,
     signal?: AbortSignal,
   ): Promise<ArrayBuffer | undefined>;
-  /** Returns absolute disk path for a desktop File, or empty string in web. */
-  abstract desktopPath(file: File): string;
+}
+
+/** Absolute disk path stamped on a File by the desktop picker or folder watcher; "" otherwise. */
+export function filePath(file: File): string {
+  return (file as File & { path?: string }).path ?? "";
 }

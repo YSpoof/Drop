@@ -95,16 +95,33 @@ pub async fn remove(path: &str) -> io::Result<()> {
     }
 }
 
-/// Rename, falling back to copy and delete across devices.
+/// Error text the frontend matches to pick the next free name.
+pub const TARGET_EXISTS: &str = "target exists";
+
+/// Moves a file without ever replacing `to`: a hard link plus unlink (atomic on one
+/// filesystem), else an exclusive-create copy and delete (across devices, or where links
+/// are unsupported). An existing target fails with [`TARGET_EXISTS`].
 pub async fn rename(from: &str, to: &str) -> io::Result<()> {
-    if fs::rename(from, to).await.is_ok() {
-        return Ok(());
-    }
     if let Some(parent) = Path::new(to).parent() {
         fs::create_dir_all(parent).await?;
     }
-    fs::copy(from, to).await?;
-    remove(from).await
+    let result = match fs::hard_link(from, to).await {
+        Err(err) if err.kind() != io::ErrorKind::AlreadyExists => copy_new(from, to).await,
+        linked => linked,
+    };
+    match result {
+        Ok(()) => remove(from).await,
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+            Err(io::Error::new(io::ErrorKind::AlreadyExists, TARGET_EXISTS))
+        }
+        Err(err) => Err(err),
+    }
+}
+
+async fn copy_new(from: &str, to: &str) -> io::Result<()> {
+    let mut source = fs::File::open(from).await?;
+    let mut target = fs::OpenOptions::new().write(true).create_new(true).open(to).await?;
+    tokio::io::copy(&mut source, &mut target).await.map(|_| ())
 }
 
 fn modified_ms(meta: &Metadata) -> i64 {
@@ -118,3 +135,7 @@ fn modified_ms(meta: &Metadata) -> i64 {
 pub fn lossy(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
+
+#[cfg(test)]
+#[path = "fs_tests.rs"]
+mod tests;

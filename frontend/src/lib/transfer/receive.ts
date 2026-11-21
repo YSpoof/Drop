@@ -3,6 +3,7 @@
 //! `ack`, and one zip per pull batch. Every write runs on one promise chain whose links each
 //! catch, and every queued step re-checks that its receive is still the current one.
 
+import { FileTooLargeError } from "./errors";
 import { CREDIT_BATCH, unpackFrame, type StartMessage } from "./protocol";
 import type { Archive, Hooks, Link, Offer, Row, Sink, Writer } from "./types";
 import { Batch, errorMessage } from "./util";
@@ -255,6 +256,15 @@ export class Receiver {
     this.leaveGroup(rx.offer.fileId);
   }
 
+  /** The sink cannot hold this file: back to pending, so the sender moves on to the next. */
+  private refuse(rx: Receive, message: string) {
+    if (rx !== this.current) return;
+    this.end(rx, true);
+    void rx.writer?.abort(true).catch(ignore);
+    this.toPending(rx.offer);
+    this.hooks.error(message);
+  }
+
   /** The user stopped the download outside the app: keep the partial, back to pending. */
   private userAborted(rx: Receive) {
     if (rx !== this.current) return;
@@ -344,7 +354,8 @@ export class Receiver {
   /** Runs `step` for `rx` after every earlier step; a failure ends only `rx`. */
   private enqueue(rx: Receive, step: () => Promise<void>) {
     this.chain(step, (error) => {
-      this.fail(rx, errorMessage(error, "Failed to write received file"));
+      if (error instanceof FileTooLargeError) this.refuse(rx, error.message);
+      else this.fail(rx, errorMessage(error, "Failed to write received file"));
     });
   }
 

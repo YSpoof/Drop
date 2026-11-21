@@ -1,6 +1,6 @@
 import { inject } from "quick-di";
 
-import { FileReaderPort } from "#lib/ports/fileReader.js";
+import { filePath } from "#lib/ports/fileReader.js";
 import { FolderWatcher } from "#lib/services/folderWatcher.js";
 import { peerStore } from "#lib/stores/peerStore.svelte.js";
 import { transferStore } from "#lib/stores/transferStore.svelte.js";
@@ -9,7 +9,6 @@ import type { QueuedFile } from "#lib/utils/files/queue.js";
 import { logger } from "#lib/utils/logger.js";
 
 export class QueueService {
-  private readonly fileReader = inject(FileReaderPort);
   private readonly folderWatcher = inject(FolderWatcher);
   private notifyDelayTimeout: ReturnType<typeof setTimeout> | null = null;
   private getEngine: () => Engine | null = () => null;
@@ -46,9 +45,9 @@ export class QueueService {
       const isFolder = newItems.length > 1 && newItems.some((qf) => qf.path.includes("/"));
 
       if (isFolder) {
-        const firstWithPath = newItems.find((qf) => !!this.fileReader.desktopPath(qf.file));
+        const firstWithPath = newItems.find((qf) => !!filePath(qf.file));
         if (firstWithPath) {
-          const absFile = this.fileReader.desktopPath(firstWithPath.file);
+          const absFile = filePath(firstWithPath.file);
           const folderRoot = firstWithPath.path.split("/")[0]!;
           const rootIdx = absFile.lastIndexOf(folderRoot);
           const folderPath = absFile.slice(0, rootIdx + folderRoot.length);

@@ -27,9 +27,6 @@
 
   const PossessCodeModal = lazy(() => import("#lib/components/modals/PossessCodeModal.svelte"));
   const CodeJoinModal = lazy(() => import("#lib/components/modals/CodeJoinModal.svelte"));
-  const UnsupportedBrowserModal = lazy(
-    () => import("#lib/components/modals/UnsupportedBrowserModal.svelte"),
-  );
   const ShareStatus = lazy(() => import("#lib/components/share/ShareStatus.svelte"));
   const Files = lazy(() => import("#lib/components/transfer/Files.svelte"));
   const TransferProgress = lazy(() => import("#lib/components/transfer/TransferProgress.svelte"));
@@ -140,10 +137,6 @@
     phase={peerStore.codeJoinPhase}
     peerName={peerStore.connectedPeerInfo?.displayName}
     onClose={() => session.codeJoin.cancel()} />
-</LazyModal>
-
-<LazyModal open={uiStore.unsupportedBrowserModalOpen}>
-  <UnsupportedBrowserModal />
 </LazyModal>
 
 <svelte:window ononline={() => session.wakeSignaling("online")} />

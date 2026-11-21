@@ -10,10 +10,13 @@ const ASSETS = [...immutable, ...staticAssets, ...prerendered].map((asset) => `/
 const DOWNLOAD_PREFIX = "/__download__/";
 
 type PendingDownload = {
-  stream: ReadableStream;
+  stream: ReadableStream<Uint8Array>;
   headers: HeadersInit;
 };
 
+type DownloadRequest = { type: "download"; filename?: string; size?: number; mime?: string };
+
+/** Downloads waiting for the browser's fetch, by path. */
 const pendingDownloads = new Map<string, PendingDownload>();
 
 function encodeContentDisposition(filename: string): string {
@@ -26,144 +29,93 @@ function encodeContentDisposition(filename: string): string {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
-function streamFromPort(port: MessagePort): ReadableStream<Uint8Array> {
-  const pending: Uint8Array[] = [];
-  let isClosed = false;
-  let isErrored = false;
-  let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+/**
+ * The page's chunks as a pull stream: a chunk leaves the queue only when the browser reads it,
+ * and its `ack` lets the page send more. The page stops at 4 MiB unacknowledged, so the queue
+ * stays bounded while a Save-as prompt is open or the disk is slow.
+ */
+function streamFromPort(port: MessagePort, onDone: () => void): ReadableStream<Uint8Array> {
+  const queue: Uint8Array[] = [];
+  let ended = false;
+  let failed = false;
+  let wake: (() => void) | null = null;
+  let stream!: ReadableStreamDefaultController<Uint8Array>;
 
-  const pump = () => {
-    if (!streamController || isErrored) return;
-
-    while (pending.length > 0) {
-      try {
-        streamController.enqueue(pending.shift()!);
-      } catch {
-        return;
-      }
-    }
-
-    if (isClosed) {
-      try {
-        streamController.close();
-      } catch {
-        // already closed
-      }
-    }
+  const fail = () => {
+    failed = true;
+    queue.length = 0;
+    onDone();
   };
 
-  port.onmessage = (event) => {
-    const data = event.data;
-    if (data === "ping") return;
-
+  port.onmessage = ({ data }) => {
     if (data === "end") {
-      isClosed = true;
-      pump();
-      try {
-        port.postMessage("end-ack");
-      } catch {
-        // port closed
-      }
-      return;
+      ended = true;
+    } else if (data === "abort") {
+      fail();
+      stream.error(new Error("Download aborted"));
+    } else if (data instanceof ArrayBuffer) {
+      queue.push(new Uint8Array(data));
     }
-
-    if (data === "abort") {
-      isErrored = true;
-      try {
-        streamController?.error(new Error("Download aborted"));
-      } catch {
-        // already errored/closed
-      }
-      return;
-    }
-
-    if (data instanceof ArrayBuffer) {
-      pending.push(new Uint8Array(data));
-      pump();
-      return;
-    }
-    if (data instanceof Uint8Array) {
-      pending.push(data);
-      pump();
-      return;
-    }
-    if (ArrayBuffer.isView(data)) {
-      pending.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
-      pump();
-    }
+    wake?.();
   };
 
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      streamController = controller;
-    },
-    pull() {
-      pump();
-    },
-    cancel() {
-      isErrored = true;
-      try {
+  return new ReadableStream<Uint8Array>(
+    {
+      start(controller) {
+        stream = controller;
+      },
+      async pull(controller) {
+        while (queue.length === 0 && !ended && !failed) {
+          const next = Promise.withResolvers<void>();
+          wake = next.resolve;
+          await next.promise;
+          wake = null;
+        }
+        if (failed) return;
+        const chunk = queue.shift();
+        if (chunk) {
+          controller.enqueue(chunk);
+          port.postMessage({ ack: chunk.byteLength });
+          return;
+        }
+        controller.close();
+        port.postMessage("end-ack");
+        port.close();
+      },
+      cancel() {
+        fail();
+        wake?.();
         port.postMessage("abort");
-      } catch {
-        // port closed
-      }
+        port.close();
+      },
     },
-  });
+    // Pull only when the browser reads, so nothing piles up inside the stream itself.
+    { highWaterMark: 0 },
+  );
 }
 
-function handleDownloadMessage(event: ExtendableMessageEvent) {
-  const data = event.data as
-    | {
-        type?: string;
-        filename?: string;
-        size?: number;
-        mime?: string;
-        readableStream?: ReadableStream;
-      }
-    | string
-    | undefined;
-
-  if (data === "ping" || (typeof data === "object" && data?.type === "ping")) {
-    event.ports[0]?.postMessage("pong");
-    return;
-  }
-
-  if (typeof data === "object" && data?.type === "claim") {
-    void self.clients.claim();
-    return;
-  }
-
-  if (typeof data === "object" && data?.type === "abort-downloads") {
-    for (const [pathname, pending] of pendingDownloads) {
-      void pending.stream.cancel();
-      pendingDownloads.delete(pathname);
-    }
-    return;
-  }
-
-  if (typeof data !== "object" || data?.type !== "download") return;
-
-  const port = event.ports[0];
+function openDownload(data: DownloadRequest, port: MessagePort | undefined) {
   if (!port) return;
 
-  const id = crypto.randomUUID();
-  const pathname = `${DOWNLOAD_PREFIX}${id}`;
-  const downloadUrl = new URL(pathname, self.registration.scope).href;
-  const filename = data.filename || "download";
-
-  const stream =
-    data.readableStream instanceof ReadableStream ? data.readableStream : streamFromPort(port);
-
+  const pathname = `${DOWNLOAD_PREFIX}${crypto.randomUUID()}`;
   const headers: Record<string, string> = {
     "Content-Type": data.mime || "application/octet-stream",
-    "Content-Disposition": encodeContentDisposition(filename),
+    "Content-Disposition": encodeContentDisposition(data.filename || "download"),
   };
   if (typeof data.size === "number" && Number.isFinite(data.size) && data.size >= 0) {
     headers["Content-Length"] = String(data.size);
   }
 
+  const stream = streamFromPort(port, () => pendingDownloads.delete(pathname));
   pendingDownloads.set(pathname, { stream, headers });
-  port.postMessage({ download: downloadUrl });
+  port.postMessage({ download: new URL(pathname, self.registration.scope).href });
+}
+
+async function kill() {
+  console.warn("(SW): ☠ - killing");
+  const keys = await caches.keys();
+  await Promise.allSettled(keys.map((key) => caches.delete(key)));
+  await self.registration.unregister();
 }
 
 async function handleWebShareEvent(event: FetchEvent): Promise<Response> {
@@ -205,8 +157,20 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// `keepalive` needs no branch: receiving any message keeps the worker running.
 self.addEventListener("message", (event) => {
-  handleDownloadMessage(event);
+  const data = event.data as { type?: string } | null | undefined;
+  switch (data?.type) {
+    case "download":
+      openDownload(data as DownloadRequest, event.ports[0]);
+      break;
+    case "claim":
+      event.waitUntil(self.clients.claim());
+      break;
+    case "KILL":
+      event.waitUntil(kill());
+      break;
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -250,13 +214,4 @@ self.addEventListener("fetch", (event) => {
       }
     })(),
   );
-});
-
-self.addEventListener("message", async (e) => {
-  if (e.data?.type === "KILL") {
-    console.warn("(SW): ☠ - killing");
-    const keys = await caches.keys();
-    await Promise.allSettled(keys.map((key) => caches.delete(key)));
-    await self.registration.unregister();
-  }
 });
